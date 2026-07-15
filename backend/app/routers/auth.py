@@ -1,0 +1,190 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.deps import AuthContext, get_auth_context
+from app.models_saas import User
+from app.services.auth import (
+    create_access_token,
+    get_user_memberships,
+    hash_password,
+    upsert_firebase_user,
+    write_audit,
+)
+from app.services.firebase_auth import FirebaseAuthError, verify_id_token
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class RegisterIn(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    password: str = Field(min_length=8)
+    organization_name: str | None = None
+
+
+class FirebaseSessionIn(BaseModel):
+    id_token: str = Field(min_length=20)
+    first_name: str | None = None
+    last_name: str | None = None
+    organization_name: str | None = None
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: dict
+    memberships: list[dict]
+
+
+class ProfileUpdateIn(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    avatar: str | None = Field(default=None, max_length=2048)
+    password: str | None = None
+
+
+def _user_public(user: User) -> dict:
+    return {
+        "id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "phone": user.phone or "",
+        "avatar": user.avatar or "",
+        "status": user.status,
+        "last_login": user.last_login.isoformat() if user.last_login else None,
+        "firebase_linked": bool(user.firebase_uid),
+    }
+
+
+def _issue_session(db: Session, user: User, request: Request | None = None, action: str = "login") -> TokenOut:
+    memberships = get_user_memberships(db, user.id)
+    if not memberships:
+        raise HTTPException(403, detail="Aucune organisation rattachée à ce compte")
+    org_id = memberships[0]["organization_id"]
+    token = create_access_token({"sub": str(user.id), "org_id": org_id})
+    write_audit(
+        db,
+        user_id=user.id,
+        organization_id=org_id,
+        action=action,
+        module="auth",
+        ip=request.client.host if request and request.client else "",
+    )
+    return TokenOut(access_token=token, user=_user_public(user), memberships=memberships)
+
+
+@router.post("/firebase", response_model=TokenOut)
+async def firebase_session(
+    payload: FirebaseSessionIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    try:
+        fb = await verify_id_token(payload.id_token)
+    except FirebaseAuthError as exc:
+        raise HTTPException(401, detail=exc.message) from exc
+
+    user = upsert_firebase_user(
+        db,
+        firebase_uid=fb["uid"],
+        email=fb["email"],
+        first_name=(payload.first_name or "").strip(),
+        last_name=(payload.last_name or "").strip(),
+        organization_name=(payload.organization_name or "").strip() or None,
+    )
+    return _issue_session(db, user, request, action="firebase.login")
+
+
+@router.post("/login", response_model=TokenOut)
+def login(_: LoginIn):
+    raise HTTPException(
+        400,
+        detail="Connexion via Firebase uniquement. Utilisez l’application web.",
+    )
+
+
+@router.post("/register", response_model=TokenOut)
+def register_legacy(_: RegisterIn):
+    raise HTTPException(
+        400,
+        detail="Inscription via Firebase uniquement. Utilisez /register dans l'application web.",
+    )
+
+
+@router.get("/me")
+def me(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    user = db.query(User).filter(User.id == auth.user.id).first()
+    if not user:
+        raise HTTPException(401, detail="Non authentifié")
+    memberships = get_user_memberships(db, user.id)
+    return {
+        "user": _user_public(user),
+        "current_organization_id": auth.organization_id,
+        "role": auth.role,
+        "permissions": auth.permissions,
+        "memberships": memberships,
+    }
+
+
+@router.patch("/me")
+def update_profile(
+    payload: ProfileUpdateIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+
+    user = db.query(User).filter(User.id == auth.user.id).first()
+    if not user:
+        raise HTTPException(404, detail="Utilisateur introuvable")
+
+    if payload.first_name is not None:
+        user.first_name = payload.first_name.strip()
+    if payload.last_name is not None:
+        user.last_name = payload.last_name.strip()
+    if payload.phone is not None:
+        user.phone = payload.phone.strip()
+    if payload.avatar is not None:
+        avatar = payload.avatar.strip()
+        if avatar and not avatar.startswith("https://"):
+            raise HTTPException(400, detail="URL de photo invalide")
+        user.avatar = avatar
+    if payload.password:
+        if user.firebase_uid:
+            raise HTTPException(
+                400,
+                detail="Le mot de passe Firebase doit être modifié depuis la session sécurisée.",
+            )
+        if len(payload.password) < 8:
+            raise HTTPException(400, detail="Le mot de passe doit contenir au moins 8 caractères")
+        user.password_hash = hash_password(payload.password)
+
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    write_audit(
+        db,
+        user_id=user.id,
+        organization_id=auth.organization_id,
+        action="profile.update",
+        module="auth",
+    )
+    return {"ok": True, "user": _user_public(user)}

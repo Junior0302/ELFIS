@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(orgId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerUid
+          == request.auth.uid;
+    }
+
+    function isActiveMember(orgId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+          .data.status == 'active';
+    }
+
+    function isAdmin(orgId) {
+      return isActiveMember(orgId)
+        && get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+          .data.role == 'admin';
+    }
+
+    match /users/{uid} {
+      allow create, read, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'firstName',
+          'lastName',
+          'email',
+          'phone',
+          'avatar',
+          'updatedAt'
+        ])
+        && request.resource.data.email == request.auth.token.email;
+      allow delete: if false;
+    }
+
+    match /organizations/{orgId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow read: if isOwner(orgId) || isActiveMember(orgId);
+      allow update: if isOwner(orgId)
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow get: if signedIn()
+          && (request.auth.uid == uid || isOwner(orgId) || isActiveMember(orgId));
+        allow list: if isOwner(orgId) || isActiveMember(orgId);
+        allow create: if isOwner(orgId)
+          || (isAdmin(orgId) && request.resource.data.role != 'owner');
+        allow update: if isOwner(orgId)
+          || (
+            isAdmin(orgId)
+            && resource.data.role != 'owner'
+            && request.resource.data.role != 'owner'
+          );
+        allow delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
