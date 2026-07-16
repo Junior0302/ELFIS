@@ -111,6 +111,19 @@ def create_checkout_session(
     customer_email: str,
 ) -> str:
     _require_stripe()
+    price_id = settings.stripe_price_pro
+    if not price_id.startswith("price_"):
+        raise HTTPException(
+            400,
+            detail={
+                "code": "stripe_price_invalid",
+                "message": (
+                    "STRIPE_PRICE_PRO doit être un ID de prix Stripe (price_...), "
+                    "pas un ID de produit (prod_...)"
+                ),
+                "value_prefix": price_id[:5],
+            },
+        )
     current = _subscription_for_org(db, organization_id)
     if current and current.status in {"active", "trialing"}:
         raise HTTPException(
@@ -123,7 +136,7 @@ def create_checkout_session(
     metadata = {"organization_id": str(organization_id), "plan": "pro"}
     params: dict[str, Any] = {
         "mode": "subscription",
-        "line_items": [{"price": settings.stripe_price_pro, "quantity": 1}],
+        "line_items": [{"price": price_id, "quantity": 1}],
         "payment_method_collection": "always",
         "subscription_data": {
             "trial_period_days": settings.stripe_trial_days,
