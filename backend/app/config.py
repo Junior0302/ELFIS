@@ -37,6 +37,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_security(self):
+        self.stripe_secret_key = self.stripe_secret_key.strip()
+        self.stripe_webhook_secret = self.stripe_webhook_secret.strip()
+        self.stripe_price_pro = self.stripe_price_pro.strip()
+        self.frontend_url = self.frontend_url.strip() or "http://localhost:5173"
         if self.app_env.lower() != "production":
             return self
         if self.jwt_secret == "comptapilot-elfis-dev-secret-change-me" or len(self.jwt_secret) < 32:

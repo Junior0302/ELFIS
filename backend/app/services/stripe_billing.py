@@ -56,7 +56,7 @@ def construct_webhook_event(payload: bytes, signature: str | None) -> dict[str, 
             sig_header=signature,
             secret=settings.stripe_webhook_secret,
         )
-    except (ValueError, stripe.error.SignatureVerificationError) as exc:
+    except (ValueError, stripe.SignatureVerificationError) as exc:
         raise HTTPException(
             400,
             detail={"code": "stripe_signature_invalid", "message": "Signature Stripe invalide"},
@@ -137,7 +137,24 @@ def create_checkout_session(
         params["customer"] = current.stripe_customer_id
     else:
         params["customer_email"] = customer_email
-    session = stripe.checkout.Session.create(**params)
+    try:
+        session = stripe.checkout.Session.create(**params)
+    except stripe.StripeError as exc:
+        raise HTTPException(
+            502,
+            detail={
+                "code": "stripe_checkout_failed",
+                "message": _stripe_error_message(exc),
+            },
+        ) from exc
+    if not session.url:
+        raise HTTPException(
+            502,
+            detail={
+                "code": "stripe_checkout_url_missing",
+                "message": "Stripe n’a pas renvoyé d’URL de paiement",
+            },
+        )
     return session.url
 
 
@@ -152,11 +169,33 @@ def create_portal_session(db: Session, *, organization_id: int) -> str:
                 "message": "Aucun compte de facturation Stripe pour cette organisation",
             },
         )
-    session = stripe.billing_portal.Session.create(
-        customer=current.stripe_customer_id,
-        return_url=f"{settings.frontend_url.rstrip('/')}/abonnement",
-    )
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=current.stripe_customer_id,
+            return_url=f"{settings.frontend_url.rstrip('/')}/abonnement",
+        )
+    except stripe.StripeError as exc:
+        raise HTTPException(
+            502,
+            detail={
+                "code": "stripe_portal_failed",
+                "message": _stripe_error_message(exc),
+            },
+        ) from exc
+    if not session.url:
+        raise HTTPException(
+            502,
+            detail={
+                "code": "stripe_portal_url_missing",
+                "message": "Stripe n’a pas renvoyé d’URL de portail",
+            },
+        )
     return session.url
+
+
+def _stripe_error_message(exc: stripe.StripeError) -> str:
+    user_message = getattr(exc, "user_message", None) or str(exc) or "Erreur Stripe"
+    return user_message[:300]
 
 
 def _timestamp(value: Any) -> datetime | None:

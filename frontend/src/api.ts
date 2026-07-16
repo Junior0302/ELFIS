@@ -69,6 +69,13 @@ export type CompanySettings = {
 function apiRoot(): string {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL as string
   if (import.meta.env.DEV) return '/api'
+  // Production Firebase Hosting → API Render
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host === 'elfis-core.web.app' || host === 'elfis-core.firebaseapp.com') {
+      return 'https://elfis-core-api.onrender.com/api'
+    }
+  }
   const { protocol, hostname } = window.location
   const port = (import.meta.env.VITE_API_PORT as string) || '8001'
   return `${protocol}//${hostname}:${port}/api`
