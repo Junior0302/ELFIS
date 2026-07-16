@@ -58,7 +58,7 @@ export default function SubscriptionBanner() {
     return () => window.clearInterval(timer)
   }, [])
 
-  if (!subscription || subscription.status === 'active') return null
+  if (!subscription || subscription.status === 'active' || subscription.access_granted) return null
 
   const activeMembership = memberships.find((membership) => membership.organization_id === orgId)
   const canManage = Boolean(

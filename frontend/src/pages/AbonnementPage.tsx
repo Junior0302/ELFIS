@@ -20,7 +20,7 @@ function openStripe(url: string) {
 }
 
 export default function AbonnementPage() {
-  const { token, orgId, memberships } = useAuth()
+  const { token, orgId, memberships, user } = useAuth()
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [action, setAction] = useState<'checkout' | 'portal' | 'sync' | null>(null)
@@ -35,25 +35,36 @@ export default function AbonnementPage() {
     try {
       let current = await api.currentSubscription(token, orgId)
       if (checkoutReturn === 'success') {
+        let syncError = ''
         try {
           current = await api.syncSubscription(token, orgId, sessionId)
-        } catch {
-          // Webhook peut encore arriver : on garde le statut courant.
+        } catch (reason) {
+          syncError = reason instanceof Error ? reason.message : 'Synchronisation Stripe impossible'
         }
-        // Petit rattrapage si le statut n’est pas encore utilisable.
-        if (!current || !['trialing', 'active'].includes(current.status)) {
-          await new Promise((resolve) => window.setTimeout(resolve, 1500))
+        if (!current?.access_granted && !['trialing', 'active'].includes(current?.status || '')) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1800))
           try {
             current = await api.syncSubscription(token, orgId, sessionId)
-          } catch {
+            syncError = ''
+          } catch (reason) {
+            syncError =
+              reason instanceof Error ? reason.message : 'Synchronisation Stripe impossible'
             current = await api.currentSubscription(token, orgId)
           }
         }
-        setReturnNotice(
-          ['trialing', 'active'].includes(current.status)
-            ? 'Essai activé. Votre accès ComptaPilot Pro est ouvert.'
-            : 'Retour de Stripe confirmé. Si le statut reste incomplet, cliquez sur « Actualiser le statut ».',
-        )
+        const opened =
+          Boolean(current?.access_granted) ||
+          ['trialing', 'active'].includes(current?.status || '')
+        if (opened) {
+          setReturnNotice('Essai activé. Votre accès ComptaPilot Pro est ouvert.')
+        } else {
+          setReturnNotice(
+            syncError
+              ? `Retour Stripe reçu, mais la sync a échoué : ${syncError}`
+              : 'Retour de Stripe confirmé. Cliquez sur « Actualiser le statut Stripe » pour forcer la synchro.',
+          )
+          if (syncError) setError(syncError)
+        }
       } else if (checkoutReturn === 'cancel') {
         setReturnNotice('Paiement interrompu. Le statut affiché a été revérifié auprès du serveur.')
       }
@@ -105,13 +116,22 @@ export default function AbonnementPage() {
     }
   }
 
-  const canUsePortal = subscription && canOpenSubscriptionPortal(subscription.status)
-  const canCheckout = subscription && canStartSubscriptionCheckout(subscription.status)
+  const statusForActions = (subscription?.raw_status ||
+    subscription?.status) as SubscriptionInfo['status']
+  const canUsePortal =
+    subscription &&
+    !subscription.platform_bypass &&
+    canOpenSubscriptionPortal(statusForActions)
+  const canCheckout =
+    subscription &&
+    !subscription.access_granted &&
+    canStartSubscriptionCheckout(statusForActions)
   const activeMembership = memberships.find((membership) => membership.organization_id === orgId)
   const canManage = Boolean(
     activeMembership?.permissions.includes('*') ||
       activeMembership?.permissions.includes('subscription.manage'),
   )
+  const isElfAdmin = Boolean(user?.is_platform_admin || subscription?.platform_bypass)
   const deadline =
     subscription?.status === 'trialing'
       ? subscription.trial_end
@@ -133,6 +153,11 @@ export default function AbonnementPage() {
       </div>
 
       {returnNotice && <div className="subscription-return">{returnNotice}</div>}
+      {isElfAdmin && (
+        <div className="subscription-return">
+          Compte ELF Admin : accès complet au produit, sans abonnement Stripe requis.
+        </div>
+      )}
       {error && <div className="auth-alert auth-alert-error">{error}</div>}
 
       <div className="subscription-grid">
@@ -179,7 +204,9 @@ export default function AbonnementPage() {
             <>
               <div className="subscription-status-line">
                 <span className={`subscription-badge ${subscriptionTone(subscription.status)}`}>
-                  {subscriptionLabels[subscription.status]}
+                  {subscription.platform_bypass
+                    ? 'Accès ELF Admin'
+                    : subscriptionLabels[subscription.status]}
                 </span>
                 <strong>{subscription.plan || 'Pro'}</strong>
               </div>

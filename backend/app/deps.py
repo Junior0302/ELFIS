@@ -92,6 +92,14 @@ def get_auth_context(
     return AuthContext(user, org_id, current["role"], current["permissions"])
 
 
+def _is_platform_admin_user(user: User | None) -> bool:
+    if not user or user.status != "active":
+        return False
+    if user.is_platform_admin:
+        return True
+    return user.email.lower() in settings.platform_admin_email_set
+
+
 def require_active_subscription(
     request: Request,
     auth: AuthContext = Depends(get_auth_context),
@@ -105,6 +113,15 @@ def require_active_subscription(
         )
     # Le mode local sans authentification reste utilisable explicitement avec X-Organization-Id.
     if auth.user is None and not settings.auth_required:
+        return auth
+
+    # ELF Admin : accès produit complet, indépendant de l’abonnement Stripe de l’org.
+    if _is_platform_admin_user(auth.user):
+        if not auth.user.is_platform_admin:
+            auth.user.is_platform_admin = True
+            db.add(auth.user)
+            db.commit()
+            db.refresh(auth.user)
         return auth
 
     subscription = (
@@ -167,8 +184,7 @@ def require_platform_admin(
     user = db.get(User, int(payload["sub"]))
     if not user or user.status != "active":
         raise HTTPException(401, detail="Utilisateur inactif")
-    configured = user.email.lower() in settings.platform_admin_email_set
-    if not user.is_platform_admin and not configured:
+    if not _is_platform_admin_user(user):
         raise HTTPException(
             403,
             detail={
@@ -176,7 +192,7 @@ def require_platform_admin(
                 "message": "Accès super-administrateur requis",
             },
         )
-    if configured and not user.is_platform_admin:
+    if not user.is_platform_admin:
         user.is_platform_admin = True
         db.add(user)
         db.commit()

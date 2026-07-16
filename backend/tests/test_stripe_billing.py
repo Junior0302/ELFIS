@@ -139,9 +139,10 @@ class StripeBillingTests(unittest.TestCase):
             checkout_params["subscription_data"]["metadata"]["organization_id"],
             "42",
         )
+        self.assertEqual(checkout_params["client_reference_id"], "42")
         self.assertEqual(
             checkout_params["success_url"],
-            "https://app.example/abonnement?checkout=success",
+            "https://app.example/abonnement?checkout=success&session_id={CHECKOUT_SESSION_ID}",
         )
         self.assertEqual(
             checkout_params["cancel_url"],

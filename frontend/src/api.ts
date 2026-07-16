@@ -374,14 +374,16 @@ export const api = {
     request<{ url: string }>('/subscriptions/checkout', { method: 'POST' }, { token, orgId }),
   createSubscriptionPortal: (token: string, orgId?: number | null) =>
     request<{ url: string }>('/subscriptions/portal', { method: 'POST' }, { token, orgId }),
-  syncSubscription: (token: string, orgId?: number | null, sessionId?: string | null) => {
-    const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''
-    return request<{ subscription: SubscriptionInfo }>(
-      `/subscriptions/sync${qs}`,
-      { method: 'POST' },
+  syncSubscription: (token: string, orgId?: number | null, sessionId?: string | null) =>
+    request<{ subscription: SubscriptionInfo }>(
+      '/subscriptions/sync',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId || null }),
+      },
       { token, orgId },
-    ).then((result) => result.subscription)
-  },
+    ).then((result) => result.subscription),
   platformOverview: (token: string) =>
     request<PlatformOverview>('/platform/overview', undefined, { token }),
   platformOrganizations: (token: string) =>
@@ -449,6 +451,9 @@ export type SubscriptionInfo = {
   past_due_since?: string | null
   cancel_at_period_end: boolean
   canceled_at?: string | null
+  platform_bypass?: boolean
+  access_granted?: boolean
+  raw_status?: string
 }
 
 export type PlatformOverview = {

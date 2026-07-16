@@ -48,6 +48,7 @@ export default function DashboardPage() {
     activeMembership?.permissions.includes('*') ||
       activeMembership?.permissions.includes('subscription.manage'),
   )
+  const isElfAdmin = Boolean(user?.is_platform_admin)
 
   useEffect(() => {
     if (!token || !orgId) return
@@ -80,7 +81,7 @@ export default function DashboardPage() {
         if (cancelled) return
         const message = e instanceof Error ? e.message : 'Impossible de charger le dashboard'
         setError(message)
-        const blockedBySub = isSubscriptionBlock(message)
+        const blockedBySub = !isElfAdmin && isSubscriptionBlock(message)
         setBlocked(blockedBySub)
         void api.currentSubscription(token, orgId).then(setSubscription).catch(() => null)
         if (blockedBySub && !attemptSync) {
@@ -100,7 +101,7 @@ export default function DashboardPage() {
     return () => window.clearInterval(timer)
   }, [])
 
-  if (blocked) {
+  if (blocked && !isElfAdmin) {
     const needsCheckout =
       !subscription || canStartSubscriptionCheckout(subscription.status)
     return (

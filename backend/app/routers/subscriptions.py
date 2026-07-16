@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, Request
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context
 from app.models_saas import StripeWebhookEvent, Subscription
@@ -19,6 +21,10 @@ from app.services.stripe_billing import (
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 
+class SyncIn(BaseModel):
+    session_id: str | None = None
+
+
 def _current(db: Session, organization_id: int) -> Subscription | None:
     return (
         db.query(Subscription)
@@ -28,13 +34,27 @@ def _current(db: Session, organization_id: int) -> Subscription | None:
     )
 
 
+def _platform_bypass(auth: AuthContext) -> bool:
+    user = auth.user
+    if not user or user.status != "active":
+        return False
+    return bool(
+        user.is_platform_admin or user.email.lower() in settings.platform_admin_email_set
+    )
+
+
 @router.get("/current")
 def current_subscription(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
     organization_id = auth.require_organization_id()
-    return {"subscription": serialize_subscription(_current(db, organization_id))}
+    return {
+        "subscription": serialize_subscription(
+            _current(db, organization_id),
+            platform_bypass=_platform_bypass(auth),
+        )
+    }
 
 
 @router.post("/checkout")
@@ -67,14 +87,19 @@ def subscription_portal(
 def subscription_sync(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
-    session_id: str | None = None,
+    payload: SyncIn = SyncIn(),
 ):
     """Rattrapage après Checkout : lit le statut réel chez Stripe sans attendre le webhook."""
     auth.require("subscription.manage")
     organization_id = auth.require_organization_id()
-    cleaned = (session_id or "").strip() or None
+    cleaned = (payload.session_id or "").strip() or None
     row = sync_checkout_session(db, organization_id=organization_id, session_id=cleaned)
-    return {"subscription": serialize_subscription(row)}
+    return {
+        "subscription": serialize_subscription(
+            row,
+            platform_bypass=_platform_bypass(auth),
+        )
+    }
 
 
 @router.post("/webhook")

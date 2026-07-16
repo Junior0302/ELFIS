@@ -21,6 +21,7 @@ STRIPE_SUBSCRIPTION_STATUSES = {
     "paused",
 }
 PRO_PLAN_STATUSES = {"trialing", "active", "past_due", "unpaid", "paused"}
+ACCESS_STATUSES = {"active", "trialing"}
 
 
 def _require_stripe(*, webhook: bool = False) -> None:
@@ -72,12 +73,17 @@ def _subscription_for_org(db: Session, organization_id: int) -> Subscription | N
     )
 
 
-def serialize_subscription(subscription: Subscription | None) -> dict[str, Any]:
+def serialize_subscription(
+    subscription: Subscription | None,
+    *,
+    platform_bypass: bool = False,
+) -> dict[str, Any]:
+    configured = bool(settings.stripe_secret_key and settings.stripe_price_pro)
     if not subscription:
         return {
-            "plan": "pro",
-            "price_eur": 19,
-            "status": "none",
+            "plan": "pro" if not platform_bypass else "elfadmin",
+            "price_eur": 0 if platform_bypass else 19,
+            "status": "active" if platform_bypass else "none",
             "trial_start": None,
             "trial_end": None,
             "current_period_start": None,
@@ -85,13 +91,17 @@ def serialize_subscription(subscription: Subscription | None) -> dict[str, Any]:
             "past_due_since": None,
             "cancel_at_period_end": False,
             "canceled_at": None,
-            "configured": bool(settings.stripe_secret_key and settings.stripe_price_pro),
+            "configured": configured,
+            "platform_bypass": platform_bypass,
+            "access_granted": platform_bypass,
         }
+    status = subscription.status
+    access_granted = platform_bypass or status in ACCESS_STATUSES
     return {
         "id": subscription.id,
-        "plan": subscription.plan,
+        "plan": "elfadmin" if platform_bypass and status == "none" else subscription.plan,
         "price_eur": subscription.price,
-        "status": subscription.status,
+        "status": "active" if platform_bypass and status not in ACCESS_STATUSES else status,
         "stripe_price_id": subscription.stripe_price_id,
         "trial_start": subscription.trial_start,
         "trial_end": subscription.trial_end,
@@ -100,7 +110,10 @@ def serialize_subscription(subscription: Subscription | None) -> dict[str, Any]:
         "past_due_since": subscription.past_due_since,
         "cancel_at_period_end": subscription.cancel_at_period_end,
         "canceled_at": subscription.canceled_at,
-        "configured": bool(settings.stripe_secret_key and settings.stripe_price_pro),
+        "configured": configured,
+        "platform_bypass": platform_bypass,
+        "access_granted": access_granted,
+        "raw_status": status,
     }
 
 
@@ -125,7 +138,7 @@ def create_checkout_session(
             },
         )
     current = _subscription_for_org(db, organization_id)
-    if current and current.status in {"active", "trialing"}:
+    if current and current.status in ACCESS_STATUSES:
         raise HTTPException(
             409,
             detail={
@@ -138,6 +151,7 @@ def create_checkout_session(
         "mode": "subscription",
         "line_items": [{"price": price_id, "quantity": 1}],
         "payment_method_collection": "always",
+        "client_reference_id": str(organization_id),
         "subscription_data": {
             "trial_period_days": settings.stripe_trial_days,
             "metadata": metadata,
@@ -236,6 +250,15 @@ def _organization_id(metadata: Any) -> int | None:
         return None
 
 
+def _stripe_id(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(value, dict):
+        raw = value.get("id")
+        return raw if isinstance(raw, str) and raw else None
+    return None
+
+
 def _find_subscription(
     db: Session,
     *,
@@ -261,23 +284,83 @@ def _find_subscription(
     return None
 
 
-def _stripe_id(value: Any) -> str | None:
-    if isinstance(value, str) and value:
-        return value
-    if isinstance(value, dict):
-        raw = value.get("id")
-        return raw if isinstance(raw, str) and raw else None
-    return None
+def _sync_organization_plan(db: Session, subscription: Subscription) -> None:
+    organization = db.get(Organization, subscription.organization_id)
+    if organization:
+        organization.subscription_plan = (
+            "pro" if subscription.status in PRO_PLAN_STATUSES else "starter"
+        )
+        db.add(organization)
+
+
+def _upsert_stripe_subscription(db: Session, obj: dict[str, Any]) -> None:
+    organization_id = _organization_id(obj.get("metadata"))
+    stripe_subscription_id = _stripe_id(obj.get("id")) or obj.get("id")
+    if not isinstance(stripe_subscription_id, str):
+        stripe_subscription_id = None
+    stripe_customer_id = _stripe_id(obj.get("customer"))
+    row = _find_subscription(
+        db,
+        organization_id=organization_id,
+        stripe_subscription_id=stripe_subscription_id,
+        stripe_customer_id=stripe_customer_id,
+    )
+    if not row:
+        if organization_id is None:
+            return
+        if not db.get(Organization, organization_id):
+            raise ValueError("Organisation Stripe introuvable")
+        row = Subscription(organization_id=organization_id, plan="pro", price=19.0)
+    elif organization_id is not None and row.organization_id != organization_id:
+        raise ValueError("Abonnement Stripe rattaché à une autre organisation")
+
+    items = ((obj.get("items") or {}).get("data") or [])
+    first_item = items[0] if items else {}
+    price = (first_item.get("price") or {}).get("id")
+    row.plan = "pro"
+    row.price = 19.0
+    stripe_status = obj.get("status")
+    row.status = stripe_status or row.status
+    if row.status == "past_due" and row.past_due_since is None:
+        row.past_due_since = datetime.utcnow()
+    elif row.status != "past_due":
+        row.past_due_since = None
+    row.stripe_customer_id = stripe_customer_id or row.stripe_customer_id
+    row.stripe_subscription_id = stripe_subscription_id or row.stripe_subscription_id
+    row.stripe_price_id = price or settings.stripe_price_pro or row.stripe_price_id
+    row.trial_start = _timestamp(obj.get("trial_start"))
+    row.trial_end = _timestamp(obj.get("trial_end"))
+    row.current_period_start = _timestamp(
+        obj.get("current_period_start") or first_item.get("current_period_start")
+    )
+    row.current_period_end = _timestamp(
+        obj.get("current_period_end") or first_item.get("current_period_end")
+    )
+    row.cancel_at_period_end = bool(obj.get("cancel_at_period_end"))
+    row.canceled_at = _timestamp(obj.get("canceled_at"))
+    if row.status == "canceled" and row.canceled_at is None:
+        row.canceled_at = datetime.utcnow()
+    row.end_date = row.current_period_end
+    db.add(row)
+    _sync_organization_plan(db, row)
 
 
 def _upsert_checkout(db: Session, session: dict[str, Any]) -> None:
     organization_id = _organization_id(session.get("metadata"))
     if organization_id is None:
+        ref = session.get("client_reference_id")
+        try:
+            organization_id = int(ref) if ref is not None else None
+        except (TypeError, ValueError):
+            organization_id = None
+    if organization_id is None:
         return
     if not db.get(Organization, organization_id):
         raise ValueError("Organisation Stripe introuvable")
+
     customer_id = _stripe_id(session.get("customer"))
-    subscription_id = _stripe_id(session.get("subscription"))
+    subscription_raw = session.get("subscription")
+    subscription_id = _stripe_id(subscription_raw)
     row = _find_subscription(
         db,
         organization_id=organization_id,
@@ -298,19 +381,84 @@ def _upsert_checkout(db: Session, session: dict[str, Any]) -> None:
     row.stripe_price_id = settings.stripe_price_pro or row.stripe_price_id
     db.add(row)
 
-    subscription_obj = session.get("subscription")
-    if isinstance(subscription_obj, dict) and subscription_obj.get("id"):
-        _upsert_stripe_subscription(db, subscription_obj)
+    if isinstance(subscription_raw, dict) and subscription_raw.get("id"):
+        if not subscription_raw.get("metadata"):
+            subscription_raw = {
+                **subscription_raw,
+                "metadata": {"organization_id": str(organization_id), "plan": "pro"},
+            }
+        _upsert_stripe_subscription(db, subscription_raw)
         return
 
-    # Ne pas rester bloqué sur incomplete : récupérer le vrai statut Stripe (trialing/active).
     if subscription_id and settings.stripe_secret_key:
         try:
             stripe.api_key = settings.stripe_secret_key
             remote = stripe.Subscription.retrieve(subscription_id)
-            _upsert_stripe_subscription(db, _as_dict(remote))
+            remote_data = _as_dict(remote)
+            if not remote_data.get("metadata"):
+                remote_data["metadata"] = {
+                    "organization_id": str(organization_id),
+                    "plan": "pro",
+                }
+            elif not remote_data["metadata"].get("organization_id"):
+                remote_data["metadata"] = {
+                    **remote_data["metadata"],
+                    "organization_id": str(organization_id),
+                }
+            _upsert_stripe_subscription(db, remote_data)
         except stripe.StripeError:
             pass
+
+
+def _recover_from_recent_checkout_sessions(
+    db: Session,
+    organization_id: int,
+) -> Subscription | None:
+    try:
+        listed = stripe.checkout.Session.list(limit=40)
+    except stripe.StripeError as exc:
+        raise HTTPException(
+            502,
+            detail={
+                "code": "stripe_session_list_failed",
+                "message": _stripe_error_message(exc),
+            },
+        ) from exc
+
+    for item in listed.data or []:
+        data = _as_dict(item)
+        meta_org = _organization_id(data.get("metadata"))
+        ref = data.get("client_reference_id")
+        try:
+            ref_org = int(ref) if ref is not None else None
+        except (TypeError, ValueError):
+            ref_org = None
+        if meta_org != organization_id and ref_org != organization_id:
+            continue
+        if data.get("status") != "complete":
+            continue
+        _upsert_checkout(db, data)
+        db.commit()
+        row = _subscription_for_org(db, organization_id)
+        if row and row.status in ACCESS_STATUSES:
+            return row
+        if row and row.stripe_subscription_id:
+            try:
+                remote = stripe.Subscription.retrieve(row.stripe_subscription_id)
+                remote_data = _as_dict(remote)
+                if not (remote_data.get("metadata") or {}).get("organization_id"):
+                    remote_data["metadata"] = {
+                        **(remote_data.get("metadata") or {}),
+                        "organization_id": str(organization_id),
+                    }
+                _upsert_stripe_subscription(db, remote_data)
+                db.commit()
+            except stripe.StripeError:
+                pass
+            return _subscription_for_org(db, organization_id)
+        if row:
+            return row
+    return _subscription_for_org(db, organization_id)
 
 
 def sync_checkout_session(
@@ -337,7 +485,13 @@ def sync_checkout_session(
             ) from exc
         session_data = _as_dict(session)
         meta_org = _organization_id(session_data.get("metadata"))
-        if meta_org is not None and meta_org != organization_id:
+        ref = session_data.get("client_reference_id")
+        try:
+            ref_org = int(ref) if ref is not None else None
+        except (TypeError, ValueError):
+            ref_org = None
+        linked_org = meta_org if meta_org is not None else ref_org
+        if linked_org is not None and linked_org != organization_id:
             raise HTTPException(
                 403,
                 detail={
@@ -347,16 +501,21 @@ def sync_checkout_session(
             )
         _upsert_checkout(db, session_data)
         db.commit()
-        return _subscription_for_org(db, organization_id)
+        row = _subscription_for_org(db, organization_id)
+        if row and row.status in ACCESS_STATUSES:
+            return row
 
     row = _subscription_for_org(db, organization_id)
-    if not row:
-        return None
-
-    if row.stripe_subscription_id:
+    if row and row.stripe_subscription_id:
         try:
             remote = stripe.Subscription.retrieve(row.stripe_subscription_id)
-            _upsert_stripe_subscription(db, _as_dict(remote))
+            remote_data = _as_dict(remote)
+            if not (remote_data.get("metadata") or {}).get("organization_id"):
+                remote_data["metadata"] = {
+                    **(remote_data.get("metadata") or {}),
+                    "organization_id": str(organization_id),
+                }
+            _upsert_stripe_subscription(db, remote_data)
             db.commit()
         except stripe.StripeError as exc:
             raise HTTPException(
@@ -366,9 +525,11 @@ def sync_checkout_session(
                     "message": _stripe_error_message(exc),
                 },
             ) from exc
-        return _subscription_for_org(db, organization_id)
+        row = _subscription_for_org(db, organization_id)
+        if row and row.status in ACCESS_STATUSES:
+            return row
 
-    if row.stripe_customer_id:
+    if row and row.stripe_customer_id:
         try:
             listed = stripe.Subscription.list(
                 customer=row.stripe_customer_id,
@@ -386,75 +547,38 @@ def sync_checkout_session(
         data = list(listed.data or [])
         if data:
             preferred = next(
-                (item for item in data if getattr(item, "status", None) in {"trialing", "active"}),
+                (item for item in data if getattr(item, "status", None) in ACCESS_STATUSES),
                 data[0],
             )
-            _upsert_stripe_subscription(db, _as_dict(preferred))
+            preferred_data = _as_dict(preferred)
+            if not (preferred_data.get("metadata") or {}).get("organization_id"):
+                preferred_data["metadata"] = {
+                    **(preferred_data.get("metadata") or {}),
+                    "organization_id": str(organization_id),
+                }
+            _upsert_stripe_subscription(db, preferred_data)
             db.commit()
-    return _subscription_for_org(db, organization_id)
-    organization_id = _organization_id(obj.get("metadata"))
-    stripe_subscription_id = obj.get("id")
-    stripe_customer_id = obj.get("customer")
-    row = _find_subscription(
-        db,
-        organization_id=organization_id,
-        stripe_subscription_id=stripe_subscription_id,
-        stripe_customer_id=stripe_customer_id,
-    )
-    if not row:
-        if organization_id is None:
-            return
-        if not db.get(Organization, organization_id):
-            raise ValueError("Organisation Stripe introuvable")
-        row = Subscription(organization_id=organization_id, plan="pro", price=19.0)
-    elif organization_id is not None and row.organization_id != organization_id:
-        raise ValueError("Abonnement Stripe rattaché à une autre organisation")
+            row = _subscription_for_org(db, organization_id)
+            if row and row.status in ACCESS_STATUSES:
+                return row
 
-    items = ((obj.get("items") or {}).get("data") or [])
-    first_item = items[0] if items else {}
-    price = (first_item.get("price") or {}).get("id")
-    row.plan = "pro"
-    row.price = 19.0
-    stripe_status = obj.get("status")
-    # Conserver toute nouvelle valeur Stripe, mais l'accès reste fermé par défaut dans deps.py.
-    row.status = stripe_status or row.status
-    if row.status == "past_due" and row.past_due_since is None:
-        row.past_due_since = datetime.utcnow()
-    elif row.status != "past_due":
-        row.past_due_since = None
-    row.stripe_customer_id = stripe_customer_id or row.stripe_customer_id
-    row.stripe_subscription_id = stripe_subscription_id or row.stripe_subscription_id
-    row.stripe_price_id = price or settings.stripe_price_pro or row.stripe_price_id
-    row.trial_start = _timestamp(obj.get("trial_start"))
-    row.trial_end = _timestamp(obj.get("trial_end"))
-    row.current_period_start = _timestamp(
-        obj.get("current_period_start") or first_item.get("current_period_start")
-    )
-    row.current_period_end = _timestamp(
-        obj.get("current_period_end") or first_item.get("current_period_end")
-    )
-    row.cancel_at_period_end = bool(obj.get("cancel_at_period_end"))
-    row.canceled_at = _timestamp(obj.get("canceled_at"))
-    if row.status == "canceled" and row.canceled_at is None:
-        row.canceled_at = datetime.utcnow()
-    row.end_date = row.current_period_end
-    db.add(row)
-    _sync_organization_plan(db, row)
+    return _recover_from_recent_checkout_sessions(db, organization_id)
 
 
 def _invoice_subscription_id(invoice: dict[str, Any]) -> str | None:
-    if invoice.get("subscription"):
-        return invoice["subscription"]
+    direct = _stripe_id(invoice.get("subscription"))
+    if direct:
+        return direct
     parent = invoice.get("parent") or {}
     details = parent.get("subscription_details") or {}
-    return details.get("subscription")
+    return _stripe_id(details.get("subscription"))
 
 
 def _apply_invoice_status(db: Session, invoice: dict[str, Any], status: str) -> None:
     row = _find_subscription(
         db,
         stripe_subscription_id=_invoice_subscription_id(invoice),
-        stripe_customer_id=invoice.get("customer"),
+        stripe_customer_id=_stripe_id(invoice.get("customer")),
     )
     if row:
         if status == "active" and row.status not in {"incomplete", "past_due", "unpaid"}:
@@ -469,15 +593,6 @@ def _apply_invoice_status(db: Session, invoice: dict[str, Any], status: str) -> 
         row.past_due_since = datetime.utcnow() if status == "past_due" else None
         db.add(row)
         _sync_organization_plan(db, row)
-
-
-def _sync_organization_plan(db: Session, subscription: Subscription) -> None:
-    organization = db.get(Organization, subscription.organization_id)
-    if organization:
-        organization.subscription_plan = (
-            "pro" if subscription.status in PRO_PLAN_STATUSES else "starter"
-        )
-        db.add(organization)
 
 
 def apply_webhook_event(db: Session, event: dict[str, Any]) -> None:
