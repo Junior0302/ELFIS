@@ -76,6 +76,17 @@ def invoice_to_extraction(invoice: Invoice) -> ExtractionResult:
     )
 
 
+def _safe_elfis_analysis(db: Session, invoice: Invoice, extraction: ExtractionResult | None = None) -> None:
+    """Analyse ELFIS AI post-pipeline : ne doit jamais faire échouer la facture."""
+    try:
+        from app.elfis_ai.orchestrator import run_elfis_analysis
+
+        run_elfis_analysis(db, invoice, extraction=extraction)
+    except Exception:
+        # Conservé volontairement silencieux côté pipeline métier
+        pass
+
+
 async def process_invoice(db: Session, invoice: Invoice) -> Invoice:
     company = get_or_create_settings(db, invoice.organization_id)
     path = Path(invoice.stored_path)
@@ -83,6 +94,8 @@ async def process_invoice(db: Session, invoice: Invoice) -> Invoice:
     _apply_pipeline_result(invoice, extraction, company)
     db.add(invoice)
     db.commit()
+    db.refresh(invoice)
+    _safe_elfis_analysis(db, invoice, extraction)
     db.refresh(invoice)
     return invoice
 
@@ -106,5 +119,7 @@ def refresh_from_manual_edit(db: Session, invoice: Invoice) -> Invoice:
     _apply_pipeline_result(invoice, extraction, company)
     db.add(invoice)
     db.commit()
+    db.refresh(invoice)
+    _safe_elfis_analysis(db, invoice, extraction)
     db.refresh(invoice)
     return invoice

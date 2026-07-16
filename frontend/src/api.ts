@@ -105,9 +105,20 @@ async function parseError(res: Response): Promise<string> {
   return text || `Erreur ${res.status}`
 }
 
-function friendlyError(status: number, message: string): string {
+function friendlyError(status: number, message: string, path?: string): string {
+  const isLocalApi =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   if (status === 404 || message.toLowerCase().includes('not found')) {
-    return 'Service API introuvable. Lancez le backend : start-backend.bat (port 8001)'
+    if (path?.includes('/billing/documents/') && path.includes('/pdf')) {
+      return isLocalApi
+        ? 'PDF indisponible. Vérifiez que le backend local est démarré (start-backend.bat).'
+        : 'PDF indisponible : l’API cloud n’est pas encore à jour. Déployez le backend (git push → Render).'
+    }
+    if (isLocalApi) {
+      return 'Service API introuvable. Lancez le backend : start-backend.bat (port 8001)'
+    }
+    return message || 'Ressource introuvable sur l’API'
   }
   if (status === 401) return message || 'Email ou mot de passe incorrect'
   return message
@@ -122,7 +133,7 @@ async function request<T>(
   if (auth?.token) headers.set('Authorization', `Bearer ${auth.token}`)
   if (auth?.orgId) headers.set('X-Organization-Id', String(auth.orgId))
   const res = await fetch(`${apiRoot()}${path}`, { ...init, headers })
-  if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res)))
+  if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res), path))
   if (res.status === 204) return undefined as T
   const contentType = res.headers.get('content-type') || ''
   if (contentType.includes('application/json')) return res.json() as Promise<T>
@@ -137,7 +148,7 @@ async function requestBlob(
   const headers = new Headers({ Authorization: `Bearer ${token}` })
   if (orgId) headers.set('X-Organization-Id', String(orgId))
   const res = await fetch(`${apiRoot()}${path}`, { headers })
-  if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res)))
+  if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res), path))
   const disposition = res.headers.get('content-disposition') || ''
   const filename = disposition.match(/filename="?([^"]+)"?/i)?.[1] || 'export'
   return { blob: await res.blob(), filename }
@@ -199,6 +210,41 @@ export const api = {
     }, { token, orgId }),
   reprocessDocument: (id: number, token: string, orgId?: number | null) =>
     request<Invoice>(`/documents/${id}/reprocess`, { method: 'POST' }, { token, orgId }),
+  getElfisReport: (id: number, token: string, orgId?: number | null) =>
+    request<{ report: import('./elfisTypes').ElfisReport; history: import('./elfisTypes').ElfisAnalysisHistoryItem[] }>(
+      `/elfis-ai/documents/${id}/report`,
+      undefined,
+      { token, orgId },
+    ),
+  reanalyzeElfis: (id: number, token: string, orgId?: number | null) =>
+    request<{ report: import('./elfisTypes').ElfisReport }>(
+      `/elfis-ai/documents/${id}/reanalyze`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  exportElfisJson: (id: number, token: string, orgId?: number | null) =>
+    downloadApiFile(`/elfis-ai/documents/${id}/export.json`, token, orgId),
+  getIntelligence: (period: string, token: string, orgId?: number | null) =>
+    request<import('./elfisTypes').IntelligenceOverview>(
+      `/elfis-ai/intelligence?period=${encodeURIComponent(period)}`,
+      undefined,
+      { token, orgId },
+    ),
+  elfisChat: (question: string, token: string, orgId?: number | null) =>
+    request<{
+      ok: boolean
+      answer: string
+      citations: string[]
+      status: string
+    }>(
+      '/elfis-ai/chat',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      },
+      { token, orgId },
+    ),
   deleteDocument: (id: number, token: string, orgId?: number | null) =>
     request<{ ok: boolean }>(`/documents/${id}`, { method: 'DELETE' }, { token, orgId }),
   getSettings: (token: string, orgId?: number | null) =>
@@ -255,7 +301,73 @@ export const api = {
       current_organization_id: number | null
       role: string | null
       permissions: string[]
+      pending_invitations: OrgInvitation[]
+      unread_notifications: number
+      role_labels: Record<string, string>
     }>('/auth/me', undefined, { token, orgId }),
+  myInvitations: (token: string, orgId?: number | null) =>
+    request<{ invitations: OrgInvitation[] }>('/auth/invitations', undefined, { token, orgId }),
+  acceptInvitation: (
+    payload: { token?: string; invitation_id?: number },
+    token: string,
+    orgId?: number | null,
+  ) =>
+    request<{
+      ok: boolean
+      organization_id: number
+      memberships: Membership[]
+      pending_invitations: OrgInvitation[]
+    }>('/auth/invitations/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  refuseInvitation: (
+    payload: { token?: string; invitation_id?: number },
+    token: string,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; pending_invitations: OrgInvitation[] }>('/auth/invitations/refuse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  leaveOrganization: (organizationId: number, token: string, orgId?: number | null) =>
+    request<{ ok: boolean; memberships: Membership[] }>(
+      `/auth/organizations/${organizationId}/leave`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  setActiveOrganization: (organizationId: number, token: string, orgId?: number | null) =>
+    request<{
+      ok: boolean
+      access_token: string
+      organization_id: number
+      role: string
+      permissions: string[]
+      memberships: Membership[]
+    }>('/auth/active-organization', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organization_id: organizationId }),
+    }, { token, orgId }),
+  myNotifications: (token: string, orgId?: number | null) =>
+    request<{ notifications: TeamNotificationItem[] }>('/auth/notifications', undefined, {
+      token,
+      orgId,
+    }),
+  markNotificationRead: (notificationId: number, token: string, orgId?: number | null) =>
+    request<{ ok: boolean; notification: TeamNotificationItem }>(
+      `/auth/notifications/${notificationId}/read`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  planCatalog: () =>
+    request<{
+      features: Record<string, string[]>
+      seat_limits: Record<string, number>
+      role_labels: Record<string, string>
+    }>('/auth/plan-catalog'),
   updateProfile: (
     payload: { first_name?: string; last_name?: string; phone?: string; avatar?: string },
     token: string,
@@ -295,15 +407,31 @@ export const api = {
       undefined,
       { token, orgId },
     ),
-  billingOverview: (token?: string | null, orgId?: number | null) =>
-    request<BillingOverview>('/billing/overview', undefined, { token, orgId }),
+  billingOverview: (
+    token?: string | null,
+    orgId?: number | null,
+    params?: { doc_type?: string; q?: string; status?: string },
+  ) => {
+    const search = new URLSearchParams()
+    if (params?.doc_type) search.set('doc_type', params.doc_type)
+    if (params?.q) search.set('q', params.q)
+    if (params?.status) search.set('status', params.status)
+    const qs = search.toString()
+    return request<BillingOverview>(`/billing/overview${qs ? `?${qs}` : ''}`, undefined, {
+      token,
+      orgId,
+    })
+  },
   createSalesDoc: (
     payload: {
       doc_type: string
       customer_name: string
+      customer_email?: string
+      customer_id?: number | null
       amount_ht: number
       vat_rate?: number
       notes?: string
+      due_days?: number
     },
     token?: string | null,
     orgId?: number | null,
@@ -313,6 +441,64 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }, { token, orgId }),
+  getSalesDoc: (docId: number, token?: string | null, orgId?: number | null) =>
+    request<{ document: SalesDoc; email_logs: DocumentEmailLog[] }>(
+      `/billing/documents/${docId}`,
+      undefined,
+      { token, orgId },
+    ),
+  updateSalesDoc: (
+    docId: number,
+    payload: {
+      customer_name?: string
+      customer_email?: string
+      customer_id?: number | null
+      amount_ht?: number
+      vat_rate?: number
+      notes?: string
+      due_days?: number
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<SalesDoc>(`/billing/documents/${docId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  deleteSalesDoc: (docId: number, token?: string | null, orgId?: number | null) =>
+    request<{ ok: boolean }>(`/billing/documents/${docId}`, { method: 'DELETE' }, { token, orgId }),
+  salesDocPdfUrl: (docId: number) => `${apiRoot()}/billing/documents/${docId}/pdf`,
+  downloadSalesDocPdf: (docId: number, token: string, orgId?: number | null) =>
+    downloadApiFile(`/billing/documents/${docId}/pdf`, token, orgId),
+  openSalesDocPdfBlob: async (docId: number, token: string, orgId?: number | null) => {
+    const { blob } = await requestBlob(`/billing/documents/${docId}/pdf`, token, orgId)
+    return URL.createObjectURL(blob)
+  },
+  emailSalesDoc: (
+    docId: number,
+    payload: { recipient?: string; message?: string; subject?: string },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{
+      document: SalesDoc
+      email_log: DocumentEmailLog
+      smtp_configured: boolean
+    }>(
+      `/billing/documents/${docId}/email`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  salesDocEmails: (docId: number, token?: string | null, orgId?: number | null) =>
+    request<{ email_logs: DocumentEmailLog[] }>(`/billing/documents/${docId}/emails`, undefined, {
+      token,
+      orgId,
+    }),
   billingAction: (docId: number, action: string, token?: string | null, orgId?: number | null, body?: object) =>
     request<unknown>(`/billing/documents/${docId}/${action}`, {
       method: 'POST',
@@ -321,26 +507,77 @@ export const api = {
     }, { token, orgId }),
   orgDetail: (organizationId: number, token?: string | null) =>
     request<OrgDetail>(`/org/${organizationId}`, undefined, { token, orgId: organizationId }),
-  orgMembers: (organizationId: number, token: string) =>
-    request<{ members: OrgMember[]; can_manage: boolean; roles: string[] }>(
-      `/org/${organizationId}/members`,
-      undefined,
-      { token, orgId: organizationId },
-    ),
-  addOrgMember: (
+  updateOrganization: (
     organizationId: number,
-    payload: { email: string; role: string },
+    payload: {
+      name?: string
+      legal_name?: string
+      siren?: string
+      vat_number?: string
+      address?: string
+      logo?: string
+      industry?: string
+      country?: string
+      currency?: string
+    },
     token: string,
   ) =>
-    request<{ ok: boolean; member: OrgMember }>(
-      `/org/${organizationId}/members`,
+    request<{ organization: OrgDetail['organization'] }>(
+      `/org/${organizationId}`,
       {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       },
       { token, orgId: organizationId },
     ),
+  orgMembers: (organizationId: number, token: string) =>
+    request<{
+      members: OrgMember[]
+      can_manage: boolean
+      roles: string[]
+      role_labels?: Record<string, string>
+      plan?: string
+      subscription_status?: string
+      seats?: { active: number; pending_invites: number; used: number }
+      can_invite?: boolean
+      seat_limit_message?: string
+    }>(`/org/${organizationId}/members`, undefined, { token, orgId: organizationId }),
+  inviteOrgMember: (
+    organizationId: number,
+    payload: { email: string; role: string },
+    token: string,
+  ) =>
+    request<{
+      ok: boolean
+      invitation: OrgInvitation
+      invite_token: string
+      email_warning: string | null
+      message: string
+    }>(`/org/${organizationId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId: organizationId }),
+  orgInvitations: (organizationId: number, token: string) =>
+    request<{ invitations: OrgInvitation[] }>(`/org/${organizationId}/invitations`, undefined, {
+      token,
+      orgId: organizationId,
+    }),
+  resendOrgInvitation: (organizationId: number, invitationId: number, token: string) =>
+    request<{
+      ok: boolean
+      invitation: OrgInvitation
+      invite_token: string
+      email_warning: string | null
+    }>(`/org/${organizationId}/invitations/${invitationId}/resend`, { method: 'POST' }, {
+      token,
+      orgId: organizationId,
+    }),
+  cancelOrgInvitation: (organizationId: number, invitationId: number, token: string) =>
+    request<{ ok: boolean }>(`/org/${organizationId}/invitations/${invitationId}`, {
+      method: 'DELETE',
+    }, { token, orgId: organizationId }),
   updateOrgMember: (
     organizationId: number,
     membershipId: number,
@@ -501,10 +738,38 @@ export type Membership = {
   membership_id: number
   organization_id: number
   organization_name: string
+  organization_logo?: string
   role: string
+  status?: string
   permissions: string[]
   plan: string
+  subscription_status?: string
   country: string
+  joined_at?: string | null
+}
+
+export type OrgInvitation = {
+  id: number
+  organization_id: number
+  organization_name: string | null
+  email: string
+  role: string
+  status: string
+  invited_by: number | null
+  expires_at: string | null
+  accepted_at: string | null
+  created_at: string | null
+}
+
+export type TeamNotificationItem = {
+  id: number
+  organization_id: number | null
+  kind: string
+  title: string
+  body: string
+  payload: Record<string, unknown>
+  is_read: boolean
+  created_at: string | null
 }
 
 export type SalesDoc = {
@@ -515,6 +780,7 @@ export type SalesDoc = {
   due_date: string
   status: string
   customer_name: string
+  customer_email: string
   amount_ht: number
   amount_tva: number
   amount_ttc: number
@@ -522,9 +788,22 @@ export type SalesDoc = {
   paid_amount: number
   signature_status: string
   notes: string
+  lines?: { label?: string; quantity?: number; unit_price?: number }[]
+}
+
+export type DocumentEmailLog = {
+  id: number
+  sales_document_id: number
+  recipient: string
+  subject: string
+  status: 'pending' | 'sent' | 'failed' | string
+  error_message: string
+  sent_at: string
 }
 
 export type BillingOverview = {
+  module?: string
+  smtp_configured?: boolean
   stats: {
     documents: number
     customers: number
@@ -535,7 +814,7 @@ export type BillingOverview = {
     credits: number
   }
   documents: SalesDoc[]
-  customers: { id: number; name: string; email: string }[]
+  customers: { id: number; name: string; email: string; phone?: string; address?: string }[]
 }
 
 export type OrgDetail = {
@@ -544,10 +823,15 @@ export type OrgDetail = {
     name: string
     legal_name: string
     siren: string
+    vat_number: string
     country: string
     currency: string
+    industry: string
+    address: string
+    logo: string
     subscription_plan: string
   }
+  can_edit?: boolean
   subscription: { plan: string; status: string; price: number } | null
   companies: { id: number; name: string; country: string; parent_company_id: number | null }[]
   teams: { id: number; name: string }[]
@@ -564,9 +848,11 @@ export type OrgMember = {
   email: string
   avatar: string
   role: string
+  role_label?: string
   permissions: string[]
   status: string
-  joined_at: string
+  invited_by?: number | null
+  joined_at: string | null
 }
 
 

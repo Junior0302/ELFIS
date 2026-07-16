@@ -3,7 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 
-const STEPS = ['OCR Document', 'Financial Validator', 'Accounting Mapper']
+const STEPS = [
+  'Lecture du document',
+  'Extraction des données',
+  'Vérification des calculs',
+  'Analyse comptable',
+  'Analyse des risques',
+  'Génération du rapport',
+  'Analyse terminée',
+]
 
 const ACCEPT = 'application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp'
 
@@ -30,9 +38,14 @@ export default function DepositPage() {
   useEffect(() => {
     if (!loading) return
     setStep(0)
+    // Progression indicative pendant l'attente réelle du backend (pas une durée garantie).
     const timers = [
-      window.setTimeout(() => setStep(1), 700),
-      window.setTimeout(() => setStep(2), 1400),
+      window.setTimeout(() => setStep(1), 400),
+      window.setTimeout(() => setStep(2), 900),
+      window.setTimeout(() => setStep(3), 1400),
+      window.setTimeout(() => setStep(4), 2000),
+      window.setTimeout(() => setStep(5), 2600),
+      window.setTimeout(() => setStep(6), 3200),
     ]
     return () => timers.forEach((t) => window.clearTimeout(t))
   }, [loading])

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models_saas import Customer, Payment, Reminder, SalesDocument
+from app.models_saas import Customer, DocumentEmailLog, Payment, Reminder, SalesDocument
 
 
 def _next_number(db: Session, org_id: int, doc_type: str) -> str:
@@ -32,10 +32,16 @@ def create_sales_document(
     amount_ht: float,
     vat_rate: float = 20.0,
     customer_id: int | None = None,
+    customer_email: str = "",
     lines: list[dict] | None = None,
     notes: str = "",
     due_days: int = 30,
 ) -> SalesDocument:
+    email = (customer_email or "").strip()
+    if customer_id and not email:
+        customer = db.get(Customer, customer_id)
+        if customer and customer.organization_id == organization_id:
+            email = customer.email or ""
     tva = round(amount_ht * vat_rate / 100.0, 2)
     ttc = round(amount_ht + tva, 2)
     today = datetime.utcnow().date()
@@ -49,6 +55,7 @@ def create_sales_document(
         due_date=due.strftime("%d-%m-%Y"),
         status="draft",
         customer_name=customer_name,
+        customer_email=email,
         amount_ht=amount_ht,
         amount_tva=tva,
         amount_ttc=ttc,
@@ -60,6 +67,58 @@ def create_sales_document(
     db.commit()
     db.refresh(doc)
     return doc
+
+
+def update_sales_document(
+    db: Session,
+    doc: SalesDocument,
+    *,
+    customer_name: str | None = None,
+    customer_email: str | None = None,
+    customer_id: int | None = None,
+    amount_ht: float | None = None,
+    vat_rate: float | None = None,
+    notes: str | None = None,
+    lines: list[dict] | None = None,
+    due_days: int | None = None,
+) -> SalesDocument:
+    if customer_name is not None:
+        doc.customer_name = customer_name.strip()
+    if customer_email is not None:
+        doc.customer_email = customer_email.strip()
+    if customer_id is not None:
+        doc.customer_id = customer_id
+        if not doc.customer_email:
+            customer = db.get(Customer, customer_id)
+            if customer and customer.organization_id == doc.organization_id:
+                doc.customer_email = customer.email or ""
+    if vat_rate is not None:
+        doc.vat_rate = vat_rate
+    if amount_ht is not None:
+        doc.amount_ht = amount_ht
+    if amount_ht is not None or vat_rate is not None:
+        doc.amount_tva = round(doc.amount_ht * doc.vat_rate / 100.0, 2)
+        doc.amount_ttc = round(doc.amount_ht + doc.amount_tva, 2)
+    if notes is not None:
+        doc.notes = notes
+    if lines is not None:
+        doc.lines_json = json.dumps(lines, ensure_ascii=False)
+    if due_days is not None:
+        today = datetime.utcnow().date()
+        doc.due_date = (today + timedelta(days=due_days)).strftime("%d-%m-%Y")
+    doc.updated_at = datetime.utcnow()
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+def delete_sales_document(db: Session, doc: SalesDocument) -> None:
+    db.query(Payment).filter(Payment.sales_document_id == doc.id).delete()
+    db.query(Reminder).filter(Reminder.sales_document_id == doc.id).delete()
+    db.query(DocumentEmailLog).filter(DocumentEmailLog.sales_document_id == doc.id).delete()
+    db.delete(doc)
+    db.commit()
 
 
 def send_document(db: Session, doc: SalesDocument) -> SalesDocument:
@@ -83,6 +142,7 @@ def convert_quote_to_invoice(db: Session, quote: SalesDocument) -> SalesDocument
         amount_ht=quote.amount_ht,
         vat_rate=quote.vat_rate,
         customer_id=quote.customer_id,
+        customer_email=quote.customer_email,
         lines=json.loads(quote.lines_json or "[]"),
         notes=f"Converti depuis {quote.number}",
     )
@@ -106,6 +166,7 @@ def create_credit_note(db: Session, invoice: SalesDocument) -> SalesDocument:
         amount_ht=invoice.amount_ht,
         vat_rate=invoice.vat_rate,
         customer_id=invoice.customer_id,
+        customer_email=invoice.customer_email,
         lines=json.loads(invoice.lines_json or "[]"),
         notes=f"Avoir sur {invoice.number}",
     )
@@ -144,9 +205,7 @@ def register_payment(
 
 
 def send_reminder(db: Session, doc: SalesDocument) -> Reminder:
-    level = (
-        db.query(Reminder).filter(Reminder.sales_document_id == doc.id).count() + 1
-    )
+    level = db.query(Reminder).filter(Reminder.sales_document_id == doc.id).count() + 1
     messages = {
         1: f"Rappel amiable : la facture {doc.number} de {doc.amount_ttc:.2f} € est en attente.",
         2: f"2e relance : merci de régulariser la facture {doc.number} sous 8 jours.",
@@ -177,3 +236,10 @@ def sign_document(db: Session, doc: SalesDocument) -> SalesDocument:
     return doc
 
 
+def list_email_logs(db: Session, doc_id: int) -> list[DocumentEmailLog]:
+    return (
+        db.query(DocumentEmailLog)
+        .filter(DocumentEmailLog.sales_document_id == doc_id)
+        .order_by(DocumentEmailLog.id.desc())
+        .all()
+    )

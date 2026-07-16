@@ -1,18 +1,24 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 export default function LoginPage() {
   const { login, user, firebaseReady } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('invite')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const afterAuthPath = inviteToken
+    ? `/compte?invite=${encodeURIComponent(inviteToken)}`
+    : '/dashboard'
+
   useEffect(() => {
-    if (user) navigate('/dashboard')
-  }, [user, navigate])
+    if (user) navigate(afterAuthPath)
+  }, [user, navigate, afterAuthPath])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -20,7 +26,7 @@ export default function LoginPage() {
     setError('')
     try {
       await login(email.trim(), password)
-      navigate('/dashboard')
+      navigate(afterAuthPath)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connexion impossible')
     } finally {
@@ -79,7 +85,10 @@ export default function LoginPage() {
       </form>
 
       <p className="auth-switch">
-        Pas encore de compte ? <Link to="/register">Créer un compte</Link>
+        Pas encore de compte ?{' '}
+        <Link to={inviteToken ? `/register?invite=${encodeURIComponent(inviteToken)}` : '/register'}>
+          Créer un compte
+        </Link>
       </p>
       <p className="auth-home-link">
         <Link to="/">← Retour à l&apos;accueil</Link>

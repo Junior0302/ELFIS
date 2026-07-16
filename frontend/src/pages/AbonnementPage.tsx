@@ -301,7 +301,11 @@ export default function AbonnementPage() {
               </button>
             )}
             {!canManage && (
-              <p className="muted">Demandez à un administrateur d’activer l’essai.</p>
+              <p className="muted">
+                Contactez le propriétaire de l’organisation pour modifier l’abonnement. En tant que
+                membre, vous utilisez le plan de l’organisation — aucun abonnement personnel n’est
+                requis.
+              </p>
             )}
           </section>
 

@@ -43,6 +43,7 @@ class Organization(Base):
     currency: Mapped[str] = mapped_column(String(8), default="EUR")
     logo: Mapped[str] = mapped_column(String(512), default="")
     industry: Mapped[str] = mapped_column(String(128), default="")
+    address: Mapped[str] = mapped_column(Text, default="")
     subscription_plan: Mapped[str] = mapped_column(String(64), default="starter")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -74,7 +75,46 @@ class OrganizationMember(Base):
     organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("organizations.id"), index=True)
     role_id: Mapped[int] = mapped_column(Integer, ForeignKey("roles.id"))
     status: Mapped[str] = mapped_column(String(32), default="active")
+    # active | suspended | removed
+    invited_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class OrganizationInvitation(Base):
+    __tablename__ = "organization_invitations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("organizations.id"), index=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    role: Mapped[str] = mapped_column(String(64), default="employe")
+    permissions_json: Mapped[str] = mapped_column(Text, default="[]")
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    # pending | accepted | expired | cancelled | refused
+    invited_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class TeamNotification(Base):
+    __tablename__ = "team_notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(String(64), default="info")
+    title: Mapped[str] = mapped_column(String(255), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    payload_json: Mapped[str] = mapped_column(Text, default="{}")
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class Company(Base):
@@ -198,6 +238,7 @@ class SalesDocument(Base):
     status: Mapped[str] = mapped_column(String(32), default="draft")
     # draft | sent | accepted | refused | paid | partial | overdue | cancelled
     customer_name: Mapped[str] = mapped_column(String(255), default="")
+    customer_email: Mapped[str] = mapped_column(String(255), default="")
     amount_ht: Mapped[float] = mapped_column(Float, default=0.0)
     amount_tva: Mapped[float] = mapped_column(Float, default=0.0)
     amount_ttc: Mapped[float] = mapped_column(Float, default=0.0)
@@ -235,3 +276,16 @@ class Payment(Base):
     paid_at: Mapped[str] = mapped_column(String(32))
     reference: Mapped[str] = mapped_column(String(128), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DocumentEmailLog(Base):
+    __tablename__ = "document_email_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sales_document_id: Mapped[int] = mapped_column(Integer, ForeignKey("sales_documents.id"), index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True, default=1)
+    recipient: Mapped[str] = mapped_column(String(255), default="")
+    subject: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(32), default="pending")  # pending|sent|failed
+    error_message: Mapped[str] = mapped_column(Text, default="")
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

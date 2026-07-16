@@ -27,6 +27,8 @@ type AuthState = {
   logout: () => void
   setOrgId: (id: number) => void
   setUser: (user: AuthUser) => void
+  setMemberships: (memberships: Membership[]) => void
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -42,12 +44,17 @@ function applySession(
     setMemberships: (m: Membership[]) => void
     setOrgIdState: (id: number | null) => void
   },
+  preferredOrgId?: number | null,
 ) {
   localStorage.setItem(TOKEN_KEY, res.access_token)
   setters.setToken(res.access_token)
   setters.setUser(res.user)
   setters.setMemberships(res.memberships)
-  const firstOrg = res.memberships[0]?.organization_id ?? null
+  const preferred =
+    preferredOrgId && res.memberships.some((m) => m.organization_id === preferredOrgId)
+      ? preferredOrgId
+      : null
+  const firstOrg = preferred ?? res.memberships[0]?.organization_id ?? null
   setters.setOrgIdState(firstOrg)
   if (firstOrg) localStorage.setItem(ORG_KEY, String(firstOrg))
   else localStorage.removeItem(ORG_KEY)
@@ -63,6 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const [loading, setLoading] = useState(Boolean(token))
   const firebaseReady = isFirebaseConfigured()
+
+  const refreshSession = async () => {
+    if (!token) return
+    const data = await api.me(token, orgId)
+    setUser(data.user)
+    setMemberships(data.memberships)
+    if (!orgId && data.current_organization_id) {
+      setOrgIdState(data.current_organization_id)
+      localStorage.setItem(ORG_KEY, String(data.current_organization_id))
+    }
+  }
 
   useEffect(() => {
     if (!token) {
@@ -150,8 +168,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOrgId: (id: number) => {
         setOrgIdState(id)
         localStorage.setItem(ORG_KEY, String(id))
+        if (token) {
+          void api
+            .setActiveOrganization(id, token, id)
+            .then((res) => {
+              localStorage.setItem(TOKEN_KEY, res.access_token)
+              setToken(res.access_token)
+              setMemberships(res.memberships)
+            })
+            .catch(() => undefined)
+        }
       },
       setUser: (next) => setUser(next),
+      setMemberships,
+      refreshSession,
     }),
     [token, user, memberships, orgId, loading, firebaseReady],
   )

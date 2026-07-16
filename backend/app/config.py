@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     stripe_past_due_grace_days: int = 3
     frontend_url: str = "http://localhost:5173"
     platform_admin_emails: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_tls: bool = True
 
     @model_validator(mode="after")
     def validate_production_security(self):

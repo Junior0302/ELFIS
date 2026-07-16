@@ -224,6 +224,8 @@ def upsert_firebase_user(
 
 
 def get_user_memberships(db: Session, user_id: int) -> list[dict]:
+    from app.services.plan_features import org_effective_plan
+
     rows = (
         db.query(OrganizationMember, Organization, Role)
         .join(Organization, Organization.id == OrganizationMember.organization_id)
@@ -236,15 +238,20 @@ def get_user_memberships(db: Session, user_id: int) -> list[dict]:
     )
     result = []
     for member, org, role in rows:
+        plan, sub_status = org_effective_plan(db, org.id)
         result.append(
             {
                 "membership_id": member.id,
                 "organization_id": org.id,
                 "organization_name": org.name,
+                "organization_logo": org.logo or "",
                 "role": role.name,
+                "status": member.status,
                 "permissions": json.loads(role.permissions or "[]"),
-                "plan": org.subscription_plan,
+                "plan": plan,
+                "subscription_status": sub_status,
                 "country": org.country,
+                "joined_at": member.joined_at.isoformat() if member.joined_at else None,
             }
         )
     return result

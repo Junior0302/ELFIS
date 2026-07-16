@@ -22,6 +22,16 @@ from app.services.auth import (
     write_audit,
 )
 from app.services.firebase_auth import FirebaseAuthError, verify_id_token
+from app.services.invitations import (
+    accept_invitation,
+    leave_organization,
+    list_notifications,
+    list_pending_invitations_for_user,
+    mark_notification_read,
+    refuse_invitation,
+    serialize_notification,
+)
+from app.services.plan_features import PLAN_FEATURES, PLAN_SEAT_LIMITS, ROLE_LABELS_FR
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -66,6 +76,15 @@ class ProfileUpdateIn(BaseModel):
     phone: str | None = None
     avatar: str | None = Field(default=None, max_length=2048)
     password: str | None = None
+
+
+class InvitationActionIn(BaseModel):
+    token: str | None = None
+    invitation_id: int | None = None
+
+
+class ActiveOrganizationIn(BaseModel):
+    organization_id: int
 
 
 def _user_public(user: User) -> dict:
@@ -146,13 +165,158 @@ def me(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_
     if not user:
         raise HTTPException(401, detail="Non authentifié")
     memberships = get_user_memberships(db, user.id)
+    pending = list_pending_invitations_for_user(db, user)
+    unread = len(list_notifications(db, user.id, unread_only=True))
     return {
         "user": _user_public(user),
         "current_organization_id": auth.organization_id,
         "role": auth.role,
         "permissions": auth.permissions,
         "memberships": memberships,
+        "pending_invitations": pending,
+        "unread_notifications": unread,
+        "role_labels": ROLE_LABELS_FR,
     }
+
+
+@router.get("/plan-catalog")
+def plan_catalog():
+    return {
+        "features": PLAN_FEATURES,
+        "seat_limits": PLAN_SEAT_LIMITS,
+        "role_labels": ROLE_LABELS_FR,
+    }
+
+
+@router.get("/invitations")
+def my_invitations(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    return {"invitations": list_pending_invitations_for_user(db, auth.user)}
+
+
+@router.post("/invitations/accept")
+def accept_invite(
+    payload: InvitationActionIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    if not payload.token and payload.invitation_id is None:
+        raise HTTPException(400, detail="token ou invitation_id requis")
+    try:
+        membership = accept_invitation(
+            db,
+            user=auth.user,
+            token=payload.token,
+            invitation_id=payload.invitation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    memberships = get_user_memberships(db, auth.user.id)
+    return {
+        "ok": True,
+        "organization_id": membership.organization_id,
+        "memberships": memberships,
+        "pending_invitations": list_pending_invitations_for_user(db, auth.user),
+    }
+
+
+@router.post("/invitations/refuse")
+def refuse_invite(
+    payload: InvitationActionIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    if not payload.token and payload.invitation_id is None:
+        raise HTTPException(400, detail="token ou invitation_id requis")
+    try:
+        refuse_invitation(
+            db,
+            user=auth.user,
+            token=payload.token,
+            invitation_id=payload.invitation_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    return {
+        "ok": True,
+        "pending_invitations": list_pending_invitations_for_user(db, auth.user),
+    }
+
+
+@router.post("/organizations/{organization_id}/leave")
+def leave_org(
+    organization_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    try:
+        leave_organization(db, user=auth.user, organization_id=organization_id)
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    memberships = get_user_memberships(db, auth.user.id)
+    return {"ok": True, "memberships": memberships}
+
+
+@router.post("/active-organization")
+def set_active_organization(
+    payload: ActiveOrganizationIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    memberships = get_user_memberships(db, auth.user.id)
+    current = next((m for m in memberships if m["organization_id"] == payload.organization_id), None)
+    if not current:
+        raise HTTPException(403, detail="Accès organisation refusé")
+    write_audit(
+        db,
+        user_id=auth.user.id,
+        organization_id=payload.organization_id,
+        action="organization.switch",
+        module="auth",
+    )
+    token = create_access_token(
+        {"sub": str(auth.user.id), "org_id": payload.organization_id}
+    )
+    return {
+        "ok": True,
+        "access_token": token,
+        "organization_id": payload.organization_id,
+        "role": current["role"],
+        "permissions": current["permissions"],
+        "memberships": memberships,
+    }
+
+
+@router.get("/notifications")
+def my_notifications(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    notes = list_notifications(db, auth.user.id)
+    return {"notifications": [serialize_notification(n) for n in notes]}
+
+
+@router.post("/notifications/{notification_id}/read")
+def read_notification(
+    notification_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    try:
+        note = mark_notification_read(db, user_id=auth.user.id, notification_id=notification_id)
+    except ValueError as exc:
+        raise HTTPException(404, detail=str(exc)) from exc
+    return {"ok": True, "notification": serialize_notification(note)}
 
 
 @router.patch("/me")

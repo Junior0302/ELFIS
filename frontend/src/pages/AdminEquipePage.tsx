@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { api, type OrgMember } from '../api'
+import { api, type OrgInvitation, type OrgMember } from '../api'
 import { useAuth } from '../auth'
 import { deleteFirestoreOrganizationMember, saveFirestoreOrganizationMember } from '../firebase'
+import { ROLE_LABELS_FR } from '../planFeatures'
 
 const ROLE_HELP: Record<string, string> = {
   admin: 'Gère l’équipe, les paramètres et l’abonnement',
@@ -15,12 +16,19 @@ const ROLE_HELP: Record<string, string> = {
 export default function AdminEquipePage() {
   const { token, orgId, memberships, user } = useAuth()
   const [members, setMembers] = useState<OrgMember[]>([])
+  const [invitations, setInvitations] = useState<OrgInvitation[]>([])
   const [roles, setRoles] = useState<string[]>([])
+  const [roleLabels, setRoleLabels] = useState<Record<string, string>>(ROLE_LABELS_FR)
   const [canManage, setCanManage] = useState(false)
+  const [canInvite, setCanInvite] = useState(true)
+  const [seatMessage, setSeatMessage] = useState('')
+  const [seats, setSeats] = useState({ active: 0, pending_invites: 0, used: 0 })
+  const [plan, setPlan] = useState('starter')
   const [loading, setLoading] = useState(true)
   const [memberForm, setMemberForm] = useState({ email: '', role: 'comptable' })
   const [saving, setSaving] = useState(false)
   const [pendingId, setPendingId] = useState<number | null>(null)
+  const [lastInviteLink, setLastInviteLink] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
@@ -34,10 +42,19 @@ export default function AdminEquipePage() {
     setLoading(true)
     setError('')
     try {
-      const data = await api.orgMembers(orgId, token)
+      const [data, invites] = await Promise.all([
+        api.orgMembers(orgId, token),
+        api.orgInvitations(orgId, token).catch(() => ({ invitations: [] as OrgInvitation[] })),
+      ])
       setMembers(data.members)
       setRoles(data.roles)
       setCanManage(data.can_manage)
+      setCanInvite(data.can_invite !== false)
+      setSeatMessage(data.seat_limit_message || '')
+      setSeats(data.seats || { active: 0, pending_invites: 0, used: 0 })
+      setPlan(data.plan || 'starter')
+      if (data.role_labels) setRoleLabels(data.role_labels)
+      setInvitations(invites.invitations.filter((item) => item.status === 'pending'))
       if (data.roles.length && !data.roles.includes(memberForm.role)) {
         setMemberForm((current) => ({ ...current, role: data.roles[0] }))
       }
@@ -69,24 +86,29 @@ export default function AdminEquipePage() {
     })
   }
 
-  const addMember = async (event: FormEvent) => {
+  const inviteMember = async (event: FormEvent) => {
     event.preventDefault()
     if (!token || !orgId) return
     setSaving(true)
     setError('')
     setMessage('')
+    setLastInviteLink('')
     try {
-      const result = await api.addOrgMember(
+      const result = await api.inviteOrgMember(
         orgId,
         { email: memberForm.email.trim().toLowerCase(), role: memberForm.role },
         token,
       )
-      await syncMember(result.member)
-      setMembers((current) => [...current, result.member])
       setMemberForm((current) => ({ ...current, email: '' }))
-      setMessage(`${result.member.email} a été ajouté avec le rôle ${result.member.role}.`)
+      setMessage(result.message)
+      if (result.email_warning) {
+        const link = `${window.location.origin}/compte?invite=${result.invite_token}`
+        setLastInviteLink(link)
+        setMessage(`${result.message} ${result.email_warning}`)
+      }
+      await load()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Ajout impossible')
+      setError(reason instanceof Error ? reason.message : 'Invitation impossible')
     } finally {
       setSaving(false)
     }
@@ -129,6 +151,7 @@ export default function AdminEquipePage() {
       }
       setMembers((current) => current.filter((item) => item.membership_id !== member.membership_id))
       setMessage(`${member.email} a été retiré de l’organisation.`)
+      await load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Suppression impossible')
     } finally {
@@ -136,14 +159,50 @@ export default function AdminEquipePage() {
     }
   }
 
+  const resendInvite = async (invitation: OrgInvitation) => {
+    if (!token || !orgId) return
+    setPendingId(invitation.id)
+    setError('')
+    setMessage('')
+    try {
+      const result = await api.resendOrgInvitation(orgId, invitation.id, token)
+      setMessage('Invitation renvoyée.')
+      if (result.email_warning) {
+        setLastInviteLink(`${window.location.origin}/compte?invite=${result.invite_token}`)
+      }
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Renvoi impossible')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const cancelInvite = async (invitation: OrgInvitation) => {
+    if (!token || !orgId) return
+    if (!window.confirm(`Annuler l’invitation pour ${invitation.email} ?`)) return
+    setPendingId(invitation.id)
+    try {
+      await api.cancelOrgInvitation(orgId, invitation.id, token)
+      setMessage('Invitation annulée.')
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Annulation impossible')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const labelFor = (role: string) => roleLabels[role] || ROLE_LABELS_FR[role] || role
+
   return (
     <>
       <div className="page-head">
         <div>
           <h2>Admin · Équipe</h2>
           <p>
-            Ajoutez des comptes, changez leurs droits, suspendez ou retirez un accès. Réservé aux
-            propriétaires et administrateurs.
+            Invitez des collaborateurs : ils utilisent l’abonnement de l’organisation, sans
+            souscription individuelle. Les droits restent limités par leur rôle.
           </p>
         </div>
         <Link className="btn secondary" to="/organisation">
@@ -153,19 +212,27 @@ export default function AdminEquipePage() {
 
       {error && <div className="auth-alert auth-alert-error">{error}</div>}
       {message && <div className="auth-alert auth-alert-ok">{message}</div>}
+      {lastInviteLink && (
+        <div className="auth-alert">
+          Lien d’invitation à transmettre :{' '}
+          <a href={lastInviteLink}>{lastInviteLink}</a>
+        </div>
+      )}
 
       <section className="panel admin-team-panel">
         <div className="section-heading">
           <div>
-            <h3>Ajouter un compte</h3>
+            <h3>Inviter un membre</h3>
             <p className="muted">
-              La personne doit déjà avoir créé son compte ComptaPilot avec cet email.
+              Plan {plan} · {seats.active} actif(s) · {seats.pending_invites} invitation(s) en
+              attente
             </p>
+            {seatMessage && <p className="muted">{seatMessage}</p>}
           </div>
         </div>
 
         {canManage ? (
-          <form className="member-invite admin-invite" onSubmit={addMember}>
+          <form className="member-invite admin-invite" onSubmit={inviteMember}>
             <div className="field">
               <label htmlFor="admin_member_email">Email</label>
               <input
@@ -186,20 +253,73 @@ export default function AdminEquipePage() {
               >
                 {roles.map((role) => (
                   <option key={role} value={role}>
-                    {role}
+                    {labelFor(role)}
                   </option>
                 ))}
               </select>
               <small className="muted">{ROLE_HELP[memberForm.role] || ''}</small>
             </div>
-            <button className="btn" type="submit" disabled={saving}>
-              {saving ? 'Ajout…' : 'Ajouter le compte'}
+            <button className="btn" type="submit" disabled={saving || !canInvite}>
+              {saving ? 'Envoi…' : 'Envoyer l’invitation'}
             </button>
           </form>
         ) : (
           <p className="muted">Vous n’avez pas la permission users.manage.</p>
         )}
       </section>
+
+      {!!invitations.length && (
+        <section className="panel" style={{ marginTop: '1rem' }}>
+          <h3>Invitations en attente</h3>
+          <div className="admin-member-table-wrap">
+            <table className="admin-member-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Rôle</th>
+                  <th>Expire</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invitations.map((invite) => (
+                  <tr key={invite.id}>
+                    <td>{invite.email}</td>
+                    <td>
+                      <span className="badge">{labelFor(invite.role)}</span>
+                    </td>
+                    <td className="muted">
+                      {invite.expires_at
+                        ? new Date(invite.expires_at).toLocaleDateString('fr-FR')
+                        : '—'}
+                    </td>
+                    <td>
+                      <div className="admin-actions">
+                        <button
+                          className="btn secondary"
+                          type="button"
+                          disabled={pendingId === invite.id}
+                          onClick={() => void resendInvite(invite)}
+                        >
+                          Renvoyer
+                        </button>
+                        <button
+                          className="btn danger-outline"
+                          type="button"
+                          disabled={pendingId === invite.id}
+                          onClick={() => void cancelInvite(invite)}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="panel" style={{ marginTop: '1rem' }}>
         <div className="section-heading">
@@ -221,6 +341,7 @@ export default function AdminEquipePage() {
                   <th>Utilisateur</th>
                   <th>Rôle</th>
                   <th>Statut</th>
+                  <th>Adhésion</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -250,7 +371,7 @@ export default function AdminEquipePage() {
                         </div>
                       </td>
                       <td>
-                        {canManage && !isOwner ? (
+                        {canManage && !isOwner && !isSelf ? (
                           <select
                             value={member.role}
                             disabled={busy}
@@ -261,12 +382,12 @@ export default function AdminEquipePage() {
                           >
                             {roles.map((role) => (
                               <option key={role} value={role}>
-                                {role}
+                                {labelFor(role)}
                               </option>
                             ))}
                           </select>
                         ) : (
-                          <span className="badge">{member.role}</span>
+                          <span className="badge">{labelFor(member.role)}</span>
                         )}
                         {!isOwner && ROLE_HELP[member.role] && (
                           <small className="muted admin-role-help">{ROLE_HELP[member.role]}</small>
@@ -276,6 +397,11 @@ export default function AdminEquipePage() {
                         <span className={`badge ${member.status === 'active' ? '' : 'warn'}`}>
                           {member.status === 'active' ? 'Actif' : 'Suspendu'}
                         </span>
+                      </td>
+                      <td className="muted">
+                        {member.joined_at
+                          ? new Date(member.joined_at).toLocaleDateString('fr-FR')
+                          : '—'}
                       </td>
                       <td>
                         {canManage && !isOwner && !isSelf ? (
@@ -298,7 +424,7 @@ export default function AdminEquipePage() {
                               disabled={busy}
                               onClick={() => void removeMember(member)}
                             >
-                              Supprimer
+                              Retirer
                             </button>
                           </div>
                         ) : (
@@ -322,7 +448,7 @@ export default function AdminEquipePage() {
         <div className="admin-role-grid">
           {Object.entries(ROLE_HELP).map(([role, help]) => (
             <article key={role}>
-              <strong>{role}</strong>
+              <strong>{labelFor(role)}</strong>
               <p>{help}</p>
             </article>
           ))}

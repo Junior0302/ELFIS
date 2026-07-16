@@ -22,6 +22,20 @@ class AccountingEntry(BaseModel):
     imputation: str = ""
 
 
+class LineItemExtraction(BaseModel):
+    label: str | None = None
+    description: str | None = None
+    reference: str | None = None
+    quantity: float | None = None
+    unit: str | None = None
+    unit_price_ht: float | None = None
+    discount: float | None = None
+    vat_rate: float | None = None
+    vat_amount: float | None = None
+    total_ht: float | None = None
+    total_ttc: float | None = None
+
+
 class ExtractionResult(BaseModel):
     supplier: str | None = None
     invoice_date: str | None = None
@@ -33,6 +47,29 @@ class ExtractionResult(BaseModel):
     document_type: str = "facture"
     confidence_score: float = 0.0
     raw_text: str = ""
+    # Champs optionnels enrichis (ELFIS AI) — n'impactent pas le pipeline historique
+    supplier_address: str | None = None
+    supplier_siret: str | None = None
+    supplier_siren: str | None = None
+    supplier_vat: str | None = None
+    supplier_email: str | None = None
+    supplier_phone: str | None = None
+    supplier_iban: str | None = None
+    supplier_bic: str | None = None
+    customer_name: str | None = None
+    customer_address: str | None = None
+    customer_siret: str | None = None
+    customer_vat: str | None = None
+    due_date: str | None = None
+    currency: str | None = "EUR"
+    payment_terms: str | None = None
+    payment_method: str | None = None
+    order_reference: str | None = None
+    line_items: list[LineItemExtraction] = Field(default_factory=list)
+    late_penalty_mention: str | None = None
+    recovery_indemnity_mention: str | None = None
+    vat_exemption_mention: str | None = None
+    reverse_charge_mention: str | None = None
 
 
 class ValidationResult(BaseModel):

@@ -12,6 +12,7 @@ from app.models_saas import (
     AIAgent,
     Company,
     Organization,
+    OrganizationInvitation,
     OrganizationMember,
     Role,
     Subscription,
@@ -19,6 +20,18 @@ from app.models_saas import (
     User,
 )
 from app.services.auth import ensure_rbac_catalog, get_user_memberships, write_audit
+from app.services.invitations import (
+    cancel_invitation,
+    create_invitation,
+    resend_invitation,
+    serialize_invitation,
+)
+from app.services.plan_features import (
+    ROLE_LABELS_FR,
+    can_invite_more,
+    count_org_seats_used,
+    org_effective_plan,
+)
 
 router = APIRouter(prefix="/org", tags=["organisation"])
 
@@ -33,6 +46,18 @@ class MemberCreateIn(BaseModel):
 class MemberUpdateIn(BaseModel):
     role: str | None = None
     status: str | None = None
+
+
+class OrganizationUpdateIn(BaseModel):
+    name: str | None = None
+    legal_name: str | None = None
+    siren: str | None = None
+    vat_number: str | None = None
+    address: str | None = None
+    logo: str | None = None
+    industry: str | None = None
+    country: str | None = None
+    currency: str | None = None
 
 
 def _require_org_manager(auth: AuthContext, organization_id: int) -> None:
@@ -54,9 +79,11 @@ def _member_public(member: OrganizationMember, user: User, role: Role) -> dict:
         "email": user.email,
         "avatar": user.avatar or "",
         "role": role.name,
+        "role_label": ROLE_LABELS_FR.get(role.name, role.name),
         "permissions": json.loads(role.permissions or "[]"),
         "status": member.status,
-        "joined_at": member.joined_at.isoformat(),
+        "invited_by": member.invited_by,
+        "joined_at": member.joined_at.isoformat() if member.joined_at else None,
     }
 
 
@@ -122,8 +149,11 @@ def organization_detail(
             "country": org.country,
             "currency": org.currency,
             "industry": org.industry,
+            "address": org.address or "",
+            "logo": org.logo or "",
             "subscription_plan": org.subscription_plan,
         },
+        "can_edit": "*" in auth.permissions or "settings.manage" in auth.permissions,
         "subscription": (
             {
                 "plan": sub.plan,
@@ -150,6 +180,52 @@ def organization_detail(
     }
 
 
+@router.patch("/{organization_id}")
+def update_organization(
+    organization_id: int,
+    payload: OrganizationUpdateIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user or auth.organization_id != organization_id:
+        raise HTTPException(403, detail="Accès organisation refusé")
+    auth.require("settings.manage")
+    org = db.get(Organization, organization_id)
+    if not org:
+        raise HTTPException(404, detail="Organisation introuvable")
+
+    data = payload.model_dump(exclude_unset=True)
+    for key, value in data.items():
+        if isinstance(value, str):
+            value = value.strip()
+        setattr(org, key, value)
+    db.add(org)
+    db.commit()
+    db.refresh(org)
+    write_audit(
+        db,
+        user_id=auth.user.id,
+        organization_id=organization_id,
+        action="organization.update",
+        module="organisation",
+    )
+    return {
+        "organization": {
+            "id": org.id,
+            "name": org.name,
+            "legal_name": org.legal_name,
+            "siren": org.siren,
+            "vat_number": org.vat_number,
+            "country": org.country,
+            "currency": org.currency,
+            "industry": org.industry,
+            "address": org.address or "",
+            "logo": org.logo or "",
+            "subscription_plan": org.subscription_plan,
+        }
+    }
+
+
 @router.get("/{organization_id}/members")
 def organization_members(
     organization_id: int,
@@ -158,63 +234,121 @@ def organization_members(
 ):
     if not auth.user or auth.organization_id != organization_id:
         raise HTTPException(403, detail="Accès organisation refusé")
+    members = [
+        _member_public(member, user, role)
+        for member, user, role in _get_member_rows(db, organization_id)
+        if member.status != "removed"
+    ]
+    plan, sub_status = org_effective_plan(db, organization_id)
+    seats = count_org_seats_used(db, organization_id)
+    can_add, seat_message = can_invite_more(db, organization_id)
     return {
-        "members": [
-            _member_public(member, user, role)
-            for member, user, role in _get_member_rows(db, organization_id)
-        ],
+        "members": members,
         "can_manage": "*" in auth.permissions or "users.manage" in auth.permissions,
         "roles": sorted(MANAGEABLE_ROLES),
+        "role_labels": ROLE_LABELS_FR,
+        "plan": plan,
+        "subscription_status": sub_status,
+        "seats": seats,
+        "can_invite": can_add,
+        "seat_limit_message": seat_message,
     }
 
 
 @router.post("/{organization_id}/members")
-def add_organization_member(
+def invite_organization_member(
     organization_id: int,
     payload: MemberCreateIn,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
+    """Invite un membre (compte existant ou nouveau) — n'impose pas d'abonnement personnel."""
     _require_org_manager(auth, organization_id)
-    role_name = payload.role.strip().lower()
-    if role_name not in MANAGEABLE_ROLES:
-        raise HTTPException(400, detail="Rôle non autorisé")
-
-    user = db.query(User).filter(User.email == payload.email.lower()).first()
-    if not user or not user.firebase_uid:
-        raise HTTPException(
-            404,
-            detail="Cet utilisateur doit d’abord créer son compte Firebase avec cette adresse.",
+    try:
+        invite, raw_token, mail_warn = create_invitation(
+            db,
+            organization_id=organization_id,
+            email=str(payload.email),
+            role=payload.role,
+            invited_by=auth.user.id,
         )
-    existing = (
-        db.query(OrganizationMember)
-        .filter(
-            OrganizationMember.organization_id == organization_id,
-            OrganizationMember.user_id == user.id,
-        )
-        .first()
-    )
-    if existing:
-        raise HTTPException(409, detail="Cet utilisateur appartient déjà à l’organisation")
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    org = db.get(Organization, organization_id)
+    return {
+        "ok": True,
+        "invitation": serialize_invitation(invite, org),
+        "invite_token": raw_token,
+        "email_warning": mail_warn,
+        "message": (
+            "Invitation envoyée. Le collaborateur la verra dans Mon compte "
+            "et bénéficiera de l’abonnement de l’organisation après acceptation."
+        ),
+    }
 
-    roles = ensure_rbac_catalog(db)
-    member = OrganizationMember(
-        user_id=user.id,
-        organization_id=organization_id,
-        role_id=roles[role_name].id,
-        status="active",
+
+@router.get("/{organization_id}/invitations")
+def list_organization_invitations(
+    organization_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    _require_org_manager(auth, organization_id)
+    org = db.get(Organization, organization_id)
+    rows = (
+        db.query(OrganizationInvitation)
+        .filter(OrganizationInvitation.organization_id == organization_id)
+        .order_by(OrganizationInvitation.id.desc())
+        .limit(100)
+        .all()
     )
-    db.add(member)
-    db.commit()
-    db.refresh(member)
-    write_audit(
-        db,
-        user_id=auth.user.id,
-        organization_id=organization_id,
-        action=f"member.add:{user.email}:{role_name}",
-        module="auth",
-    )
-    return {"ok": True, "member": _member_public(member, user, roles[role_name])}
+    return {"invitations": [serialize_invitation(r, org) for r in rows]}
+
+
+@router.post("/{organization_id}/invitations/{invitation_id}/resend")
+def resend_organization_invitation(
+    organization_id: int,
+    invitation_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    _require_org_manager(auth, organization_id)
+    try:
+        invite, raw_token, mail_warn = resend_invitation(
+            db,
+            invitation_id=invitation_id,
+            organization_id=organization_id,
+            actor_id=auth.user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    org = db.get(Organization, organization_id)
+    return {
+        "ok": True,
+        "invitation": serialize_invitation(invite, org),
+        "invite_token": raw_token,
+        "email_warning": mail_warn,
+    }
+
+
+@router.delete("/{organization_id}/invitations/{invitation_id}")
+def cancel_organization_invitation(
+    organization_id: int,
+    invitation_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    _require_org_manager(auth, organization_id)
+    try:
+        cancel_invitation(
+            db,
+            invitation_id=invitation_id,
+            organization_id=organization_id,
+            actor_id=auth.user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    return {"ok": True}
 
 
 @router.patch("/{organization_id}/members/{membership_id}")
@@ -236,6 +370,12 @@ def update_organization_member(
     )
     if not member:
         raise HTTPException(404, detail="Membre introuvable")
+
+    target_role = db.get(Role, member.role_id)
+    if target_role and target_role.name == "owner":
+        raise HTTPException(400, detail="Le rôle du propriétaire ne peut pas être modifié")
+    if member.user_id == auth.user.id and payload.role is not None:
+        raise HTTPException(400, detail="Vous ne pouvez pas modifier votre propre rôle")
 
     if payload.role is not None:
         role_name = payload.role.strip().lower()
@@ -285,7 +425,7 @@ def delete_organization_member(
     if not member:
         raise HTTPException(404, detail="Membre introuvable")
     if member.user_id == auth.user.id:
-        raise HTTPException(400, detail="Vous ne pouvez pas retirer votre propre accès")
+        raise HTTPException(400, detail="Utilisez « Quitter l’organisation » depuis Mon compte")
 
     role = db.get(Role, member.role_id)
     if role and role.name == "owner":
@@ -294,7 +434,8 @@ def delete_organization_member(
     user = db.get(User, member.user_id)
     email = user.email if user else str(member.user_id)
     uid = user.firebase_uid if user else ""
-    db.delete(member)
+    member.status = "removed"
+    db.add(member)
     db.commit()
     write_audit(
         db,

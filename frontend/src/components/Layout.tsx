@@ -10,6 +10,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
     title: 'Pilotage',
     items: [
       { to: '/dashboard', label: 'Tableau de bord', hint: 'Vue d’ensemble', permission: 'invoice.read' },
+      { to: '/intelligence', label: 'Intelligence', hint: 'Alertes & ELFIS', permission: 'ai.analysis' },
       { to: '/copilote', label: 'Copilote IA', hint: 'Questions & conseils', permission: 'ai.analysis' },
     ],
   },
@@ -18,7 +19,13 @@ const navSections: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/deposit', label: 'Déposer', hint: 'OCR factures', permission: 'invoice.create' },
       { to: '/history', label: 'Comptabilité', hint: 'Documents & exports', permission: 'documents.read' },
-      { to: '/facturation', label: 'Facturation', hint: 'Devis & clients', permission: 'invoice.read' },
+      {
+        to: '/facturation',
+        label: 'Facturation',
+        hint: 'Devis & clients',
+        permission: 'invoice.read',
+      },
+      { to: '/devis', label: 'Devis', hint: 'Liste & envoi', permission: 'invoice.read' },
     ],
   },
   {
@@ -30,7 +37,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
         hint: 'Essai, carte & factures',
         permission: 'subscription.manage',
       },
-      { to: '/organisation', label: 'Organisation', hint: 'Structure & abonnement' },
+      { to: '/organisation', label: 'Organisation', hint: 'Entreprise & coordonnées' },
       {
         to: '/admin/equipe',
         label: 'Admin équipe',
@@ -140,7 +147,7 @@ export default function Layout() {
                   <br />
                 </>
               )}
-              {memberships.length > 1 && (
+              {memberships.length > 0 && (
                 <select
                   className="org-select"
                   value={orgId ?? ''}
@@ -149,7 +156,8 @@ export default function Layout() {
                 >
                   {memberships.map((m) => (
                     <option key={m.membership_id} value={m.organization_id}>
-                      {m.organization_name} ({m.role})
+                      {m.organization_name} ({m.role}
+                      {m.plan ? ` · ${m.plan}` : ''})
                     </option>
                   ))}
                 </select>

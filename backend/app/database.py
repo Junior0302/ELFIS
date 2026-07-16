@@ -80,3 +80,15 @@ def init_db() -> None:
     _sqlite_add_column_if_missing(
         "bank_accounts", "organization_id", "organization_id INTEGER DEFAULT 0"
     )
+    _sqlite_add_column_if_missing("organizations", "address", "address TEXT DEFAULT ''")
+    _sqlite_add_column_if_missing(
+        "sales_documents", "customer_email", "customer_email VARCHAR(255) DEFAULT ''"
+    )
+    _sqlite_add_column_if_missing(
+        "organization_members", "invited_by", "invited_by INTEGER"
+    )
+    _sqlite_add_column_if_missing(
+        "organization_members",
+        "updated_at",
+        "updated_at DATETIME",
+    )

@@ -38,6 +38,25 @@ class Invoice(Base):
     )
 
 
+class ElfisAnalysis(Base):
+    """Rapport ELFIS AI versionné, lié à une facture et une organisation."""
+
+    __tablename__ = "elfis_analyses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(Integer, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True, default=0)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="completed")
+    analysis_version: Mapped[str] = mapped_column(String(32), default="1.0.0")
+    processing_time_ms: Mapped[int] = mapped_column(Integer, default=0)
+    report_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
 class CompanySettings(Base):
     __tablename__ = "company_settings"
 

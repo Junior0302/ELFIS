@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, downloadApiFile, formatEuro, type Invoice } from '../api'
 import ConfidenceMeter from '../components/ConfidenceMeter'
+import ElfisReportPanel from '../components/elfis/ElfisReportPanel'
 import StatusBadge from '../components/StatusBadge'
 import { useAuth } from '../auth'
+import type { ElfisAnalysisHistoryItem, ElfisReport } from '../elfisTypes'
 
 const SOFTWARE_EXPORTS = [
   { id: 'fec', label: 'FEC' },
@@ -32,18 +34,38 @@ export default function ResultPage() {
   const { id } = useParams()
   const invoiceId = Number(id)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [report, setReport] = useState<ElfisReport | null>(null)
+  const [history, setHistory] = useState<ElfisAnalysisHistoryItem[]>([])
   const [saving, setSaving] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
+  const [reanalyzing, setReanalyzing] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [reportError, setReportError] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
+
+  const loadReport = async (docId: number) => {
+    if (!token) return
+    try {
+      const data = await api.getElfisReport(docId, token, orgId)
+      setReport(data.report)
+      setHistory(data.history)
+      setReportError('')
+    } catch (reason) {
+      setReportError(reason instanceof Error ? reason.message : 'Rapport ELFIS indisponible')
+    }
+  }
 
   useEffect(() => {
     if (!invoiceId || !token) return
     api
       .getDocument(invoiceId, token, orgId)
-      .then(setInvoice)
+      .then((doc) => {
+        setInvoice(doc)
+        void loadReport(doc.id)
+      })
       .catch((e) => setError(e.message || 'Document introuvable'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoiceId, token, orgId])
 
   useEffect(() => {
@@ -70,18 +92,24 @@ export default function ResultPage() {
     setSaving(true)
     setMessage('')
     try {
-      const updated = await api.updateDocument(invoice.id, {
-        supplier: invoice.supplier,
-        invoice_date: invoice.invoice_date,
-        invoice_number: invoice.invoice_number,
-        amount_ht: invoice.amount_ht,
-        amount_tva: invoice.amount_tva,
-        amount_ttc: invoice.amount_ttc,
-        vat_rate: invoice.vat_rate,
-        document_type: invoice.document_type,
-      }, token, orgId)
+      const updated = await api.updateDocument(
+        invoice.id,
+        {
+          supplier: invoice.supplier,
+          invoice_date: invoice.invoice_date,
+          invoice_number: invoice.invoice_number,
+          amount_ht: invoice.amount_ht,
+          amount_tva: invoice.amount_tva,
+          amount_ttc: invoice.amount_ttc,
+          vat_rate: invoice.vat_rate,
+          document_type: invoice.document_type,
+        },
+        token,
+        orgId,
+      )
       setInvoice(updated)
-      setMessage('Modifications enregistrées. Écriture régénérée.')
+      setMessage('Modifications enregistrées. Écriture et rapport ELFIS régénérés.')
+      await loadReport(updated.id)
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Erreur de sauvegarde')
     } finally {
@@ -97,10 +125,26 @@ export default function ResultPage() {
       const updated = await api.reprocessDocument(invoice.id, token, orgId)
       setInvoice(updated)
       setMessage('Document retraité par le pipeline IA.')
+      await loadReport(updated.id)
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Échec du retraitement')
     } finally {
       setReprocessing(false)
+    }
+  }
+
+  const onReanalyze = async () => {
+    if (!invoice || !token) return
+    setReanalyzing(true)
+    try {
+      const data = await api.reanalyzeElfis(invoice.id, token, orgId)
+      setReport(data.report)
+      await loadReport(invoice.id)
+      setMessage('Rapport ELFIS régénéré.')
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Réanalyse impossible')
+    } finally {
+      setReanalyzing(false)
     }
   }
 
@@ -114,6 +158,16 @@ export default function ResultPage() {
     }
   }
 
+  const copyJson = async () => {
+    if (!report) return
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(report, null, 2))
+      setMessage('JSON ELFIS copié dans le presse-papiers.')
+    } catch {
+      setMessage('Copie JSON impossible.')
+    }
+  }
+
   if (error) return <div className="panel form-error">{error}</div>
   if (!invoice) return <div className="loading">Chargement du résultat…</div>
 
@@ -121,9 +175,9 @@ export default function ResultPage() {
     <>
       <div className="page-head">
         <div>
-          <h2>Résultat</h2>
+          <h2>Rapport ELFIS</h2>
           <p>
-            Module 1 · {invoice.filename} ·{' '}
+            {invoice.filename} ·{' '}
             <StatusBadge needsReview={invoice.needs_review} status={invoice.status} />
           </p>
         </div>
@@ -144,9 +198,8 @@ export default function ResultPage() {
         </section>
 
         <section className="panel">
-          <h3>Extraction IA</h3>
+          <h3>Correction manuelle</h3>
           <ConfidenceMeter score={invoice.confidence_score} />
-
           <form onSubmit={onSave}>
             <div className="form-grid" style={{ marginTop: '1rem' }}>
               <div className="field full">
@@ -243,58 +296,12 @@ export default function ResultPage() {
               </div>
             </div>
 
-            {(invoice.anomalies.length > 0 || invoice.missing_fields.length > 0) && (
-              <div style={{ marginTop: '1rem' }}>
-                <strong>Contrôles / incohérences</strong>
-                <ul className="alert-list">
-                  {invoice.anomalies.map((a) => (
-                    <li key={a}>{a}</li>
-                  ))}
-                  {invoice.missing_fields.map((m) => (
-                    <li key={m}>Champ manquant : {m}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {invoice.accounting_entry && (
               <div style={{ marginTop: '1.1rem' }}>
-                <strong>Imputation & écriture</strong>
-                {invoice.accounting_entry.imputation && (
-                  <p className="muted" style={{ margin: '0.35rem 0' }}>
-                    Proposition : {invoice.accounting_entry.imputation}
-                  </p>
-                )}
+                <strong>Écriture actuelle</strong>
                 <p className="muted" style={{ margin: '0.35rem 0' }}>
-                  {invoice.accounting_entry.label}
+                  {invoice.accounting_entry.imputation} · {formatEuro(invoice.amount_ttc || 0)}
                 </p>
-                <p className="muted" style={{ margin: 0 }}>
-                  {invoice.accounting_entry.explanation}
-                </p>
-                {invoice.accounting_entry.lines.length > 0 ? (
-                  <table className="entry-table">
-                    <thead>
-                      <tr>
-                        <th>Compte</th>
-                        <th>Libellé</th>
-                        <th>Débit</th>
-                        <th>Crédit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoice.accounting_entry.lines.map((line, idx) => (
-                        <tr key={`${line.account}-${idx}`}>
-                          <td>{line.account}</td>
-                          <td>{line.label}</td>
-                          <td>{formatEuro(line.debit)}</td>
-                          <td>{formatEuro(line.credit)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="muted">Aucune ligne d’écriture pour ce type de document.</p>
-                )}
               </div>
             )}
 
@@ -303,7 +310,7 @@ export default function ResultPage() {
                 {saving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
               <button className="btn secondary" type="button" onClick={onReprocess} disabled={reprocessing}>
-                {reprocessing ? 'Retraitement…' : 'Relancer l’IA'}
+                {reprocessing ? 'Retraitement…' : 'Réanalyser'}
               </button>
               <button
                 className="btn secondary"
@@ -336,10 +343,24 @@ export default function ResultPage() {
                 ))}
               </div>
             </div>
-
             {message && <p className="muted">{message}</p>}
           </form>
         </section>
+      </div>
+
+      <div style={{ marginTop: '1rem' }}>
+        {reportError && <div className="panel form-error">{reportError}</div>}
+        {!report && !reportError && <div className="loading">Génération du rapport ELFIS…</div>}
+        {report && (
+          <ElfisReportPanel
+            report={report}
+            history={history}
+            onCopyJson={() => void copyJson()}
+            onExportJson={() => void download(`/elfis-ai/documents/${invoice.id}/export.json`)}
+            onReanalyze={() => void onReanalyze()}
+            reanalyzing={reanalyzing}
+          />
+        )}
       </div>
     </>
   )

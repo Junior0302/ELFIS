@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 export default function RegisterPage() {
   const { register, user, firebaseReady } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('invite')
   const registering = useRef(false)
   const [form, setForm] = useState({
     first_name: '',
@@ -17,8 +19,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (user && !registering.current) navigate('/dashboard')
-  }, [user, navigate])
+    if (user && !registering.current) {
+      navigate(inviteToken ? `/compte?invite=${encodeURIComponent(inviteToken)}` : '/dashboard')
+    }
+  }, [user, navigate, inviteToken])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -37,7 +41,11 @@ export default function RegisterPage() {
         password: form.password,
         organization_name: form.organization_name.trim() || undefined,
       })
-      navigate('/abonnement')
+      navigate(
+        inviteToken
+          ? `/compte?invite=${encodeURIComponent(inviteToken)}`
+          : '/abonnement',
+      )
     } catch (err) {
       registering.current = false
       setError(err instanceof Error ? err.message : 'Inscription impossible')
@@ -50,7 +58,11 @@ export default function RegisterPage() {
     <div className="auth-card">
       <div className="auth-card-head">
         <h2>Créer un compte</h2>
-        <p>Compte Firebase + organisation ComptaPilot en une étape.</p>
+        <p>
+          {inviteToken
+            ? 'Créez votre compte avec l’adresse invitée. Aucun abonnement personnel n’est requis pour rejoindre l’équipe.'
+            : 'Compte Firebase + organisation ComptaPilot en une étape.'}
+        </p>
       </div>
 
       {!firebaseReady && (

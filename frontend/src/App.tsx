@@ -10,11 +10,13 @@ import AdminEquipePage from './pages/AdminEquipePage'
 import ComptePage from './pages/ComptePage'
 import CopilotePage from './pages/CopilotePage'
 import DashboardPage from './pages/DashboardPage'
+import DevisPage from './pages/DevisPage'
 import DepositPage from './pages/DepositPage'
 import FacturationPage from './pages/FacturationPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import HistoryPage from './pages/HistoryPage'
 import HomePage from './pages/HomePage'
+import IntelligencePage from './pages/IntelligencePage'
 import LoginPage from './pages/LoginPage'
 import ModulesPage from './pages/ModulesPage'
 import OrganisationPage from './pages/OrganisationPage'
@@ -40,10 +42,12 @@ export default function App() {
           <Route element={<RequireAuth />}>
             <Route element={<Layout />}>
               <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="intelligence" element={<IntelligencePage />} />
               <Route path="deposit" element={<DepositPage />} />
               <Route path="result/:id" element={<ResultPage />} />
               <Route path="history" element={<HistoryPage />} />
               <Route path="facturation" element={<FacturationPage />} />
+              <Route path="devis" element={<DevisPage />} />
               <Route path="abonnement" element={<AbonnementPage />} />
               <Route path="copilote" element={<CopilotePage />} />
               <Route path="organisation" element={<OrganisationPage />} />
