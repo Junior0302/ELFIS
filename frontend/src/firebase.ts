@@ -10,7 +10,6 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth'
 import { doc, getFirestore, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore'
-import { getDownloadURL, getStorage, ref, uploadBytes, type FirebaseStorage } from 'firebase/storage'
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
@@ -28,7 +27,6 @@ export function isFirebaseConfigured(): boolean {
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
 let firestore: Firestore | null = null
-let storage: FirebaseStorage | null = null
 
 export function getFirebaseAuth(): Auth {
   if (!isFirebaseConfigured()) {
@@ -58,11 +56,6 @@ function getFirebaseApp(): FirebaseApp {
 export function getFirebaseFirestore(): Firestore {
   if (!firestore) firestore = getFirestore(getFirebaseApp())
   return firestore
-}
-
-function getFirebaseStorage(): FirebaseStorage {
-  if (!storage) storage = getStorage(getFirebaseApp())
-  return storage
 }
 
 function requireFirebaseUser(): FirebaseUser {
@@ -174,18 +167,6 @@ export async function saveFirestoreOrganizationMember(
   )
 }
 
-export async function uploadFirebaseAvatar(file: File): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error('Sélectionnez une image.')
-  if (file.size > 5 * 1024 * 1024) throw new Error('La photo ne doit pas dépasser 5 Mo.')
-  const user = requireFirebaseUser()
-  const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
-  const target = ref(getFirebaseStorage(), `avatars/${user.uid}/profile.${extension}`)
-  await uploadBytes(target, file, { contentType: file.type })
-  const url = await getDownloadURL(target)
-  await updateProfile(user, { photoURL: url })
-  return url
-}
-
 export function mapFirebaseError(err: unknown): string {
   const code = typeof err === 'object' && err && 'code' in err ? String((err as { code: string }).code) : ''
   const map: Record<string, string> = {
@@ -201,10 +182,6 @@ export function mapFirebaseError(err: unknown): string {
       'Pour changer le mot de passe, déconnectez-vous puis reconnectez-vous avant de réessayer.',
     'auth/network-request-failed': 'Réseau indisponible. Vérifiez votre connexion.',
     'auth/operation-not-allowed': 'Email/mot de passe non activé dans Firebase Console.',
-    'storage/unauthorized':
-      'Envoi de photo refusé. Publiez les règles Firebase Storage puis réessayez.',
-    'storage/bucket-not-found':
-      'Firebase Storage n’est pas encore activé pour ce projet.',
   }
   if (code && map[code]) return map[code]
   if (err instanceof Error && err.message) return err.message

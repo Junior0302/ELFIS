@@ -6,7 +6,6 @@ import {
   mapFirebaseError,
   saveFirestoreProfile,
   updateFirebaseUserPassword,
-  uploadFirebaseAvatar,
 } from '../firebase'
 
 export default function ComptePage() {
@@ -73,7 +72,10 @@ export default function ComptePage() {
     setSaving(true)
     try {
       let avatar = user.avatar || ''
-      if (avatarFile) avatar = await uploadFirebaseAvatar(avatarFile)
+      if (avatarFile) {
+        const uploaded = await api.uploadAvatar(avatarFile, token, orgId)
+        avatar = uploaded.user.avatar || ''
+      }
       const payload = {
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),

@@ -2,7 +2,7 @@
 
 > Déposez une facture. L'IA prépare votre comptabilité.
 
-Stack : **FastAPI + React + Firebase Auth + Cloud Firestore + Firebase Storage**.
+Stack : **FastAPI + React + Firebase Auth + Cloud Firestore + stockage persistant Render**.
 
 ## Auth Firebase (obligatoire)
 
@@ -29,15 +29,15 @@ La base `(default)` du projet `elfis-core` est utilisée en région `eur3`.
 - `users/{uid}` : profil synchronisé de l’utilisateur
 - `organizations/{id}` : organisation active
 - `organizations/{id}/members/{uid}` : rôle, permissions et statut
-- Firebase Storage `avatars/{uid}/...` : photos de profil
+- disque persistant de l’API `/data/storage` : documents et photos de profil
 
 Les règles temporaires ouvertes de la console ne doivent pas être conservées. Les règles sécurisées
-sont dans `firestore.rules` et `storage.rules`. Pour les publier :
+sont dans `firestore.rules`. Pour les publier :
 
 ```bash
 firebase login
 firebase use elfis-core
-firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 Un propriétaire ou administrateur peut ajouter un utilisateur déjà inscrit depuis

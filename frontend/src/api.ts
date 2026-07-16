@@ -288,6 +288,15 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }, { token, orgId }),
+  uploadAvatar: async (file: File, token: string, orgId?: number | null) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<{ ok: boolean; user: AuthUser }>(
+      '/auth/me/avatar',
+      { method: 'POST', body: form },
+      { token, orgId },
+    )
+  },
   aiChat: (question: string, token?: string | null, orgId?: number | null) =>
     request<{
       ok: boolean

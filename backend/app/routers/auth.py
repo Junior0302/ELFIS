@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+import aiofiles
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context
 from app.models_saas import User
@@ -19,6 +24,13 @@ from app.services.auth import (
 from app.services.firebase_auth import FirebaseAuthError, verify_id_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+AVATAR_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 
 class LoginIn(BaseModel):
@@ -188,3 +200,70 @@ def update_profile(
         module="auth",
     )
     return {"ok": True, "user": _user_public(user)}
+
+
+@router.post("/me/avatar")
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
+    extension = AVATAR_TYPES.get(file.content_type or "")
+    if not extension:
+        raise HTTPException(400, detail="Formats acceptés : JPG, PNG ou WebP")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, detail="Photo vide")
+    if len(content) > MAX_AVATAR_BYTES:
+        raise HTTPException(400, detail="La photo ne doit pas dépasser 5 Mo")
+
+    user = db.get(User, auth.user.id)
+    if not user:
+        raise HTTPException(404, detail="Utilisateur introuvable")
+
+    avatar_dir = settings.storage_path / "avatars"
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{user.firebase_uid or user.id}-{uuid4().hex}{extension}"
+    target = avatar_dir / filename
+    async with aiofiles.open(target, "wb") as output:
+        await output.write(content)
+
+    previous = Path(user.avatar).name if "/api/auth/avatars/" in (user.avatar or "") else ""
+    if previous and previous != filename:
+        old_path = avatar_dir / previous
+        if old_path.exists():
+            old_path.unlink(missing_ok=True)
+
+    base = str(request.base_url).rstrip("/")
+    user.avatar = f"{base}/api/auth/avatars/{filename}"
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    write_audit(
+        db,
+        user_id=user.id,
+        organization_id=auth.organization_id,
+        action="profile.avatar.update",
+        module="auth",
+    )
+    return {"ok": True, "user": _user_public(user)}
+
+
+@router.get("/avatars/{filename}")
+def get_avatar(filename: str):
+    safe_name = Path(filename).name
+    if safe_name != filename:
+        raise HTTPException(404, detail="Photo introuvable")
+    path = settings.storage_path / "avatars" / safe_name
+    if not path.is_file():
+        raise HTTPException(404, detail="Photo introuvable")
+    media_type = {
+        ".jpg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media_type)
