@@ -16,7 +16,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (user) navigate('/')
+    if (user) navigate('/dashboard')
   }, [user, navigate])
 
   const onSubmit = async (e: FormEvent) => {
@@ -35,7 +35,7 @@ export default function RegisterPage() {
         password: form.password,
         organization_name: form.organization_name.trim() || undefined,
       })
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Inscription impossible')
     } finally {
@@ -123,6 +123,9 @@ export default function RegisterPage() {
 
       <p className="auth-switch">
         Déjà inscrit ? <Link to="/login">Se connecter</Link>
+      </p>
+      <p className="auth-home-link">
+        <Link to="/">← Retour à l&apos;accueil</Link>
       </p>
     </div>
   )

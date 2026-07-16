@@ -223,7 +223,7 @@ def answer_finance_question(
             answer = (
                 "Bonjour ! Je suis votre Finance Agent, le copilote du dirigeant. "
                 "Ravi de vous parler. Pour l’instant je n’ai pas encore vos chiffres sous la main — "
-                "connectez votre banque ou déposez une facture, puis reparlez-moi. "
+                "déposez une facture ou créez votre première facture client, puis reparlez-moi. "
                 "En attendant, vous pouvez me demander « Que peux-tu faire ? »."
             )
         else:
@@ -253,13 +253,13 @@ def answer_finance_question(
             "• Quels clients sont en retard ?\n"
             "• Puis-je investir dans un véhicule à 40 000 € ?\n"
             "• Où en est ma TVA récupérable ?\n"
-            "Je m’appuie sur votre banque, votre facturation et vos factures fournisseur."
+            "Je m’appuie sur votre facturation et vos factures fournisseur."
         )
     elif any(k in q for k in ("bénéfice", "benefice", "marge", "rentab")):
         if empty:
             answer = (
                 "Je n'ai pas encore de chiffre d'affaires ni de dépenses à comparer. "
-                "Créez une facture client ou importez des mouvements bancaires, "
+                "Créez une facture client et déposez vos factures fournisseur, "
                 "et je pourrai analyser votre marge."
             )
         else:
@@ -279,9 +279,9 @@ def answer_finance_question(
     elif any(k in q for k in ("trésor", "tresorerie", "cash", "solde", "liquid")):
         if empty or snap["balance"] == 0 and not snap["charges"]:
             answer = (
-                "Je n'ai pas encore de compte bancaire connecté. "
-                "Allez dans Banque, connectez votre compte et indiquez le solde actuel — "
-                "je pourrai ensuite projeter votre trésorerie à 30, 60 et 90 jours."
+                "Je n’ai pas encore assez d’encaissements et de paiements enregistrés pour calculer "
+                "une position de trésorerie fiable. Renseignez vos factures et leurs paiements, "
+                "puis reposez-moi la question."
             )
         else:
             f = snap["forecast"]
@@ -320,8 +320,8 @@ def answer_finance_question(
     elif any(k in q for k in ("doublon", "anomal", "risque", "fraude")):
         if snap["duplicates"] == 0 and snap["anomalies"] == 0:
             answer = (
-                "Pas d'anomalie bancaire signalée pour l'instant. "
-                "Connectez votre banque et synchronisez vos mouvements pour activer cette surveillance."
+                "Je ne détecte pas d’anomalie dans les données actuellement disponibles. "
+                "Déposez vos documents réels pour enrichir mes contrôles."
             )
         else:
             answer = (
@@ -333,8 +333,8 @@ def answer_finance_question(
         if empty or snap["balance"] == 0:
             answer = (
                 "Pour juger un investissement (par exemple un véhicule à 40 000 €), "
-                "j'ai besoin de votre solde bancaire réel. Connectez d'abord votre banque, "
-                "puis reposez-moi la question."
+                "j’ai besoin de données réelles sur vos encaissements, vos charges et vos factures. "
+                "Complétez-les, puis reposez-moi la question."
             )
         else:
             ok = snap["balance"] > 40000 and snap["forecast"]["30"] > 15000
@@ -353,7 +353,7 @@ def answer_finance_question(
         if empty:
             answer = (
                 "Je n'ai pas encore de flux de dépenses à analyser. "
-                "Une fois la banque ou les factures renseignées, je pourrai expliquer "
+                "Une fois les factures renseignées, je pourrai expliquer "
                 "ce qui pèse sur votre résultat."
             )
         else:
@@ -377,7 +377,7 @@ def answer_finance_question(
         elif empty:
             answer = (
                 "Je vous écoute. Pour une réponse précise, j’ai besoin de vos données réelles. "
-                "Commencez par connecter votre banque ou déposer une facture — "
+                "Commencez par déposer une facture ou créer une facture client — "
                 "ou demandez-moi « Que peux-tu faire ? » pour voir des exemples."
             )
         else:
@@ -449,7 +449,7 @@ def pilot_kpis(db: Session, organization_id: int | None) -> dict:
             "forecast_30": 0.0,
             "alerts": [],
             "recommendations": [
-                "Créez votre compte Firebase, déposez une facture et connectez votre banque pour démarrer.",
+                "Déposez une facture fournisseur et créez votre première facture client pour démarrer.",
             ],
             "evolution": {
                 "ca_label": "CA facturé",

@@ -131,6 +131,19 @@
   color: rgba(16, 36, 28, 0.72);
 }
 
+.auth-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.auth-field-heading a {
+  color: #0b3d2e;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .auth-form .field input {
   width: 100%;
   padding: 0.78rem 0.9rem;
@@ -186,6 +199,42 @@
 .auth-switch a {
   color: #0b3d2e;
   font-weight: 600;
+}
+
+.auth-home-link {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  color: rgba(16, 36, 28, 0.52);
+  font-size: 0.8rem;
+}
+
+.password-reset-success {
+  text-align: center;
+}
+
+.password-reset-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 61, 46, 0.1);
+  color: #0b3d2e;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.password-reset-success h3 {
+  margin: 0;
+  color: #10241c;
+}
+
+.password-reset-success p {
+  margin: 0.65rem 0 1.25rem;
+  color: rgba(16, 36, 28, 0.65);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 .auth-demo {
@@ -249,7 +298,22 @@
   }
 
   .auth-aside {
-    padding: 2rem 1.5rem 1.5rem;
+    padding: 1.4rem 1.25rem;
+  }
+
+  .auth-logo {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 0.7rem;
+  }
+
+  .auth-title {
+    font-size: 1.65rem;
+  }
+
+  .auth-lead {
+    margin: 0.55rem 0 0;
+    font-size: 0.9rem;
   }
 
   .auth-bullets {
@@ -258,5 +322,17 @@
 
   .auth-form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .auth-main {
+    align-items: flex-start;
+    padding: 1rem 0.75rem 1.5rem;
+  }
+
+  .auth-card {
+    padding: 1.4rem 1rem;
+    border-radius: 16px;
   }
 }

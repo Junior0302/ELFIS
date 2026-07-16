@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
-import { api } from '../api'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 const links: { to: string; label: string; hint: string; permission?: string }[] = [
-  { to: '/', label: 'Tableau de bord', hint: 'Vue d’ensemble', permission: 'invoice.read' },
+  { to: '/dashboard', label: 'Tableau de bord', hint: 'Vue d’ensemble', permission: 'invoice.read' },
   { to: '/copilote', label: 'Copilote IA', hint: 'Discutez finance', permission: 'ai.analysis' },
   { to: '/deposit', label: 'Déposer', hint: 'PDF ou photo OCR', permission: 'invoice.create' },
   { to: '/history', label: 'Comptabilité', hint: 'Factures & exports', permission: 'documents.read' },
   { to: '/facturation', label: 'Facturation', hint: 'Devis & clients', permission: 'invoice.read' },
-  { to: '/banque', label: 'Banque', hint: 'Solde & mouvements', permission: 'bank.read' },
-  { to: '/tresorerie', label: 'Trésorerie', hint: 'Prévisions 30/60/90 j', permission: 'finance.read' },
   { to: '/organisation', label: 'Organisation', hint: 'Entreprise & équipes' },
   { to: '/compte', label: 'Mon compte', hint: 'Profil & sécurité' },
   { to: '/modules', label: 'Modules', hint: 'Toute la plateforme' },
@@ -19,8 +16,8 @@ const links: { to: string; label: string; hint: string; permission?: string }[] 
 
 export default function Layout() {
   const { user, memberships, orgId, setOrgId, logout } = useAuth()
-  const [aiMode, setAiMode] = useState<string>('…')
-  const [lanHint, setLanHint] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const location = useLocation()
   const activeMembership = memberships.find((membership) => membership.organization_id === orgId)
   const can = (permission?: string) =>
     !permission ||
@@ -30,37 +27,50 @@ export default function Layout() {
     )
 
   useEffect(() => {
-    api
-      .health()
-      .then((h) => setAiMode(h.ai_mode === 'openai' ? 'IA conversationnelle' : 'Réponses guidées'))
-      .catch(() => setAiMode('API hors ligne'))
-
-    const host = window.location.hostname
-    if (host && host !== 'localhost' && host !== '127.0.0.1') {
-      setLanHint(`${window.location.host}`)
-    } else {
-      setLanHint('')
-    }
-  }, [])
+    setMenuOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <header className="mobile-topbar">
+        <Link className="mobile-brand" to="/dashboard">
+          <img src="/favicon.svg" alt="" />
+          <span>ComptaPilot IA</span>
+        </Link>
+        <button
+          type="button"
+          className="mobile-menu-toggle"
+          aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+      </header>
+      <button
+        type="button"
+        className={`mobile-menu-backdrop ${menuOpen ? 'open' : ''}`}
+        aria-label="Fermer le menu"
+        onClick={() => setMenuOpen(false)}
+      />
+      <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
-          <div className="brand-mark">
+          <Link to="/dashboard" className="brand-mark">
             <img src="/favicon.svg" alt="" />
             <div>
               <h1>ComptaPilot IA</h1>
               <p>Copilote du dirigeant</p>
             </div>
-          </div>
+          </Link>
         </div>
         <nav className="nav">
           {links.filter((link) => can(link.permission)).map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
-              end={link.to === '/'}
+              end={link.to === '/dashboard'}
               className={({ isActive }) => (isActive ? 'active' : undefined)}
               title={link.hint}
             >
@@ -70,7 +80,7 @@ export default function Layout() {
           ))}
         </nav>
         <div className="sidebar-foot">
-          {user ? (
+          {user && (
             <>
               <strong>
                 {user.first_name} {user.last_name}
@@ -97,20 +107,6 @@ export default function Layout() {
               <button type="button" className="linkish" onClick={logout}>
                 Déconnexion
               </button>
-            </>
-          ) : (
-            <>
-              <strong>{aiMode}</strong>
-              <br />
-              <Link to="/login" className="lan-hint">
-                Se connecter
-              </Link>
-            </>
-          )}
-          {lanHint && (
-            <>
-              <br />
-              <span className="lan-hint">Réseau : {lanHint}</span>
             </>
           )}
         </div>

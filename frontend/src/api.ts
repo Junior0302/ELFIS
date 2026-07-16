@@ -210,43 +210,6 @@ export const api = {
     request<{ formats: { id: string; label: string; ext: string }[] }>('/exports/formats'),
   listModules: () =>
     request<{ product: string; vision: string; modules: ModuleInfo[] }>('/modules'),
-  bankOverview: (token?: string | null, orgId?: number | null) =>
-    request<BankOverview>('/modules/banque/overview', undefined, { token, orgId }),
-  bankConnect: (
-    payload: { bank_name: string; label?: string; iban?: string; balance?: number },
-    token?: string | null,
-    orgId?: number | null,
-  ) =>
-    request<{ ok: boolean; message: string; account: NonNullable<BankOverview['account']> }>(
-      '/modules/banque/connect',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      },
-      { token, orgId },
-    ),
-  bankSync: (token?: string | null, orgId?: number | null) =>
-    request<{
-      ok: boolean
-      imported: number
-      analyzed: number
-      message: string
-      stats: BankOverview['stats']
-    }>('/modules/banque/sync', { method: 'POST' }, { token, orgId }),
-  bankImportCsv: async (file: File, token: string, orgId?: number | null) => {
-    const form = new FormData()
-    form.append('file', file)
-    return request<{
-      ok: boolean
-      imported: number
-      ignored: number
-      analyzed: number
-      message: string
-    }>('/modules/banque/import-csv', { method: 'POST', body: form }, { token, orgId })
-  },
-  treasuryOverview: (token?: string | null, orgId?: number | null) =>
-    request<TreasuryOverview>('/modules/tresorerie/overview', undefined, { token, orgId }),
   firebaseSession: (payload: {
     id_token: string
     first_name?: string
@@ -389,51 +352,6 @@ export type ModuleInfo = {
   summary: string
   capabilities: string[]
   route: string | null
-}
-
-export type BankTransaction = {
-  id: number
-  booked_at: string
-  label: string
-  amount: number
-  category: string
-  is_duplicate: boolean
-  is_anomaly: boolean
-  anomaly_reason: string | null
-  reconciled: boolean
-  matched_invoice_id: number | null
-  confidence: number
-}
-
-export type BankOverview = {
-  account: {
-    id: number
-    label: string
-    bank_name: string
-    iban: string
-    balance: number
-    connected: boolean
-    last_sync_at: string | null
-  } | null
-  stats: {
-    count: number
-    credits: number
-    debits: number
-    to_reconcile: number
-    duplicates: number
-    anomalies: number
-  }
-  transactions: BankTransaction[]
-}
-
-export type TreasuryOverview = {
-  current_balance: number
-  forecast: { '30': number; '60': number; '90': number }
-  tensions: string[]
-  recommendations: string[]
-  encaissements: number
-  decaissements: number
-  net_period: number
 }
 
 export type AuthUser = {

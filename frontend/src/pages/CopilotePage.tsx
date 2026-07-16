@@ -16,16 +16,35 @@ export default function CopilotePage() {
 
   useEffect(() => {
     const first = user?.first_name || 'vous'
-    setMessages([
-      {
-        role: 'assistant',
-        text:
-          `Bonjour ${first} 👋 Je suis votre Finance Agent, le copilote du dirigeant. ` +
-          `Je peux vous expliquer votre CA, votre marge, votre trésorerie ou un investissement. ` +
-          `Par où souhaitez-vous commencer ?`,
-      },
-    ])
-  }, [user?.first_name])
+    const welcome: Msg = {
+      role: 'assistant',
+      text:
+        `Bonjour ${first} 👋 Je suis votre Finance Agent. Vous pouvez me parler naturellement : ` +
+        `je m’appuie sur les données de votre entreprise pour vous répondre simplement. ` +
+        `Que souhaitez-vous comprendre aujourd’hui ?`,
+    }
+    setMessages([welcome])
+    if (!token) return
+
+    let cancelled = false
+    api
+      .aiConversations(token, orgId)
+      .then(({ conversations }) => {
+        if (cancelled || conversations.length === 0) return
+        const history = conversations
+          .slice(0, 6)
+          .reverse()
+          .flatMap<Msg>((conversation) => [
+            { role: 'user', text: conversation.question },
+            { role: 'assistant', text: conversation.answer },
+          ])
+        setMessages([welcome, ...history])
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, token, user?.first_name])
 
   useEffect(() => {
     api
@@ -34,8 +53,8 @@ export default function CopilotePage() {
       .catch(() =>
         setSuggestions([
           'Que peux-tu faire ?',
-          'Quel est l’état de ma trésorerie ?',
-          'Pourquoi ma marge baisse-t-elle ?',
+          'Résume mon activité simplement',
+          'Comment se porte ma marge ?',
           'Quels clients sont en retard ?',
         ]),
       )
@@ -155,9 +174,9 @@ export default function CopilotePage() {
           <div className="copilot-side-tips">
             <h4>Des réponses fiables</h4>
             <ul>
-              <li>Connectez un compte dans Banque</li>
               <li>Déposez vos factures fournisseur</li>
               <li>Émettez devis et factures clients</li>
+              <li>Posez aussi des questions de suivi</li>
             </ul>
           </div>
         </aside>

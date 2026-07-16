@@ -2,6 +2,7 @@ import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
   getAuth,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
@@ -84,6 +85,12 @@ export async function firebaseRegister(
 export async function firebaseLogout(): Promise<void> {
   if (!isFirebaseConfigured() || !auth) return
   await signOut(auth)
+}
+
+export async function resetFirebasePassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(getFirebaseAuth(), email, {
+    url: `${window.location.origin}/login`,
+  })
 }
 
 export async function updateFirebaseUserPassword(password: string): Promise<void> {
@@ -180,6 +187,7 @@ export function mapFirebaseError(err: unknown): string {
     'auth/too-many-requests': 'Trop de tentatives. Réessayez plus tard.',
     'auth/requires-recent-login':
       'Pour changer le mot de passe, déconnectez-vous puis reconnectez-vous avant de réessayer.',
+    'auth/missing-email': 'Saisissez votre adresse email.',
     'auth/network-request-failed': 'Réseau indisponible. Vérifiez votre connexion.',
     'auth/operation-not-allowed': 'Email/mot de passe non activé dans Firebase Console.',
   }

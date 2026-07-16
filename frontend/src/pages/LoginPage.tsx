@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (user) navigate('/')
+    if (user) navigate('/dashboard')
   }, [user, navigate])
 
   const onSubmit = async (e: FormEvent) => {
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError('')
     try {
       await login(email.trim(), password)
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connexion impossible')
     } finally {
@@ -56,7 +56,10 @@ export default function LoginPage() {
           />
         </div>
         <div className="field">
-          <label htmlFor="password">Mot de passe</label>
+          <div className="auth-field-heading">
+            <label htmlFor="password">Mot de passe</label>
+            <Link to="/forgot-password">Mot de passe oublié ?</Link>
+          </div>
           <input
             id="password"
             type="password"
@@ -77,6 +80,9 @@ export default function LoginPage() {
 
       <p className="auth-switch">
         Pas encore de compte ? <Link to="/register">Créer un compte</Link>
+      </p>
+      <p className="auth-home-link">
+        <Link to="/">← Retour à l&apos;accueil</Link>
       </p>
     </div>
   )

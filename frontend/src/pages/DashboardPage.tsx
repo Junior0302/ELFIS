@@ -46,8 +46,8 @@ export default function DashboardPage() {
           <Link className="btn" to="/deposit">
             Déposer une facture
           </Link>
-          <Link className="btn secondary" to="/banque">
-            Connecter la banque
+          <Link className="btn secondary" to="/copilote">
+            Parler au copilote
           </Link>
         </div>
       </div>
@@ -56,17 +56,17 @@ export default function DashboardPage() {
         <section className="panel onboarding-panel">
           <h3>Commencez réellement</h3>
           <p className="muted">
-            Aucune donnée fictive. Connectez votre activité pour activer le copilote financier.
+            Aucune donnée fictive. Ajoutez vos premiers documents pour activer le copilote financier.
           </p>
           <ol className="onboarding-steps">
             <li>
               <Link to="/deposit">1. Déposez votre première facture PDF</Link>
             </li>
             <li>
-              <Link to="/banque">2. Connectez votre compte bancaire</Link>
+              <Link to="/facturation">2. Créez votre première facture client</Link>
             </li>
             <li>
-              <Link to="/facturation">3. Créez votre première facture client</Link>
+              <Link to="/settings">3. Configurez les informations de l’entreprise</Link>
             </li>
             <li>
               <Link to="/copilote">4. Posez une question au Finance Agent</Link>
