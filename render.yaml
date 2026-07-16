@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: elfis-core-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: AUTH_REQUIRED
+        value: "true"
+      - key: DATABASE_URL
+        value: sqlite:////data/comptapilot.db
+      - key: STORAGE_DIR
+        value: /data/storage
+      - key: CORS_ORIGINS
+        value: https://elfis-core.web.app,https://elfis-core.firebaseapp.com
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FIREBASE_PROJECT_ID
+        value: elfis-core
+      - key: FIREBASE_WEB_API_KEY
+        value: AIzaSyBfPpjwJoWxVvfAQskrNbas-CEtUqILRW4
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_API_KEY
+        sync: false
+    disk:
+      name: elfis-core-data
+      mountPath: /data
+      sizeGB: 1
