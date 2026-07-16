@@ -3,17 +3,38 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 import SubscriptionBanner from './SubscriptionBanner'
 
-const links: { to: string; label: string; hint: string; permission?: string }[] = [
-  { to: '/dashboard', label: 'Tableau de bord', hint: 'Vue d’ensemble', permission: 'invoice.read' },
-  { to: '/copilote', label: 'Copilote IA', hint: 'Discutez finance', permission: 'ai.analysis' },
-  { to: '/deposit', label: 'Déposer', hint: 'PDF ou photo OCR', permission: 'invoice.create' },
-  { to: '/history', label: 'Comptabilité', hint: 'Factures & exports', permission: 'documents.read' },
-  { to: '/facturation', label: 'Facturation', hint: 'Devis & clients', permission: 'invoice.read' },
-  { to: '/abonnement', label: 'Abonnement', hint: 'Offre, carte & factures', permission: 'subscription.manage' },
-  { to: '/organisation', label: 'Organisation', hint: 'Entreprise & équipes' },
-  { to: '/compte', label: 'Mon compte', hint: 'Profil & sécurité' },
-  { to: '/modules', label: 'Modules', hint: 'Toute la plateforme' },
-  { to: '/settings', label: 'Paramètres', hint: 'Entreprise & TVA' },
+type NavItem = { to: string; label: string; hint: string; permission?: string }
+
+const navSections: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'Pilotage',
+    items: [
+      { to: '/dashboard', label: 'Tableau de bord', hint: 'Vue d’ensemble', permission: 'invoice.read' },
+      { to: '/copilote', label: 'Copilote IA', hint: 'Questions & conseils', permission: 'ai.analysis' },
+    ],
+  },
+  {
+    title: 'Activité',
+    items: [
+      { to: '/deposit', label: 'Déposer', hint: 'OCR factures', permission: 'invoice.create' },
+      { to: '/history', label: 'Comptabilité', hint: 'Documents & exports', permission: 'documents.read' },
+      { to: '/facturation', label: 'Facturation', hint: 'Devis & clients', permission: 'invoice.read' },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      {
+        to: '/abonnement',
+        label: 'Abonnement',
+        hint: 'Essai, carte & factures',
+        permission: 'subscription.manage',
+      },
+      { to: '/organisation', label: 'Organisation', hint: 'Équipe & droits' },
+      { to: '/settings', label: 'Paramètres', hint: 'Entreprise & TVA', permission: 'settings.manage' },
+      { to: '/compte', label: 'Mon compte', hint: 'Profil & sécurité' },
+    ],
+  },
 ]
 
 export default function Layout() {
@@ -68,18 +89,27 @@ export default function Layout() {
           </Link>
         </div>
         <nav className="nav">
-          {links.filter((link) => can(link.permission)).map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/dashboard'}
-              className={({ isActive }) => (isActive ? 'active' : undefined)}
-              title={link.hint}
-            >
-              <span className="nav-label">{link.label}</span>
-              <span className="nav-hint">{link.hint}</span>
-            </NavLink>
-          ))}
+          {navSections.map((section) => {
+            const items = section.items.filter((link) => can(link.permission))
+            if (items.length === 0) return null
+            return (
+              <div key={section.title} className="nav-section">
+                <p className="nav-section-title">{section.title}</p>
+                {items.map((link) => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    end={link.to === '/dashboard'}
+                    className={({ isActive }) => (isActive ? 'active' : undefined)}
+                    title={link.hint}
+                  >
+                    <span className="nav-label">{link.label}</span>
+                    <span className="nav-hint">{link.hint}</span>
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })}
         </nav>
         <div className="sidebar-foot">
           {user && (
@@ -87,10 +117,14 @@ export default function Layout() {
               <strong>
                 {user.first_name} {user.last_name}
               </strong>
-              <br />
-              <Link to="/compte" className="lan-hint">
-                Gérer mon profil
-              </Link>
+              {activeMembership && (
+                <>
+                  <br />
+                  <span className="lan-hint">
+                    {activeMembership.organization_name} · {activeMembership.role}
+                  </span>
+                </>
+              )}
               <br />
               {user.is_platform_admin && (
                 <>
@@ -100,7 +134,7 @@ export default function Layout() {
                   <br />
                 </>
               )}
-              {memberships.length > 0 && (
+              {memberships.length > 1 && (
                 <select
                   className="org-select"
                   value={orgId ?? ''}
