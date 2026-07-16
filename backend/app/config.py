@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     auth_required: bool = True
     firebase_web_api_key: str = ""
     firebase_project_id: str = ""
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_pro: str = ""
+    stripe_trial_days: int = 14
+    stripe_past_due_grace_days: int = 3
+    frontend_url: str = "http://localhost:5173"
+    platform_admin_emails: str = ""
 
     @model_validator(mode="after")
     def validate_production_security(self):
@@ -50,6 +57,14 @@ class Settings(BaseSettings):
         path = Path(self.storage_dir)
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    @property
+    def platform_admin_email_set(self) -> set[str]:
+        return {
+            email.strip().lower()
+            for email in self.platform_admin_emails.split(",")
+            if email.strip()
+        }
 
 
 settings = Settings()

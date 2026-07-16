@@ -29,6 +29,20 @@ services:
         value: gpt-4o-mini
       - key: OPENAI_API_KEY
         sync: false
+      - key: FRONTEND_URL
+        value: https://elfis-core.web.app
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: STRIPE_TRIAL_DAYS
+        value: "14"
+      - key: STRIPE_PAST_DUE_GRACE_DAYS
+        value: "3"
+      - key: PLATFORM_ADMIN_EMAILS
+        value: johnjuniort40@gmail.com
     disk:
       name: elfis-core-data
       mountPath: /data

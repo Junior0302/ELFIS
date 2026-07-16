@@ -5,13 +5,17 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.models import Invoice
 from app.services.export_excel import invoice_to_excel, invoices_to_excel
 from app.services.export_pdf import invoice_to_pdf
 from app.services.export_software import SOFTWARE_TARGETS, export_software
 
-router = APIRouter(prefix="/exports", tags=["exports"])
+router = APIRouter(
+    prefix="/exports",
+    tags=["exports"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 def _invoice_for_org(db: Session, invoice_id: int, organization_id: int) -> Invoice:
@@ -53,7 +57,7 @@ def export_history_excel(
     auth.require("documents.read")
     invoices = (
         db.query(Invoice)
-        .filter(Invoice.organization_id == (auth.organization_id or 0))
+        .filter(Invoice.organization_id == auth.require_organization_id())
         .order_by(Invoice.created_at.desc())
         .all()
     )
@@ -75,7 +79,7 @@ def export_history_software(
     auth.require("documents.read")
     query = (
         db.query(Invoice)
-        .filter(Invoice.organization_id == (auth.organization_id or 0))
+        .filter(Invoice.organization_id == auth.require_organization_id())
         .order_by(Invoice.created_at.desc())
     )
     if target.lower() == "excel":
@@ -106,7 +110,7 @@ def export_excel(
     db: Session = Depends(get_db),
 ):
     auth.require("documents.read")
-    invoice = _invoice_for_org(db, invoice_id, auth.organization_id or 0)
+    invoice = _invoice_for_org(db, invoice_id, auth.require_organization_id())
     content = invoice_to_excel(invoice)
     return Response(
         content,
@@ -122,7 +126,7 @@ def export_pdf(
     db: Session = Depends(get_db),
 ):
     auth.require("documents.read")
-    invoice = _invoice_for_org(db, invoice_id, auth.organization_id or 0)
+    invoice = _invoice_for_org(db, invoice_id, auth.require_organization_id())
     content = invoice_to_pdf(invoice)
     return Response(
         content,
@@ -139,7 +143,7 @@ def export_invoice_software(
     db: Session = Depends(get_db),
 ):
     auth.require("documents.read")
-    invoice = _invoice_for_org(db, invoice_id, auth.organization_id or 0)
+    invoice = _invoice_for_org(db, invoice_id, auth.require_organization_id())
     try:
         content, media, filename = export_software(target, [invoice])
     except ValueError as exc:

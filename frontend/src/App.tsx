@@ -2,7 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth'
 import AuthLayout from './components/AuthLayout'
 import Layout from './components/Layout'
+import PlatformLayout from './components/PlatformLayout'
 import RequireAuth from './components/RequireAuth'
+import RequirePlatformAdmin from './components/RequirePlatformAdmin'
+import AbonnementPage from './pages/AbonnementPage'
 import ComptePage from './pages/ComptePage'
 import CopilotePage from './pages/CopilotePage'
 import DashboardPage from './pages/DashboardPage'
@@ -17,6 +20,10 @@ import OrganisationPage from './pages/OrganisationPage'
 import RegisterPage from './pages/RegisterPage'
 import ResultPage from './pages/ResultPage'
 import SettingsPage from './pages/SettingsPage'
+import PlatformOrganizationsPage from './pages/platform/PlatformOrganizationsPage'
+import PlatformOverviewPage from './pages/platform/PlatformOverviewPage'
+import PlatformSubscriptionsPage from './pages/platform/PlatformSubscriptionsPage'
+import PlatformUsersPage from './pages/platform/PlatformUsersPage'
 
 export default function App() {
   return (
@@ -36,11 +43,20 @@ export default function App() {
               <Route path="result/:id" element={<ResultPage />} />
               <Route path="history" element={<HistoryPage />} />
               <Route path="facturation" element={<FacturationPage />} />
+              <Route path="abonnement" element={<AbonnementPage />} />
               <Route path="copilote" element={<CopilotePage />} />
               <Route path="organisation" element={<OrganisationPage />} />
               <Route path="compte" element={<ComptePage />} />
               <Route path="modules" element={<ModulesPage />} />
               <Route path="settings" element={<SettingsPage />} />
+            </Route>
+          </Route>
+          <Route element={<RequirePlatformAdmin />}>
+            <Route path="platform" element={<PlatformLayout />}>
+              <Route index element={<PlatformOverviewPage />} />
+              <Route path="organisations" element={<PlatformOrganizationsPage />} />
+              <Route path="utilisateurs" element={<PlatformUsersPage />} />
+              <Route path="abonnements" element={<PlatformSubscriptionsPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

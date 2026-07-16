@@ -16,7 +16,9 @@ from app.routers import (
     exports,
     modules,
     org,
+    platform,
     settings as settings_router,
+    subscriptions,
 )
 from app.services.auth import seed_auth
 from app.services.banking import purge_demo_finance_data
@@ -57,6 +59,8 @@ app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(org.router, prefix="/api")
+app.include_router(subscriptions.router, prefix="/api")
+app.include_router(platform.router, prefix="/api")
 app.include_router(billing.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")

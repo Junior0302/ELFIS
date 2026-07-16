@@ -55,6 +55,53 @@ Un propriétaire ou administrateur peut ajouter un utilisateur déjà inscrit de
 En production, l’API refuse de démarrer avec le secret JWT de développement, un CORS ouvert ou
 une configuration Firebase absente.
 
+## Stripe Billing — ComptaPilot Pro
+
+L’offre SaaS unique est **ComptaPilot Pro à 19 € TTC/mois**, avec carte bancaire enregistrée au
+départ et essai Stripe de 14 jours. Le backend démarre sans clés Stripe, mais les endpoints de
+checkout et webhook répondent alors avec une erreur structurée `stripe_not_configured`.
+
+1. Dans Stripe, créer un produit **ComptaPilot Pro** et un prix récurrent mensuel de **19,00 EUR**.
+2. Renseigner dans `backend/.env` :
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_PRO=price_...
+STRIPE_TRIAL_DAYS=14
+STRIPE_PAST_DUE_GRACE_DAYS=3
+FRONTEND_URL=http://localhost:5173
+PLATFORM_ADMIN_EMAILS=admin@example.com
+```
+
+3. En local, installer Stripe CLI puis transférer les événements vers l’API :
+
+```bash
+stripe login
+stripe listen --forward-to http://127.0.0.1:8001/api/subscriptions/webhook
+```
+
+Copier le secret `whsec_...` affiché par Stripe CLI. Pour un test complet, appeler
+`POST /api/subscriptions/checkout` en tant que propriétaire/administrateur, puis utiliser la carte
+de test Stripe `4242 4242 4242 4242`, une date future et un CVC quelconque.
+
+En Test comme en Live, le webhook Stripe doit viser
+`https://votre-api.example/api/subscriptions/webhook` et écouter :
+
+- `checkout.session.completed`
+- `customer.subscription.created`, `customer.subscription.updated`,
+  `customer.subscription.deleted`
+- `invoice.paid`, `invoice.payment_failed`
+
+Les clés, prix et secrets webhook Test et Live sont distincts : avant le passage en Live, remplacer
+ensemble `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO` et `STRIPE_WEBHOOK_SECRET`. Stripe est la source de
+vérité de l’état d’abonnement ; ne modifiez pas directement la table `subscriptions`.
+
+Les routes métier renvoient une réponse structurée `402` si l’abonnement est absent/inactif.
+Les routes auth, profil, organisation et abonnement restent accessibles afin de permettre la
+connexion et la régularisation. Les adresses dans `PLATFORM_ADMIN_EMAILS` accèdent aux vues serveur
+`/api/platform/*`, qui n’exposent aucune donnée de carte.
+
 ## Modules
 
 | Module | Accès |

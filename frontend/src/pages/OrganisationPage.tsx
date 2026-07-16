@@ -1,7 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api, type OrgDetail, type OrgMember } from '../api'
+import { Link } from 'react-router-dom'
+import { api, formatEuro, type OrgDetail, type OrgMember, type SubscriptionInfo } from '../api'
 import { useAuth } from '../auth'
 import { saveFirestoreOrganizationMember } from '../firebase'
+import {
+  canOpenSubscriptionPortal,
+  formatDate,
+  subscriptionLabels,
+  subscriptionTone,
+} from '../subscription'
 
 export default function OrganisationPage() {
   const { token, orgId, memberships, user } = useAuth()
@@ -13,10 +20,23 @@ export default function OrganisationPage() {
   const [savingMember, setSavingMember] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
+  const [subscriptionError, setSubscriptionError] = useState('')
+  const [openingPortal, setOpeningPortal] = useState(false)
+  const activeMembership = memberships.find((item) => item.organization_id === orgId)
+  const canManageSubscription = Boolean(
+    activeMembership?.permissions.includes('*') ||
+      activeMembership?.permissions.includes('subscription.manage'),
+  )
+  const canOpenPortal = Boolean(
+    subscription && canOpenSubscriptionPortal(subscription.status),
+  )
 
   useEffect(() => {
     if (!orgId) return
     if (!token) return
+    setSubscription(null)
+    setSubscriptionError('')
     Promise.all([api.orgDetail(orgId, token), api.orgMembers(orgId, token)])
       .then(([organization, memberData]) => {
         setDetail(organization)
@@ -25,7 +45,27 @@ export default function OrganisationPage() {
         setCanManage(memberData.can_manage)
       })
       .catch((e) => setError(e.message || 'Erreur organisation'))
+    api.currentSubscription(token, orgId)
+      .then(setSubscription)
+      .catch((reason) => {
+        setSubscriptionError(reason instanceof Error ? reason.message : 'Abonnement indisponible')
+      })
   }, [orgId, token])
+
+  const openPortal = async () => {
+    if (!token || !orgId) return
+    setOpeningPortal(true)
+    setSubscriptionError('')
+    try {
+      const { url } = await api.createSubscriptionPortal(token, orgId)
+      const target = new URL(url, window.location.origin)
+      if (!['http:', 'https:'].includes(target.protocol)) throw new Error('URL Stripe invalide')
+      window.location.assign(target.toString())
+    } catch (reason) {
+      setSubscriptionError(reason instanceof Error ? reason.message : 'Portail Stripe indisponible')
+      setOpeningPortal(false)
+    }
+  }
 
   const syncMember = async (member: OrgMember) => {
     if (!orgId || !member.uid) return
@@ -133,6 +173,47 @@ export default function OrganisationPage() {
           <strong>{detail.ai_agents.length}</strong>
         </div>
       </div>
+
+      <section className="panel organisation-subscription">
+        <div>
+          <span className="home-eyebrow">Abonnement</span>
+          <h3>ComptaPilot {subscription?.plan || detail.subscription?.plan || 'Pro'}</h3>
+          {subscription ? (
+            <p className="muted">
+              {formatEuro(subscription.price_eur || 19)} / mois · échéance{' '}
+              {formatDate(
+                subscription.status === 'trialing'
+                  ? subscription.trial_end
+                  : subscription.current_period_end,
+              )}
+            </p>
+          ) : (
+            <p className="muted">
+              {detail.subscription
+                ? `${formatEuro(detail.subscription.price)} / mois`
+                : 'Statut détaillé indisponible'}
+            </p>
+          )}
+          {subscriptionError && <small className="form-error">{subscriptionError}</small>}
+        </div>
+        <div className="organisation-subscription-actions">
+          {subscription && (
+            <span className={`subscription-badge ${subscriptionTone(subscription.status)}`}>
+              {subscriptionLabels[subscription.status]}
+            </span>
+          )}
+          {canManageSubscription && canOpenPortal && (
+            <button className="btn secondary" type="button" disabled={openingPortal} onClick={() => void openPortal()}>
+              {openingPortal ? 'Ouverture…' : 'Ouvrir le portail Stripe'}
+            </button>
+          )}
+          {canManageSubscription && !canOpenPortal && (
+            <Link className="btn secondary" to="/abonnement">
+              Choisir l’abonnement
+            </Link>
+          )}
+        </div>
+      </section>
 
       <div className="result-grid" style={{ minHeight: 'auto' }}>
         <section className="panel">

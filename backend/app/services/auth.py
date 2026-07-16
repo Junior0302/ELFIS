@@ -37,6 +37,7 @@ ROLE_PERMS: dict[str, list[str]] = {
         "tax.manage",
         "ai.analysis",
         "finance.read",
+        "subscription.manage",
     ],
     "cfo": [
         "finance.read",
@@ -78,6 +79,7 @@ ALL_PERMISSIONS = [
     ("finance.read", "finance"),
     ("forecast.read", "previsions"),
     ("reporting.read", "pilotage"),
+    ("subscription.manage", "subscription"),
 ]
 
 
@@ -130,6 +132,11 @@ def ensure_rbac_catalog(db: Session) -> dict[str, Role]:
 def seed_auth(db: Session) -> None:
     """Catalogue RBAC uniquement — comptes via Firebase /register."""
     ensure_rbac_catalog(db)
+    for user in db.query(User).all():
+        should_be_admin = user.email.lower() in settings.platform_admin_email_set
+        if user.is_platform_admin != should_be_admin:
+            user.is_platform_admin = should_be_admin
+            db.add(user)
     # Les anciens agents de roadmap n'étaient pas reliés à un service réel.
     db.query(AIAgent).filter(AIAgent.type != "finance").delete(synchronize_session=False)
     # Retire d'anciens comptes fictifs s'ils existent encore
@@ -167,6 +174,7 @@ def upsert_firebase_user(
         if last_name:
             user.last_name = last_name
         user.last_login = datetime.utcnow()
+        user.is_platform_admin = email.lower() in settings.platform_admin_email_set
         db.add(user)
         db.flush()
     else:
@@ -178,6 +186,7 @@ def upsert_firebase_user(
             password_hash="",
             firebase_uid=firebase_uid,
             status="active",
+            is_platform_admin=email.lower() in settings.platform_admin_email_set,
             last_login=datetime.utcnow(),
         )
         db.add(user)

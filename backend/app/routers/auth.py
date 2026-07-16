@@ -77,6 +77,7 @@ def _user_public(user: User) -> dict:
         "phone": user.phone or "",
         "avatar": user.avatar or "",
         "status": user.status,
+        "is_platform_admin": user.is_platform_admin,
         "last_login": user.last_login.isoformat() if user.last_login else None,
         "firebase_linked": bool(user.firebase_uid),
     }

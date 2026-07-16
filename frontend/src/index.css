@@ -967,6 +967,444 @@ textarea {
   }
 }
 
+/* Abonnements */
+.global-subscription-banner,
+.subscription-return {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(11, 61, 46, 0.18);
+  border-radius: 14px;
+  background: rgba(123, 196, 160, 0.2);
+  color: var(--forest);
+}
+
+.global-subscription-banner.past_due,
+.global-subscription-banner.incomplete {
+  background: rgba(196, 120, 43, 0.15);
+  color: #7a430d;
+}
+
+.global-subscription-banner.unpaid,
+.global-subscription-banner.expired,
+.global-subscription-banner.incomplete_expired {
+  background: rgba(180, 35, 24, 0.11);
+  color: var(--danger);
+}
+
+.global-subscription-banner.none,
+.global-subscription-banner.canceled,
+.global-subscription-banner.paused {
+  background: rgba(16, 36, 28, 0.08);
+  color: rgba(16, 36, 28, 0.78);
+}
+
+.global-subscription-banner a {
+  flex: 0 0 auto;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.subscription-return {
+  justify-content: flex-start;
+  background: rgba(255, 253, 248, 0.82);
+}
+
+.subscription-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  gap: 1.2rem;
+  align-items: start;
+}
+
+.pricing-card {
+  border-color: rgba(11, 61, 46, 0.26);
+  background: linear-gradient(145deg, rgba(255, 253, 248, 0.95), rgba(231, 242, 236, 0.78));
+}
+
+.pricing-card h3 {
+  margin-bottom: 0.35rem;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+}
+
+.pricing-amount,
+.home-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0.75rem 0;
+}
+
+.pricing-amount strong,
+.home-price strong {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 6vw, 4.4rem);
+  letter-spacing: -0.06em;
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin: 1.4rem 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.pricing-features li::before {
+  content: "✓";
+  margin-right: 0.6rem;
+  color: var(--forest);
+  font-weight: 800;
+}
+
+.subscription-main-action {
+  width: 100%;
+}
+
+.subscription-status-line,
+.organisation-subscription,
+.organisation-subscription-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.subscription-details {
+  display: grid;
+  gap: 0;
+  margin: 1.3rem 0;
+}
+
+.subscription-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.subscription-details dt {
+  color: rgba(16, 36, 28, 0.62);
+}
+
+.subscription-details dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.subscription-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(123, 196, 160, 0.22);
+  color: var(--forest);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.subscription-badge.warn {
+  background: rgba(196, 120, 43, 0.15);
+  color: #7a430d;
+}
+
+.subscription-badge.danger {
+  background: rgba(180, 35, 24, 0.11);
+  color: var(--danger);
+}
+
+.subscription-badge.neutral {
+  background: rgba(16, 36, 28, 0.08);
+  color: rgba(16, 36, 28, 0.7);
+}
+
+.subscription-trust {
+  margin: 1.2rem 0 0;
+  color: rgba(16, 36, 28, 0.5);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.organisation-subscription {
+  margin-bottom: 1rem;
+}
+
+.organisation-subscription h3 {
+  margin-bottom: 0.4rem;
+}
+
+.organisation-subscription-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* Tarif public */
+.home-pricing {
+  padding: 7rem max(1.5rem, calc((100% - 1180px) / 2));
+  background: #eef4ef;
+}
+
+.home-pricing .home-section-heading > span {
+  color: var(--forest);
+}
+
+.home-pricing-card {
+  display: grid;
+  grid-template-columns: 1fr 0.9fr auto;
+  align-items: center;
+  gap: clamp(1.5rem, 4vw, 4rem);
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid rgba(11, 61, 46, 0.2);
+  border-radius: 28px;
+  background: #fffdf8;
+  box-shadow: var(--shadow);
+}
+
+.home-pricing-card p {
+  max-width: 30rem;
+  margin: 0;
+  color: rgba(16, 36, 28, 0.62);
+  line-height: 1.5;
+}
+
+/* Administration plateforme */
+.platform-shell {
+  min-height: 100vh;
+  background: #101821;
+  color: #eef4f8;
+}
+
+.platform-header {
+  min-height: 76px;
+  padding: 1rem max(1.25rem, calc((100% - 1280px) / 2));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0b121a;
+}
+
+.platform-header > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.platform-kicker,
+.platform-title > span {
+  color: #75d6bf;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.platform-account,
+.platform-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.platform-account {
+  color: rgba(238, 244, 248, 0.68);
+  font-size: 0.82rem;
+}
+
+.platform-account a,
+.platform-account button {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: transparent;
+  color: #eef4f8;
+  cursor: pointer;
+}
+
+.platform-nav {
+  padding: 0.75rem max(1.25rem, calc((100% - 1280px) / 2));
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.platform-nav a {
+  flex: 0 0 auto;
+  padding: 0.6rem 0.85rem;
+  border-radius: 9px;
+  color: rgba(238, 244, 248, 0.65);
+}
+
+.platform-nav a.active {
+  background: rgba(117, 214, 191, 0.13);
+  color: #9ce8d7;
+}
+
+.platform-main {
+  width: min(1280px, calc(100% - 2.5rem));
+  margin: 0 auto;
+  padding: 2.5rem 0;
+}
+
+.platform-title {
+  margin-bottom: 1.8rem;
+}
+
+.platform-title h1 {
+  margin: 0.45rem 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+}
+
+.platform-title p {
+  margin: 0;
+  color: rgba(238, 244, 248, 0.58);
+}
+
+.platform-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.platform-stats article,
+.platform-table-wrap,
+.platform-alert,
+.platform-loading {
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background: #16212c;
+}
+
+.platform-stats article {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.platform-stats span {
+  color: rgba(238, 244, 248, 0.58);
+}
+
+.platform-stats strong {
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 2rem;
+}
+
+.platform-alert {
+  margin-bottom: 1rem;
+  border-color: rgba(240, 112, 112, 0.35);
+  color: #ffb6b6;
+}
+
+.platform-table-wrap {
+  overflow-x: auto;
+}
+
+.platform-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+
+.platform-table th,
+.platform-table td {
+  padding: 0.9rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.platform-table th {
+  color: rgba(238, 244, 248, 0.48);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.platform-table td {
+  color: rgba(238, 244, 248, 0.78);
+}
+
+.platform-table td:first-child strong,
+.platform-table td:first-child small {
+  display: block;
+}
+
+.platform-table small {
+  margin-top: 0.2rem;
+  color: rgba(238, 244, 248, 0.38);
+}
+
+.platform-pill {
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(117, 214, 191, 0.12);
+  color: #9ce8d7;
+  font-size: 0.75rem;
+}
+
+.platform-empty {
+  color: rgba(238, 244, 248, 0.52);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .subscription-grid,
+  .home-pricing-card {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .global-subscription-banner,
+  .organisation-subscription,
+  .platform-header,
+  .platform-account {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .organisation-subscription-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .organisation-subscription-actions .btn {
+    width: 100%;
+  }
+
+  .home-pricing {
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+  }
+
+  .platform-account {
+    gap: 0.45rem;
+  }
+
+  .platform-account span {
+    word-break: break-all;
+  }
+
+  .platform-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-main {
+    width: min(100% - 1.5rem, 1280px);
+    padding-top: 1.5rem;
+  }
+}
+
 .mobile-topbar,
 .mobile-menu-backdrop {
   display: none;

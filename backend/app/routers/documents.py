@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.pipeline import process_invoice, refresh_from_manual_edit
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.models import Invoice
 from app.schemas import InvoiceOut, InvoiceUpdate
 from app.services.ocr import ALLOWED_EXT
@@ -14,7 +14,11 @@ from app.services.serializers import serialize_invoice
 from app.services.storage import resolve_stored, save_upload
 from pathlib import Path
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
@@ -54,7 +58,7 @@ async def upload_document(
 
     stored = await save_upload(file.filename, content)
     invoice = Invoice(
-        organization_id=auth.organization_id or 0,
+        organization_id=auth.require_organization_id(),
         filename=file.filename,
         stored_path=str(stored),
         mime_type=file.content_type or "application/octet-stream",
@@ -88,7 +92,7 @@ def list_documents(
     auth.require("documents.read")
     query = (
         db.query(Invoice)
-        .filter(Invoice.organization_id == (auth.organization_id or 0))
+        .filter(Invoice.organization_id == auth.require_organization_id())
         .order_by(Invoice.created_at.desc())
     )
     if q:
@@ -112,7 +116,7 @@ def get_document(
     db: Session = Depends(get_db),
 ):
     auth.require("documents.read")
-    invoice = _organization_invoice(db, invoice_id, auth.organization_id or 0)
+    invoice = _organization_invoice(db, invoice_id, auth.require_organization_id())
     return serialize_invoice(invoice)
 
 
@@ -124,7 +128,7 @@ def update_document(
     db: Session = Depends(get_db),
 ):
     auth.require("documents.write")
-    invoice = _organization_invoice(db, invoice_id, auth.organization_id or 0)
+    invoice = _organization_invoice(db, invoice_id, auth.require_organization_id())
 
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
@@ -142,7 +146,7 @@ async def reprocess_document(
     db: Session = Depends(get_db),
 ):
     auth.require("documents.write")
-    invoice = _organization_invoice(db, invoice_id, auth.organization_id or 0)
+    invoice = _organization_invoice(db, invoice_id, auth.require_organization_id())
     invoice.status = "processing"
     db.add(invoice)
     db.commit()
@@ -157,7 +161,7 @@ def download_original(
     db: Session = Depends(get_db),
 ):
     auth.require("documents.read")
-    invoice = _organization_invoice(db, invoice_id, auth.organization_id or 0)
+    invoice = _organization_invoice(db, invoice_id, auth.require_organization_id())
     path = resolve_stored(invoice.stored_path)
     if not path.exists():
         raise HTTPException(404, detail="Fichier introuvable sur le stockage")
@@ -172,7 +176,7 @@ def delete_document(
     db: Session = Depends(get_db),
 ):
     auth.require("invoice.delete")
-    invoice = _organization_invoice(db, invoice_id, auth.organization_id or 0)
+    invoice = _organization_invoice(db, invoice_id, auth.require_organization_id())
     path = resolve_stored(invoice.stored_path)
     if path.exists():
         path.unlink(missing_ok=True)

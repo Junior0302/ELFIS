@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 
 export default function RegisterPage() {
   const { register, user, firebaseReady } = useAuth()
   const navigate = useNavigate()
+  const registering = useRef(false)
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -16,7 +17,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (user) navigate('/dashboard')
+    if (user && !registering.current) navigate('/dashboard')
   }, [user, navigate])
 
   const onSubmit = async (e: FormEvent) => {
@@ -26,6 +27,7 @@ export default function RegisterPage() {
       return
     }
     setLoading(true)
+    registering.current = true
     setError('')
     try {
       await register({
@@ -35,8 +37,9 @@ export default function RegisterPage() {
         password: form.password,
         organization_name: form.organization_name.trim() || undefined,
       })
-      navigate('/dashboard')
+      navigate('/abonnement')
     } catch (err) {
+      registering.current = false
       setError(err instanceof Error ? err.message : 'Inscription impossible')
     } finally {
       setLoading(false)

@@ -79,6 +79,14 @@ async function parseError(res: Response): Promise<string> {
   try {
     const data = JSON.parse(text) as { detail?: unknown }
     if (typeof data.detail === 'string') return data.detail
+    if (
+      typeof data.detail === 'object' &&
+      data.detail &&
+      'message' in data.detail &&
+      typeof data.detail.message === 'string'
+    ) {
+      return data.detail.message
+    }
     if (Array.isArray(data.detail)) {
       return data.detail
         .map((item) => (typeof item === 'object' && item && 'msg' in item ? String(item.msg) : String(item)))
@@ -341,6 +349,24 @@ export const api = {
       },
       { token, orgId: organizationId },
     ),
+  currentSubscription: async (token: string, orgId?: number | null) => {
+    const result = await request<{ subscription: SubscriptionInfo }>(
+      '/subscriptions/current',
+      undefined,
+      { token, orgId },
+    )
+    return result.subscription
+  },
+  createSubscriptionCheckout: (token: string, orgId?: number | null) =>
+    request<{ url: string }>('/subscriptions/checkout', { method: 'POST' }, { token, orgId }),
+  createSubscriptionPortal: (token: string, orgId?: number | null) =>
+    request<{ url: string }>('/subscriptions/portal', { method: 'POST' }, { token, orgId }),
+  platformOverview: (token: string) =>
+    request<PlatformOverview>('/platform/overview', undefined, { token }),
+  platformOrganizations: (token: string) =>
+    request<{ organizations: PlatformOrganization[] }>('/platform/organizations', undefined, { token }),
+  platformUsers: (token: string) =>
+    request<{ users: PlatformUser[] }>('/platform/users', undefined, { token }),
 }
 
 
@@ -363,6 +389,63 @@ export type AuthUser = {
   avatar?: string
   status: string
   last_login?: string | null
+  is_platform_admin: boolean
+}
+
+export type SubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'unpaid'
+  | 'canceled'
+  | 'expired'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'paused'
+  | 'none'
+
+export type SubscriptionInfo = {
+  id?: number
+  plan: string
+  status: SubscriptionStatus
+  price_eur: number
+  configured: boolean
+  stripe_price_id?: string | null
+  trial_start?: string | null
+  trial_end: string | null
+  current_period_start?: string | null
+  current_period_end: string | null
+  past_due_since?: string | null
+  cancel_at_period_end: boolean
+  canceled_at?: string | null
+}
+
+export type PlatformOverview = {
+  organizations: number
+  users: number
+  active_memberships: number
+  subscriptions_by_status: Partial<Record<SubscriptionStatus, number>>
+}
+
+export type PlatformOrganization = {
+  id: number
+  name: string
+  legal_name: string
+  country: string
+  member_count: number
+  subscription: SubscriptionInfo
+  created_at: string | null
+}
+
+export type PlatformUser = {
+  id: number
+  display_name: string
+  email: string
+  status: string
+  is_platform_admin: boolean
+  organization_count: number
+  last_login: string | null
+  created_at: string | null
 }
 
 export type PilotOverview = {

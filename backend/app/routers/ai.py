@@ -5,10 +5,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.services.finance_agent import answer_finance_question, list_conversations
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+router = APIRouter(
+    prefix="/ai", tags=["ai"], dependencies=[Depends(require_active_subscription)]
+)
 
 
 class ChatIn(BaseModel):
@@ -24,7 +26,7 @@ def ai_chat(
     if auth.user and "ai.analysis" not in auth.permissions and "*" not in auth.permissions:
         raise HTTPException(403, detail="Permission ai.analysis requise")
 
-    org_id = auth.organization_id or 1
+    org_id = auth.require_organization_id()
 
     result = answer_finance_question(
         db,

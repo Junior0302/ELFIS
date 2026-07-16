@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
+import SubscriptionBanner from './SubscriptionBanner'
 
 const links: { to: string; label: string; hint: string; permission?: string }[] = [
   { to: '/dashboard', label: 'Tableau de bord', hint: 'Vue d’ensemble', permission: 'invoice.read' },
@@ -8,6 +9,7 @@ const links: { to: string; label: string; hint: string; permission?: string }[] 
   { to: '/deposit', label: 'Déposer', hint: 'PDF ou photo OCR', permission: 'invoice.create' },
   { to: '/history', label: 'Comptabilité', hint: 'Factures & exports', permission: 'documents.read' },
   { to: '/facturation', label: 'Facturation', hint: 'Devis & clients', permission: 'invoice.read' },
+  { to: '/abonnement', label: 'Abonnement', hint: 'Offre, carte & factures', permission: 'subscription.manage' },
   { to: '/organisation', label: 'Organisation', hint: 'Entreprise & équipes' },
   { to: '/compte', label: 'Mon compte', hint: 'Profil & sécurité' },
   { to: '/modules', label: 'Modules', hint: 'Toute la plateforme' },
@@ -90,6 +92,14 @@ export default function Layout() {
                 Gérer mon profil
               </Link>
               <br />
+              {user.is_platform_admin && (
+                <>
+                  <Link to="/platform" className="lan-hint">
+                    Administration plateforme
+                  </Link>
+                  <br />
+                </>
+              )}
               {memberships.length > 0 && (
                 <select
                   className="org-select"
@@ -112,6 +122,7 @@ export default function Layout() {
         </div>
       </aside>
       <main className="main">
+        <SubscriptionBanner />
         <Outlet />
       </main>
     </div>

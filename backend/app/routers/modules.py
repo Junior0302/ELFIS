@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.modules.registry import get_module, get_modules
 from app.services.banking import (
     bank_overview,
@@ -17,7 +17,11 @@ from app.services.banking import (
     sync_bank,
 )
 
-router = APIRouter(prefix="/modules", tags=["modules"])
+router = APIRouter(
+    prefix="/modules",
+    tags=["modules"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 class BankTxOut(BaseModel):
@@ -71,7 +75,7 @@ def banque_overview(
     db: Session = Depends(get_db),
 ):
     auth.require("bank.read")
-    data = bank_overview(db, auth.organization_id)
+    data = bank_overview(db, auth.require_organization_id())
     account = data["account"]
     return {
         "module": get_module("banque"),
@@ -101,9 +105,9 @@ def banque_connect(
         label=payload.label,
         iban=payload.iban,
         balance=payload.balance,
-        organization_id=auth.organization_id or 0,
+        organization_id=auth.require_organization_id(),
     )
-    data = bank_overview(db, auth.organization_id)
+    data = bank_overview(db, auth.require_organization_id())
     return {
         "ok": True,
         "account": BankAccountOut.model_validate(account),
@@ -126,10 +130,10 @@ def banque_sync(
 ):
     auth.require("bank.connect")
     try:
-        result = sync_bank(db, auth.organization_id)
+        result = sync_bank(db, auth.require_organization_id())
     except ValueError as exc:
         raise HTTPException(400, detail=str(exc)) from exc
-    data = bank_overview(db, auth.organization_id)
+    data = bank_overview(db, auth.require_organization_id())
     imported = int(result["imported"])
     analyzed = int(result["analyzed"])
     return {
@@ -175,7 +179,7 @@ async def banque_import_csv(
         result = import_bank_csv(
             db,
             content=content,
-            organization_id=auth.organization_id or 0,
+            organization_id=auth.require_organization_id(),
         )
     except ValueError as exc:
         raise HTTPException(400, detail=str(exc)) from exc
@@ -196,7 +200,7 @@ def tresorerie_overview(
     db: Session = Depends(get_db),
 ):
     auth.require("finance.read")
-    forecast = cashflow_forecast(db, auth.organization_id)
+    forecast = cashflow_forecast(db, auth.require_organization_id())
     return {
         "module": get_module("tresorerie"),
         **forecast,

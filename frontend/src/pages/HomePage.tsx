@@ -55,6 +55,9 @@ export default function HomePage() {
           <a href="#copilote" onClick={() => setMenuOpen(false)}>
             Copilote IA
           </a>
+          <a href="#tarif" onClick={() => setMenuOpen(false)}>
+            Tarif
+          </a>
           {user ? (
             <Link className="btn" to="/dashboard">
               Ouvrir mon espace
@@ -121,6 +124,32 @@ export default function HomePage() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section className="home-pricing" id="tarif">
+          <div className="home-section-heading">
+            <span>Un tarif simple</span>
+            <h2>Tout ComptaPilot, sans surprise.</h2>
+          </div>
+          <article className="home-pricing-card">
+            <div>
+              <span className="home-eyebrow">ComptaPilot Pro</span>
+              <div className="home-price">
+                <strong>19 €</strong>
+                <span>/ mois</span>
+              </div>
+              <p>14 jours d’essai. Carte demandée au départ, résiliation depuis votre espace.</p>
+            </div>
+            <ul className="pricing-features">
+              <li>Copilote financier IA</li>
+              <li>OCR, comptabilité et exports</li>
+              <li>Facturation et suivi d’activité</li>
+              <li>Utilisateurs et organisation</li>
+            </ul>
+            <Link className="btn home-primary-cta" to={user ? '/abonnement' : '/register'}>
+              {user ? 'Gérer mon abonnement' : 'Essayer gratuitement pendant 14 jours'}
+            </Link>
+          </article>
         </section>
 
         <section className="home-copilot-section" id="copilote">

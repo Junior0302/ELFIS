@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import {
@@ -10,6 +10,8 @@ import {
 
 export default function ComptePage() {
   const { token, orgId, user, memberships, setUser } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -22,6 +24,13 @@ export default function ComptePage() {
   const [saving, setSaving] = useState(false)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState('')
+
+  useEffect(() => {
+    const checkout = new URLSearchParams(location.search).get('checkout')
+    if (checkout === 'success' || checkout === 'cancel') {
+      navigate(`/abonnement?checkout=${checkout}`, { replace: true })
+    }
+  }, [location.search, navigate])
 
   useEffect(() => {
     if (!user) return

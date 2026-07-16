@@ -5,13 +5,17 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.models import Invoice
 from app.schemas import DashboardStats
 from app.services.finance_agent import pilot_kpis
 from app.services.serializers import serialize_invoice
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(
+    prefix="/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -20,7 +24,9 @@ def dashboard_stats(
     db: Session = Depends(get_db),
 ):
     auth.require("invoice.read")
-    query = db.query(Invoice).filter(Invoice.organization_id == (auth.organization_id or 0))
+    query = db.query(Invoice).filter(
+        Invoice.organization_id == auth.require_organization_id()
+    )
     invoice_count = query.count()
     total_ht = query.with_entities(func.coalesce(func.sum(Invoice.amount_ht), 0.0)).scalar() or 0.0
     recoverable_vat = (
@@ -42,4 +48,4 @@ def dashboard_pilot(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
 ):
-    return pilot_kpis(db, auth.organization_id)
+    return pilot_kpis(db, auth.require_organization_id())

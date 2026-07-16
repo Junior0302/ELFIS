@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.models_saas import Customer, Payment, Reminder, SalesDocument
 from app.services.auth import write_audit
 from app.services.billing import (
@@ -21,7 +21,11 @@ from app.services.billing import (
     sign_document,
 )
 
-router = APIRouter(prefix="/billing", tags=["facturation"])
+router = APIRouter(
+    prefix="/billing",
+    tags=["facturation"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 class CustomerIn(BaseModel):
@@ -50,7 +54,7 @@ class PaymentIn(BaseModel):
 
 
 def _org_id(auth: AuthContext) -> int:
-    return auth.organization_id or 1
+    return auth.require_organization_id()
 
 
 def _serialize(doc: SalesDocument) -> dict:
