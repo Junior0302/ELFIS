@@ -43,28 +43,84 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="ELFIS Core API",
     description="Moteur IA commun — ComptaPilot IA (AI Finance Copilot)",
-    version="0.7.5",
+    version="0.7.6",
     lifespan=lifespan,
 )
+
+DEFAULT_CORS_ORIGINS = [
+    "https://elfis-core.web.app",
+    "https://elfis-core.firebaseapp.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 cors_kwargs: dict = {
     "allow_methods": ["*"],
     "allow_headers": ["*"],
+    "expose_headers": ["*"],
 }
 if settings.cors_origin_list == ["*"]:
-    cors_kwargs["allow_origins"] = ["*"]
-    cors_kwargs["allow_credentials"] = False
+    # En prod Render, on évite "*" + credentials : on liste les origines front.
+    if settings.app_env.lower() == "production":
+        cors_kwargs["allow_origins"] = list(
+            dict.fromkeys([*DEFAULT_CORS_ORIGINS, settings.frontend_url.rstrip("/")])
+        )
+        cors_kwargs["allow_credentials"] = True
+    else:
+        cors_kwargs["allow_origins"] = ["*"]
+        cors_kwargs["allow_credentials"] = False
 else:
-    cors_kwargs["allow_origins"] = settings.cors_origin_list
+    cors_kwargs["allow_origins"] = list(
+        dict.fromkeys([*settings.cors_origin_list, *DEFAULT_CORS_ORIGINS])
+    )
     cors_kwargs["allow_credentials"] = True
 
 app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 
+def _cors_headers_for(request: Request) -> dict[str, str]:
+    origin = request.headers.get("origin") or ""
+    allowed = cors_kwargs.get("allow_origins") or []
+    headers: dict[str, str] = {
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+    }
+    if allowed == ["*"]:
+        headers["Access-Control-Allow-Origin"] = "*"
+        return headers
+    if origin and (origin in allowed or origin in DEFAULT_CORS_ORIGINS):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Vary"] = "Origin"
+        return headers
+    # Fallback prod front
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Vary"] = "Origin"
+    return headers
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=_cors_headers_for(request),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+        headers=_cors_headers_for(request),
+    )
+
+
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(_request: Request, exc: Exception):
-    if isinstance(exc, (HTTPException, StarletteHTTPException, RequestValidationError)):
-        raise exc
+async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={
@@ -73,6 +129,7 @@ async def unhandled_exception_handler(_request: Request, exc: Exception):
                 "message": "Erreur serveur inattendue",
             }
         },
+        headers=_cors_headers_for(request),
     )
 
 
@@ -101,7 +158,7 @@ def health():
         "ai_mode": ai_mode,
         "details": {
             "slogan": "Déposez une facture. L'IA prépare votre comptabilité.",
-            "version": "0.7.5",
+            "version": "0.7.6",
             "modules_live": [
                 "comptabilite",
                 "banque",

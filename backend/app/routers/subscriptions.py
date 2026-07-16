@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 
 class SyncIn(BaseModel):
-    session_id: str | None = None
+    session_id: str | None = Field(default=None)
 
 
 def _current(db: Session, organization_id: int) -> Subscription | None:
@@ -87,13 +87,25 @@ def subscription_portal(
 def subscription_sync(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
-    payload: SyncIn = SyncIn(),
+    payload: SyncIn = Body(default_factory=SyncIn),
 ):
     """Rattrapage après Checkout : lit le statut réel chez Stripe sans attendre le webhook."""
     auth.require("subscription.manage")
     organization_id = auth.require_organization_id()
     cleaned = (payload.session_id or "").strip() or None
-    row = sync_checkout_session(db, organization_id=organization_id, session_id=cleaned)
+    try:
+        row = sync_checkout_session(db, organization_id=organization_id, session_id=cleaned)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "stripe_sync_failed",
+                "message": f"Synchronisation Stripe impossible : {str(exc)[:200]}",
+            },
+        ) from exc
     return {
         "subscription": serialize_subscription(
             row,
