@@ -356,6 +356,12 @@ export const api = {
       },
       { token, orgId: organizationId },
     ),
+  deleteOrgMember: (organizationId: number, membershipId: number, token: string) =>
+    request<{ ok: boolean; uid: string; email: string }>(
+      `/org/${organizationId}/members/${membershipId}`,
+      { method: 'DELETE' },
+      { token, orgId: organizationId },
+    ),
   currentSubscription: async (token: string, orgId?: number | null) => {
     const result = await request<{ subscription: SubscriptionInfo }>(
       '/subscriptions/current',
@@ -368,12 +374,30 @@ export const api = {
     request<{ url: string }>('/subscriptions/checkout', { method: 'POST' }, { token, orgId }),
   createSubscriptionPortal: (token: string, orgId?: number | null) =>
     request<{ url: string }>('/subscriptions/portal', { method: 'POST' }, { token, orgId }),
+  syncSubscription: (token: string, orgId?: number | null, sessionId?: string | null) => {
+    const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''
+    return request<{ subscription: SubscriptionInfo }>(
+      `/subscriptions/sync${qs}`,
+      { method: 'POST' },
+      { token, orgId },
+    ).then((result) => result.subscription)
+  },
   platformOverview: (token: string) =>
     request<PlatformOverview>('/platform/overview', undefined, { token }),
   platformOrganizations: (token: string) =>
     request<{ organizations: PlatformOrganization[] }>('/platform/organizations', undefined, { token }),
   platformUsers: (token: string) =>
     request<{ users: PlatformUser[] }>('/platform/users', undefined, { token }),
+  updatePlatformUser: (
+    userId: number,
+    payload: { status: 'active' | 'suspended' },
+    token: string,
+  ) =>
+    request<{ ok: boolean; user: PlatformUser }>(`/platform/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token }),
 }
 
 

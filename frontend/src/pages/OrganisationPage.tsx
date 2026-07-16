@@ -1,8 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, formatEuro, type OrgDetail, type OrgMember, type SubscriptionInfo } from '../api'
 import { useAuth } from '../auth'
-import { saveFirestoreOrganizationMember } from '../firebase'
 import {
   canOpenSubscriptionPortal,
   formatDate,
@@ -14,11 +13,7 @@ export default function OrganisationPage() {
   const { token, orgId, memberships, user } = useAuth()
   const [detail, setDetail] = useState<OrgDetail | null>(null)
   const [members, setMembers] = useState<OrgMember[]>([])
-  const [roles, setRoles] = useState<string[]>([])
   const [canManage, setCanManage] = useState(false)
-  const [memberForm, setMemberForm] = useState({ email: '', role: 'comptable' })
-  const [savingMember, setSavingMember] = useState(false)
-  const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [subscriptionError, setSubscriptionError] = useState('')
@@ -41,11 +36,11 @@ export default function OrganisationPage() {
       .then(([organization, memberData]) => {
         setDetail(organization)
         setMembers(memberData.members)
-        setRoles(memberData.roles)
         setCanManage(memberData.can_manage)
       })
       .catch((e) => setError(e.message || 'Erreur organisation'))
-    api.currentSubscription(token, orgId)
+    api
+      .currentSubscription(token, orgId)
       .then(setSubscription)
       .catch((reason) => {
         setSubscriptionError(reason instanceof Error ? reason.message : 'Abonnement indisponible')
@@ -64,57 +59,6 @@ export default function OrganisationPage() {
     } catch (reason) {
       setSubscriptionError(reason instanceof Error ? reason.message : 'Portail Stripe indisponible')
       setOpeningPortal(false)
-    }
-  }
-
-  const syncMember = async (member: OrgMember) => {
-    if (!orgId || !member.uid) return
-    await saveFirestoreOrganizationMember(String(orgId), {
-      uid: member.uid,
-      email: member.email,
-      displayName: member.display_name,
-      role: member.role,
-      permissions: member.permissions,
-      status: member.status,
-    })
-  }
-
-  const addMember = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!orgId || !token) return
-    setSavingMember(true)
-    setError('')
-    setMessage('')
-    try {
-      const result = await api.addOrgMember(orgId, memberForm, token)
-      await syncMember(result.member)
-      setMembers((current) => [...current, result.member])
-      setMemberForm((current) => ({ ...current, email: '' }))
-      setMessage('Utilisateur ajouté et droits synchronisés avec Firestore.')
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Ajout impossible')
-    } finally {
-      setSavingMember(false)
-    }
-  }
-
-  const updateMember = async (
-    member: OrgMember,
-    change: { role?: string; status?: string },
-  ) => {
-    if (!orgId || !token) return
-    setError('')
-    try {
-      const result = await api.updateOrgMember(orgId, member.membership_id, change, token)
-      await syncMember(result.member)
-      setMembers((current) =>
-        current.map((item) =>
-          item.membership_id === result.member.membership_id ? result.member : item,
-        ),
-      )
-      setMessage('Droits mis à jour.')
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Mise à jour impossible')
     }
   }
 
@@ -153,7 +97,6 @@ export default function OrganisationPage() {
       </div>
 
       {error && <div className="auth-alert auth-alert-error">{error}</div>}
-      {message && <div className="auth-alert auth-alert-ok">{message}</div>}
 
       <div className="stats">
         <div className="stat">
@@ -203,7 +146,12 @@ export default function OrganisationPage() {
             </span>
           )}
           {canManageSubscription && canOpenPortal && (
-            <button className="btn secondary" type="button" disabled={openingPortal} onClick={() => void openPortal()}>
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={openingPortal}
+              onClick={() => void openPortal()}
+            >
               {openingPortal ? 'Ouverture…' : 'Ouvrir le portail Stripe'}
             </button>
           )}
@@ -223,10 +171,16 @@ export default function OrganisationPage() {
           ) : (
             <div className="list">
               {detail.companies.map((c) => (
-                <div key={c.id} className="list-item" style={{ gridTemplateColumns: '1fr 0.5fr 0.5fr' }}>
+                <div
+                  key={c.id}
+                  className="list-item"
+                  style={{ gridTemplateColumns: '1fr 0.5fr 0.5fr' }}
+                >
                   <strong>{c.name}</strong>
                   <span>{c.country}</span>
-                  <span className="muted">{c.parent_company_id ? `fils de #${c.parent_company_id}` : 'siège'}</span>
+                  <span className="muted">
+                    {c.parent_company_id ? `fils de #${c.parent_company_id}` : 'siège'}
+                  </span>
                 </div>
               ))}
             </div>
@@ -239,7 +193,11 @@ export default function OrganisationPage() {
           </p>
           <div className="list" style={{ marginTop: '0.75rem' }}>
             {detail.ai_agents.map((a) => (
-              <div key={a.id} className="list-item" style={{ gridTemplateColumns: '1fr 0.6fr 0.5fr' }}>
+              <div
+                key={a.id}
+                className="list-item"
+                style={{ gridTemplateColumns: '1fr 0.6fr 0.5fr' }}
+              >
                 <strong>{a.name}</strong>
                 <span>{a.type}</span>
                 <span className="badge">{a.status}</span>
@@ -254,48 +212,22 @@ export default function OrganisationPage() {
           <div>
             <h3>Utilisateurs et droits</h3>
             <p className="muted">
-              Les accès sont contrôlés côté API et répliqués dans Cloud Firestore.
+              {members.length} compte(s) dans l’organisation. La gestion complète (ajout, rôles,
+              suppression) se fait dans l’espace admin.
             </p>
           </div>
-          <span className="badge">{members.length} utilisateur(s)</span>
+          {canManage ? (
+            <Link className="btn" to="/admin/equipe">
+              Gérer l’équipe
+            </Link>
+          ) : (
+            <span className="badge">{members.length} utilisateur(s)</span>
+          )}
         </div>
-
-        {canManage && (
-          <form className="member-invite" onSubmit={addMember}>
-            <div className="field">
-              <label htmlFor="member_email">Email du compte existant</label>
-              <input
-                id="member_email"
-                type="email"
-                required
-                placeholder="prenom@entreprise.fr"
-                value={memberForm.email}
-                onChange={(event) => setMemberForm({ ...memberForm, email: event.target.value })}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="member_role">Rôle</label>
-              <select
-                id="member_role"
-                value={memberForm.role}
-                onChange={(event) => setMemberForm({ ...memberForm, role: event.target.value })}
-              >
-                {roles.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button className="btn" type="submit" disabled={savingMember}>
-              {savingMember ? 'Ajout…' : 'Ajouter'}
-            </button>
-          </form>
-        )}
 
         <div className="member-list">
           {members.map((member) => (
-            <div className="member-row" key={member.membership_id}>
+            <div className="member-row member-row-readonly" key={member.membership_id}>
               <div className="member-identity">
                 <div className="member-avatar">
                   {member.avatar ? (
@@ -309,38 +241,10 @@ export default function OrganisationPage() {
                   <span className="muted">{member.email}</span>
                 </div>
               </div>
-              {canManage && member.role !== 'owner' ? (
-                <select
-                  value={member.role}
-                  aria-label={`Rôle de ${member.display_name}`}
-                  onChange={(event) => void updateMember(member, { role: event.target.value })}
-                >
-                  {roles.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span className="badge">{member.role}</span>
-              )}
-              {canManage && member.role !== 'owner' ? (
-                <button
-                  className="btn secondary"
-                  type="button"
-                  onClick={() =>
-                    void updateMember(member, {
-                      status: member.status === 'active' ? 'suspended' : 'active',
-                    })
-                  }
-                >
-                  {member.status === 'active' ? 'Suspendre' : 'Réactiver'}
-                </button>
-              ) : (
-                <span className={`badge ${member.status === 'active' ? '' : 'warn'}`}>
-                  {member.status}
-                </span>
-              )}
+              <span className="badge">{member.role}</span>
+              <span className={`badge ${member.status === 'active' ? '' : 'warn'}`}>
+                {member.status === 'active' ? 'Actif' : 'Suspendu'}
+              </span>
             </div>
           ))}
         </div>

@@ -30,7 +30,13 @@ const navSections: { title: string; items: NavItem[] }[] = [
         hint: 'Essai, carte & factures',
         permission: 'subscription.manage',
       },
-      { to: '/organisation', label: 'Organisation', hint: 'Équipe & droits' },
+      { to: '/organisation', label: 'Organisation', hint: 'Structure & abonnement' },
+      {
+        to: '/admin/equipe',
+        label: 'Admin équipe',
+        hint: 'Comptes & droits',
+        permission: 'users.manage',
+      },
       { to: '/settings', label: 'Paramètres', hint: 'Entreprise & TVA', permission: 'settings.manage' },
       { to: '/compte', label: 'Mon compte', hint: 'Profil & sécurité' },
     ],
@@ -128,8 +134,8 @@ export default function Layout() {
               <br />
               {user.is_platform_admin && (
                 <>
-                  <Link to="/platform" className="lan-hint">
-                    Administration plateforme
+                  <Link to="/elfadmin" className="lan-hint">
+                    ELF Admin
                   </Link>
                   <br />
                 </>

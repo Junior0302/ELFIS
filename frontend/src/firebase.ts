@@ -10,7 +10,7 @@ import {
   type Auth,
   type User as FirebaseUser,
 } from 'firebase/auth'
-import { doc, getFirestore, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore'
+import { deleteDoc, doc, getFirestore, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore'
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
@@ -172,6 +172,14 @@ export async function saveFirestoreOrganizationMember(
     { ...member, updatedAt: serverTimestamp() },
     { merge: true },
   )
+}
+
+export async function deleteFirestoreOrganizationMember(
+  organizationId: string,
+  uid: string,
+): Promise<void> {
+  if (!uid) return
+  await deleteDoc(doc(getFirebaseFirestore(), 'organizations', organizationId, 'members', uid))
 }
 
 export function mapFirebaseError(err: unknown): string {

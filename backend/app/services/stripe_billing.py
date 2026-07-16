@@ -143,7 +143,10 @@ def create_checkout_session(
             "metadata": metadata,
         },
         "metadata": metadata,
-        "success_url": f"{settings.frontend_url.rstrip('/')}/abonnement?checkout=success",
+        "success_url": (
+            f"{settings.frontend_url.rstrip('/')}/abonnement"
+            "?checkout=success&session_id={CHECKOUT_SESSION_ID}"
+        ),
         "cancel_url": f"{settings.frontend_url.rstrip('/')}/abonnement?checkout=cancel",
     }
     if current and current.stripe_customer_id:
@@ -211,6 +214,14 @@ def _stripe_error_message(exc: stripe.StripeError) -> str:
     return user_message[:300]
 
 
+def _as_dict(obj: Any) -> dict[str, Any]:
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "to_dict"):
+        return obj.to_dict()  # type: ignore[no-any-return]
+    return dict(obj)
+
+
 def _timestamp(value: Any) -> datetime | None:
     if value in (None, ""):
         return None
@@ -250,17 +261,28 @@ def _find_subscription(
     return None
 
 
+def _stripe_id(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(value, dict):
+        raw = value.get("id")
+        return raw if isinstance(raw, str) and raw else None
+    return None
+
+
 def _upsert_checkout(db: Session, session: dict[str, Any]) -> None:
     organization_id = _organization_id(session.get("metadata"))
     if organization_id is None:
         return
     if not db.get(Organization, organization_id):
         raise ValueError("Organisation Stripe introuvable")
+    customer_id = _stripe_id(session.get("customer"))
+    subscription_id = _stripe_id(session.get("subscription"))
     row = _find_subscription(
         db,
         organization_id=organization_id,
-        stripe_subscription_id=session.get("subscription"),
-        stripe_customer_id=session.get("customer"),
+        stripe_subscription_id=subscription_id,
+        stripe_customer_id=customer_id,
     )
     if row and row.organization_id != organization_id:
         raise ValueError("Session Stripe rattachée à une autre organisation")
@@ -271,13 +293,105 @@ def _upsert_checkout(db: Session, session: dict[str, Any]) -> None:
             status="incomplete",
             price=19.0,
         )
-    row.stripe_customer_id = session.get("customer") or row.stripe_customer_id
-    row.stripe_subscription_id = session.get("subscription") or row.stripe_subscription_id
+    row.stripe_customer_id = customer_id or row.stripe_customer_id
+    row.stripe_subscription_id = subscription_id or row.stripe_subscription_id
     row.stripe_price_id = settings.stripe_price_pro or row.stripe_price_id
     db.add(row)
 
+    subscription_obj = session.get("subscription")
+    if isinstance(subscription_obj, dict) and subscription_obj.get("id"):
+        _upsert_stripe_subscription(db, subscription_obj)
+        return
 
-def _upsert_stripe_subscription(db: Session, obj: dict[str, Any]) -> None:
+    # Ne pas rester bloqué sur incomplete : récupérer le vrai statut Stripe (trialing/active).
+    if subscription_id and settings.stripe_secret_key:
+        try:
+            stripe.api_key = settings.stripe_secret_key
+            remote = stripe.Subscription.retrieve(subscription_id)
+            _upsert_stripe_subscription(db, _as_dict(remote))
+        except stripe.StripeError:
+            pass
+
+
+def sync_checkout_session(
+    db: Session,
+    *,
+    organization_id: int,
+    session_id: str | None = None,
+) -> Subscription | None:
+    """Resynchronise l'abonnement depuis Stripe (retour checkout ou rattrapage webhook)."""
+    _require_stripe()
+    if session_id:
+        try:
+            session = stripe.checkout.Session.retrieve(
+                session_id,
+                expand=["subscription"],
+            )
+        except stripe.StripeError as exc:
+            raise HTTPException(
+                502,
+                detail={
+                    "code": "stripe_session_retrieve_failed",
+                    "message": _stripe_error_message(exc),
+                },
+            ) from exc
+        session_data = _as_dict(session)
+        meta_org = _organization_id(session_data.get("metadata"))
+        if meta_org is not None and meta_org != organization_id:
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "stripe_session_org_mismatch",
+                    "message": "Cette session Stripe ne correspond pas à l’organisation active",
+                },
+            )
+        _upsert_checkout(db, session_data)
+        db.commit()
+        return _subscription_for_org(db, organization_id)
+
+    row = _subscription_for_org(db, organization_id)
+    if not row:
+        return None
+
+    if row.stripe_subscription_id:
+        try:
+            remote = stripe.Subscription.retrieve(row.stripe_subscription_id)
+            _upsert_stripe_subscription(db, _as_dict(remote))
+            db.commit()
+        except stripe.StripeError as exc:
+            raise HTTPException(
+                502,
+                detail={
+                    "code": "stripe_subscription_retrieve_failed",
+                    "message": _stripe_error_message(exc),
+                },
+            ) from exc
+        return _subscription_for_org(db, organization_id)
+
+    if row.stripe_customer_id:
+        try:
+            listed = stripe.Subscription.list(
+                customer=row.stripe_customer_id,
+                status="all",
+                limit=5,
+            )
+        except stripe.StripeError as exc:
+            raise HTTPException(
+                502,
+                detail={
+                    "code": "stripe_subscription_list_failed",
+                    "message": _stripe_error_message(exc),
+                },
+            ) from exc
+        data = list(listed.data or [])
+        if data:
+            preferred = next(
+                (item for item in data if getattr(item, "status", None) in {"trialing", "active"}),
+                data[0],
+            )
+            _upsert_stripe_subscription(db, _as_dict(preferred))
+            db.commit()
+    return _subscription_for_org(db, organization_id)
     organization_id = _organization_id(obj.get("metadata"))
     stripe_subscription_id = obj.get("id")
     stripe_customer_id = obj.get("customer")

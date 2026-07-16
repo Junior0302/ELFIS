@@ -13,6 +13,7 @@ from app.services.stripe_billing import (
     create_checkout_session,
     create_portal_session,
     serialize_subscription,
+    sync_checkout_session,
 )
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -60,6 +61,20 @@ def subscription_portal(
     auth.require("subscription.manage")
     organization_id = auth.require_organization_id()
     return {"url": create_portal_session(db, organization_id=organization_id)}
+
+
+@router.post("/sync")
+def subscription_sync(
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+    session_id: str | None = None,
+):
+    """Rattrapage après Checkout : lit le statut réel chez Stripe sans attendre le webhook."""
+    auth.require("subscription.manage")
+    organization_id = auth.require_organization_id()
+    cleaned = (session_id or "").strip() or None
+    row = sync_checkout_session(db, organization_id=organization_id, session_id=cleaned)
+    return {"subscription": serialize_subscription(row)}
 
 
 @router.post("/webhook")

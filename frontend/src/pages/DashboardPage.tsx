@@ -51,26 +51,48 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!token || !orgId) return
+    let cancelled = false
     setError('')
     setBlocked(false)
     setStats(null)
 
-    Promise.all([
-      api.dashboard(token, orgId),
-      api.dashboardPilot(token, orgId).catch(() => null),
-      api.currentSubscription(token, orgId).catch(() => null),
-    ])
-      .then(([s, p, sub]) => {
+    const load = async (attemptSync: boolean) => {
+      try {
+        if (attemptSync) {
+          try {
+            await api.syncSubscription(token, orgId)
+          } catch {
+            /* sync optionnel : webhooks ou sync manuel */
+          }
+        }
+        const [s, p, sub] = await Promise.all([
+          api.dashboard(token, orgId),
+          api.dashboardPilot(token, orgId).catch(() => null),
+          api.currentSubscription(token, orgId).catch(() => null),
+        ])
+        if (cancelled) return
         setStats(s)
         setPilot(p)
         setSubscription(sub)
-      })
-      .catch((e) => {
+        setBlocked(false)
+        setError('')
+      } catch (e) {
+        if (cancelled) return
         const message = e instanceof Error ? e.message : 'Impossible de charger le dashboard'
         setError(message)
-        setBlocked(isSubscriptionBlock(message))
+        const blockedBySub = isSubscriptionBlock(message)
+        setBlocked(blockedBySub)
         void api.currentSubscription(token, orgId).then(setSubscription).catch(() => null)
-      })
+        if (blockedBySub && !attemptSync) {
+          await load(true)
+        }
+      }
+    }
+
+    void load(false)
+    return () => {
+      cancelled = true
+    }
   }, [token, orgId])
 
   useEffect(() => {
@@ -101,9 +123,42 @@ export default function DashboardPage() {
             l’abonnement. Carte demandée au départ, 19 €/mois après l’essai.
           </p>
           {canManageSubscription ? (
-            <Link className="btn" to="/abonnement">
-              {needsCheckout ? 'Activer mon essai' : 'Gérer mon abonnement'}
-            </Link>
+            <div className="dashboard-gate-actions">
+              <Link className="btn" to="/abonnement">
+                {needsCheckout ? 'Activer mon essai' : 'Gérer mon abonnement'}
+              </Link>
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => {
+                  if (!token || !orgId) return
+                  setError('')
+                  setBlocked(false)
+                  setStats(null)
+                  void (async () => {
+                    try {
+                      await api.syncSubscription(token, orgId)
+                      const [s, p, sub] = await Promise.all([
+                        api.dashboard(token, orgId),
+                        api.dashboardPilot(token, orgId).catch(() => null),
+                        api.currentSubscription(token, orgId).catch(() => null),
+                      ])
+                      setStats(s)
+                      setPilot(p)
+                      setSubscription(sub)
+                    } catch (e) {
+                      const message =
+                        e instanceof Error ? e.message : 'Impossible de charger le dashboard'
+                      setError(message)
+                      setBlocked(isSubscriptionBlock(message))
+                      void api.currentSubscription(token, orgId).then(setSubscription).catch(() => null)
+                    }
+                  })()
+                }}
+              >
+                Actualiser le statut
+              </button>
+            </div>
           ) : (
             <p className="muted">Demandez à un administrateur d’activer l’abonnement.</p>
           )}
@@ -182,7 +237,7 @@ export default function DashboardPage() {
             </li>
           </ol>
           <div className="dashboard-next-links">
-            <Link to="/organisation">Équipe & droits</Link>
+            <Link to="/admin/equipe">Équipe & droits</Link>
             <Link to="/abonnement">Abonnement</Link>
           </div>
         </section>
@@ -302,9 +357,9 @@ export default function DashboardPage() {
                   <strong>Copilote IA</strong>
                   <span>Demander une explication sur vos chiffres</span>
                 </Link>
-                <Link to="/organisation">
-                  <strong>Organisation</strong>
-                  <span>Équipe, rôles et droits</span>
+                <Link to="/admin/equipe">
+                  <strong>Admin équipe</strong>
+                  <span>Ajouter, droits et suppression</span>
                 </Link>
               </div>
             </aside>

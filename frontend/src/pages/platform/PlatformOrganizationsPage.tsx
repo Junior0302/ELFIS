@@ -20,9 +20,9 @@ export default function PlatformOrganizationsPage() {
   return (
     <>
       <div className="platform-title">
-        <span>Administration</span>
+        <span>ELF Admin</span>
         <h1>Organisations</h1>
-        <p>{items.length} organisation(s) visible(s) sur la plateforme.</p>
+        <p>{items.length} organisation(s) sur la plateforme.</p>
       </div>
       {error && <div className="platform-alert">{error}</div>}
       {loading ? <div className="platform-loading">Chargement…</div> : (

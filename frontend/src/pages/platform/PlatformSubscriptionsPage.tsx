@@ -20,7 +20,7 @@ export default function PlatformSubscriptionsPage() {
   return (
     <>
       <div className="platform-title">
-        <span>Administration</span>
+        <span>ELF Admin</span>
         <h1>Abonnements</h1>
         <p>Suivi consolidé des essais, abonnements actifs et incidents de paiement.</p>
       </div>

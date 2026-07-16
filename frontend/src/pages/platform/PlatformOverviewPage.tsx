@@ -17,9 +17,9 @@ export default function PlatformOverviewPage() {
   return (
     <>
       <div className="platform-title">
-        <span>Vue d’ensemble</span>
-        <h1>Pilotage de ComptaPilot</h1>
-        <p>Indicateurs consolidés de toute la plateforme.</p>
+        <span>ELF Admin</span>
+        <h1>Pilotage plateforme</h1>
+        <p>Vue consolidée des utilisateurs, organisations et abonnements ComptaPilot.</p>
       </div>
       {error && <div className="platform-alert">{error}</div>}
       {!overview && !error ? (

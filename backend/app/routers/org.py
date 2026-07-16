@@ -264,3 +264,43 @@ def update_organization_member(
         module="auth",
     )
     return {"ok": True, "member": _member_public(member, user, role)}
+
+
+@router.delete("/{organization_id}/members/{membership_id}")
+def delete_organization_member(
+    organization_id: int,
+    membership_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    _require_org_manager(auth, organization_id)
+    member = (
+        db.query(OrganizationMember)
+        .filter(
+            OrganizationMember.id == membership_id,
+            OrganizationMember.organization_id == organization_id,
+        )
+        .first()
+    )
+    if not member:
+        raise HTTPException(404, detail="Membre introuvable")
+    if member.user_id == auth.user.id:
+        raise HTTPException(400, detail="Vous ne pouvez pas retirer votre propre accès")
+
+    role = db.get(Role, member.role_id)
+    if role and role.name == "owner":
+        raise HTTPException(400, detail="Le propriétaire ne peut pas être retiré")
+
+    user = db.get(User, member.user_id)
+    email = user.email if user else str(member.user_id)
+    uid = user.firebase_uid if user else ""
+    db.delete(member)
+    db.commit()
+    write_audit(
+        db,
+        user_id=auth.user.id,
+        organization_id=organization_id,
+        action=f"member.remove:{email}",
+        module="auth",
+    )
+    return {"ok": True, "uid": uid, "email": email}

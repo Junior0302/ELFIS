@@ -23,22 +23,41 @@ export default function AbonnementPage() {
   const { token, orgId, memberships } = useAuth()
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [loading, setLoading] = useState(true)
-  const [action, setAction] = useState<'checkout' | 'portal' | null>(null)
+  const [action, setAction] = useState<'checkout' | 'portal' | 'sync' | null>(null)
   const [error, setError] = useState('')
   const [returnNotice, setReturnNotice] = useState('')
   const [now, setNow] = useState(Date.now())
 
-  const loadSubscription = useCallback(async (checkoutReturn?: 'success' | 'cancel') => {
+  const loadSubscription = useCallback(async (checkoutReturn?: 'success' | 'cancel', sessionId?: string | null) => {
     if (!token || !orgId) return
     setLoading(true)
     setError('')
     try {
-      setSubscription(await api.currentSubscription(token, orgId))
+      let current = await api.currentSubscription(token, orgId)
       if (checkoutReturn === 'success') {
-        setReturnNotice('Retour de Stripe confirmé : le statut affiché a été revérifié auprès du serveur.')
+        try {
+          current = await api.syncSubscription(token, orgId, sessionId)
+        } catch {
+          // Webhook peut encore arriver : on garde le statut courant.
+        }
+        // Petit rattrapage si le statut n’est pas encore utilisable.
+        if (!current || !['trialing', 'active'].includes(current.status)) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1500))
+          try {
+            current = await api.syncSubscription(token, orgId, sessionId)
+          } catch {
+            current = await api.currentSubscription(token, orgId)
+          }
+        }
+        setReturnNotice(
+          ['trialing', 'active'].includes(current.status)
+            ? 'Essai activé. Votre accès ComptaPilot Pro est ouvert.'
+            : 'Retour de Stripe confirmé. Si le statut reste incomplet, cliquez sur « Actualiser le statut ».',
+        )
       } else if (checkoutReturn === 'cancel') {
         setReturnNotice('Paiement interrompu. Le statut affiché a été revérifié auprès du serveur.')
       }
+      setSubscription(current)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Abonnement indisponible')
       if (checkoutReturn) {
@@ -54,6 +73,7 @@ export default function AbonnementPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     let checkoutReturn: 'success' | 'cancel' | undefined
+    const sessionId = params.get('session_id')
     if (params.has('success') || params.get('checkout') === 'success') {
       checkoutReturn = 'success'
     } else if (params.has('canceled') || params.get('checkout') === 'cancel') {
@@ -61,7 +81,7 @@ export default function AbonnementPage() {
     }
     if (checkoutReturn) setReturnNotice('Retour de Stripe détecté. Vérification du statut en cours…')
     if (params.size > 0) window.history.replaceState({}, '', window.location.pathname)
-    void loadSubscription(checkoutReturn)
+    void loadSubscription(checkoutReturn, sessionId)
   }, [loadSubscription])
 
   useEffect(() => {
@@ -187,6 +207,30 @@ export default function AbonnementPage() {
                   </div>
                 )}
               </dl>
+              {canManage && (
+                <button
+                  className="btn secondary"
+                  type="button"
+                  disabled={Boolean(action) || loading}
+                  onClick={() => {
+                    setAction('sync')
+                    void (async () => {
+                      try {
+                        setSubscription(await api.syncSubscription(token!, orgId))
+                        setReturnNotice('Statut resynchronisé depuis Stripe.')
+                      } catch (reason) {
+                        setError(
+                          reason instanceof Error ? reason.message : 'Synchronisation impossible',
+                        )
+                      } finally {
+                        setAction(null)
+                      }
+                    })()
+                  }}
+                >
+                  {action === 'sync' ? 'Synchronisation…' : 'Actualiser le statut Stripe'}
+                </button>
+              )}
               {canUsePortal && canManage && (
                 <button
                   className="btn secondary"

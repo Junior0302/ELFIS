@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import require_platform_admin
 from app.models_saas import Organization, OrganizationMember, Role, Subscription, User
+from app.services.auth import write_audit
 from app.services.stripe_billing import serialize_subscription
 
 router = APIRouter(
     prefix="/platform",
-    tags=["platform"],
+    tags=["platform", "elfadmin"],
     dependencies=[Depends(require_platform_admin)],
 )
+
+
+class PlatformUserUpdateIn(BaseModel):
+    status: str | None = None
 
 
 def _latest_subscription(db: Session, organization_id: int) -> Subscription | None:
@@ -157,4 +163,52 @@ def platform_user_detail(user_id: int, db: Session = Depends(get_db)):
             }
             for member, organization, role in memberships
         ],
+    }
+
+
+@router.patch("/users/{user_id}")
+def update_platform_user(
+    user_id: int,
+    payload: PlatformUserUpdateIn,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, detail="Utilisateur introuvable")
+    if user.id == admin.id:
+        raise HTTPException(400, detail="Vous ne pouvez pas modifier votre propre compte ici")
+
+    if payload.status is not None:
+        status = payload.status.strip().lower()
+        if status not in {"active", "suspended"}:
+            raise HTTPException(400, detail="Statut non autorisé")
+        if user.is_platform_admin and status != "active":
+            raise HTTPException(400, detail="Un compte ELF Admin ne peut pas être suspendu")
+        user.status = status
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=None,
+        action=f"elfadmin.user.update:{user.email}:{user.status}",
+        module="platform",
+    )
+    return {
+        "ok": True,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "display_name": f"{user.first_name} {user.last_name}".strip(),
+            "status": user.status,
+            "is_platform_admin": user.is_platform_admin,
+            "last_login": user.last_login,
+            "created_at": user.created_at,
+            "organization_count": db.query(OrganizationMember)
+            .filter(OrganizationMember.user_id == user.id)
+            .count(),
+        },
     }

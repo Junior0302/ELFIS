@@ -1,11 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth'
 
-const platformLinks = [
-  { to: '/platform', label: 'Synthèse', end: true },
-  { to: '/platform/organisations', label: 'Organisations' },
-  { to: '/platform/utilisateurs', label: 'Utilisateurs' },
-  { to: '/platform/abonnements', label: 'Abonnements' },
+const elfAdminLinks = [
+  { to: '/elfadmin', label: 'Synthèse', end: true },
+  { to: '/elfadmin/utilisateurs', label: 'Utilisateurs' },
+  { to: '/elfadmin/organisations', label: 'Organisations' },
+  { to: '/elfadmin/abonnements', label: 'Abonnements' },
 ]
 
 export default function PlatformLayout() {
@@ -16,16 +16,18 @@ export default function PlatformLayout() {
       <header className="platform-header">
         <div>
           <span className="platform-kicker">ELFIS Core</span>
-          <strong>Administration plateforme</strong>
+          <strong>ELF Admin</strong>
         </div>
         <div className="platform-account">
           <span>{user?.email}</span>
           <NavLink to="/dashboard">Retour au produit</NavLink>
-          <button type="button" onClick={logout}>Déconnexion</button>
+          <button type="button" onClick={logout}>
+            Déconnexion
+          </button>
         </div>
       </header>
-      <nav className="platform-nav" aria-label="Administration plateforme">
-        {platformLinks.map((link) => (
+      <nav className="platform-nav" aria-label="ELF Admin">
+        {elfAdminLinks.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
