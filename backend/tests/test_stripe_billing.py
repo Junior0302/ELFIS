@@ -210,6 +210,46 @@ class StripeBillingTests(unittest.TestCase):
         self.assertIsNotNone(row.trial_end)
         self.assertIsNotNone(row.current_period_end)
 
+    def test_checkout_and_subscription_upsert_do_not_duplicate_stripe_ids(self):
+        from app.services.stripe_billing import _upsert_checkout
+
+        # Orphelin incomplet déjà présent pour l'org.
+        self.db.add(
+            Subscription(
+                organization_id=42,
+                plan="pro",
+                status="incomplete",
+                price=19.0,
+            )
+        )
+        self.db.commit()
+
+        session = {
+            "metadata": {"organization_id": "42"},
+            "client_reference_id": "42",
+            "customer": "cus_dup",
+            "subscription": {
+                "id": "sub_dup",
+                "customer": "cus_dup",
+                "status": "trialing",
+                "metadata": {"organization_id": "42"},
+                "trial_start": 1_700_000_000,
+                "trial_end": 1_701_209_600,
+                "items": {"data": [{"price": {"id": "price_pro"}}]},
+            },
+        }
+        _upsert_checkout(self.db, session)
+        self.db.commit()
+        # Même session rejouée (webhook + sync) ne doit pas planter ni dupliquer.
+        _upsert_checkout(self.db, session)
+        self.db.commit()
+
+        rows = self.db.query(Subscription).filter(Subscription.organization_id == 42).all()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].status, "trialing")
+        self.assertEqual(rows[0].stripe_subscription_id, "sub_dup")
+        self.assertEqual(rows[0].stripe_customer_id, "cus_dup")
+
     def test_subscription_transitions_update_organization_plan(self):
         organization = self.db.get(Organization, 42)
         expected_plans = {

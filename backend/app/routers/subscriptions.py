@@ -14,6 +14,7 @@ from app.services.stripe_billing import (
     construct_webhook_event,
     create_checkout_session,
     create_portal_session,
+    get_organization_subscription,
     serialize_subscription,
     sync_checkout_session,
 )
@@ -26,12 +27,7 @@ class SyncIn(BaseModel):
 
 
 def _current(db: Session, organization_id: int) -> Subscription | None:
-    return (
-        db.query(Subscription)
-        .filter(Subscription.organization_id == organization_id)
-        .order_by(Subscription.id.desc())
-        .first()
-    )
+    return get_organization_subscription(db, organization_id)
 
 
 def _platform_bypass(auth: AuthContext) -> bool:

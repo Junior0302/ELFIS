@@ -5,6 +5,7 @@ from typing import Any
 
 import stripe
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -65,12 +66,26 @@ def construct_webhook_event(payload: bytes, signature: str | None) -> dict[str, 
 
 
 def _subscription_for_org(db: Session, organization_id: int) -> Subscription | None:
-    return (
+    rows = (
         db.query(Subscription)
         .filter(Subscription.organization_id == organization_id)
         .order_by(Subscription.id.desc())
-        .first()
+        .all()
     )
+    if not rows:
+        return None
+    for status in ("trialing", "active", "past_due", "unpaid", "paused"):
+        for row in rows:
+            if row.status == status:
+                return row
+    for row in rows:
+        if row.stripe_subscription_id:
+            return row
+    return rows[0]
+
+
+def get_organization_subscription(db: Session, organization_id: int) -> Subscription | None:
+    return _subscription_for_org(db, organization_id)
 
 
 def serialize_subscription(
@@ -282,22 +297,85 @@ def _find_subscription(
     stripe_subscription_id: str | None = None,
     stripe_customer_id: str | None = None,
 ) -> Subscription | None:
-    query = db.query(Subscription)
+    """Résout une ligne existante sans jamais créer de doublon sur les IDs Stripe."""
+    db.flush()
+    by_sub = None
+    by_customer = None
+    by_org = None
     if stripe_subscription_id:
-        row = query.filter(Subscription.stripe_subscription_id == stripe_subscription_id).first()
-        if row:
-            return row
+        by_sub = (
+            db.query(Subscription)
+            .filter(Subscription.stripe_subscription_id == stripe_subscription_id)
+            .first()
+        )
     if stripe_customer_id:
-        row = query.filter(Subscription.stripe_customer_id == stripe_customer_id).first()
-        if row:
-            return row
+        by_customer = (
+            db.query(Subscription)
+            .filter(Subscription.stripe_customer_id == stripe_customer_id)
+            .first()
+        )
     if organization_id is not None:
-        return (
-            query.filter(Subscription.organization_id == organization_id)
+        by_org = (
+            db.query(Subscription)
+            .filter(Subscription.organization_id == organization_id)
             .order_by(Subscription.id.desc())
             .first()
         )
-    return None
+
+    # Priorité stricte : ID abonnement Stripe > client Stripe > org.
+    chosen = by_sub or by_customer or by_org
+    if not chosen:
+        return None
+
+    # Nettoie les orphelins incomplets de la même org pour éviter les UNIQUE INSERT.
+    if organization_id is not None and (by_sub or by_customer):
+        orphans = (
+            db.query(Subscription)
+            .filter(
+                Subscription.organization_id == organization_id,
+                Subscription.id != chosen.id,
+            )
+            .all()
+        )
+        for orphan in orphans:
+            same_sub = (
+                stripe_subscription_id
+                and orphan.stripe_subscription_id == stripe_subscription_id
+            )
+            same_customer = (
+                stripe_customer_id and orphan.stripe_customer_id == stripe_customer_id
+            )
+            empty_stripe = not orphan.stripe_subscription_id and not orphan.stripe_customer_id
+            incomplete = orphan.status in {"incomplete", "none", ""}
+            if same_sub or (incomplete and (empty_stripe or same_customer)):
+                db.delete(orphan)
+        db.flush()
+    return chosen
+
+
+def _resolve_or_create_subscription(
+    db: Session,
+    *,
+    organization_id: int,
+    stripe_subscription_id: str | None = None,
+    stripe_customer_id: str | None = None,
+) -> Subscription:
+    row = _find_subscription(
+        db,
+        organization_id=organization_id,
+        stripe_subscription_id=stripe_subscription_id,
+        stripe_customer_id=stripe_customer_id,
+    )
+    if row and row.organization_id != organization_id:
+        raise ValueError("Abonnement Stripe rattaché à une autre organisation")
+    if row:
+        return row
+    return Subscription(
+        organization_id=organization_id,
+        plan="pro",
+        status="incomplete",
+        price=19.0,
+    )
 
 
 def _sync_organization_plan(db: Session, subscription: Subscription) -> None:
@@ -315,20 +393,26 @@ def _upsert_stripe_subscription(db: Session, obj: dict[str, Any]) -> None:
         obj.get("id") if isinstance(obj.get("id"), str) else None
     )
     stripe_customer_id = _stripe_id(obj.get("customer"))
-    row = _find_subscription(
+    if organization_id is None:
+        # Dernier recours : rattacher via une ligne déjà connue.
+        existing = _find_subscription(
+            db,
+            stripe_subscription_id=stripe_subscription_id,
+            stripe_customer_id=stripe_customer_id,
+        )
+        if existing:
+            organization_id = existing.organization_id
+        else:
+            return
+    if not db.get(Organization, organization_id):
+        raise ValueError("Organisation Stripe introuvable")
+
+    row = _resolve_or_create_subscription(
         db,
         organization_id=organization_id,
         stripe_subscription_id=stripe_subscription_id,
         stripe_customer_id=stripe_customer_id,
     )
-    if not row:
-        if organization_id is None:
-            return
-        if not db.get(Organization, organization_id):
-            raise ValueError("Organisation Stripe introuvable")
-        row = Subscription(organization_id=organization_id, plan="pro", price=19.0)
-    elif organization_id is not None and row.organization_id != organization_id:
-        raise ValueError("Abonnement Stripe rattaché à une autre organisation")
 
     items = ((obj.get("items") or {}).get("data") or [])
     first_item = _as_dict(items[0]) if items else {}
@@ -344,8 +428,38 @@ def _upsert_stripe_subscription(db: Session, obj: dict[str, Any]) -> None:
         row.past_due_since = datetime.utcnow()
     elif row.status != "past_due":
         row.past_due_since = None
-    row.stripe_customer_id = stripe_customer_id or row.stripe_customer_id
-    row.stripe_subscription_id = stripe_subscription_id or row.stripe_subscription_id
+    # Ne jamais réassigner un ID Stripe déjà porté par une autre ligne.
+    if stripe_customer_id:
+        conflict = (
+            db.query(Subscription)
+            .filter(
+                Subscription.stripe_customer_id == stripe_customer_id,
+                Subscription.id != getattr(row, "id", None),
+            )
+            .first()
+        )
+        if conflict is None:
+            row.stripe_customer_id = stripe_customer_id
+    if stripe_subscription_id:
+        conflict = (
+            db.query(Subscription)
+            .filter(
+                Subscription.stripe_subscription_id == stripe_subscription_id,
+                Subscription.id != getattr(row, "id", None),
+            )
+            .first()
+        )
+        if conflict is None:
+            row.stripe_subscription_id = stripe_subscription_id
+        elif conflict.id != row.id:
+            # Fusionner vers la ligne qui possède déjà l’ID Stripe.
+            if row.id is None:
+                db.expunge(row)
+            else:
+                db.delete(row)
+                db.flush()
+            row = conflict
+            row.organization_id = organization_id
     row.stripe_price_id = price or settings.stripe_price_pro or row.stripe_price_id
     row.trial_start = _timestamp(obj.get("trial_start"))
     row.trial_end = _timestamp(obj.get("trial_end"))
@@ -361,6 +475,7 @@ def _upsert_stripe_subscription(db: Session, obj: dict[str, Any]) -> None:
         row.canceled_at = datetime.utcnow()
     row.end_date = row.current_period_end
     db.add(row)
+    db.flush()
     _sync_organization_plan(db, row)
 
 
@@ -380,25 +495,56 @@ def _upsert_checkout(db: Session, session: dict[str, Any]) -> None:
     customer_id = _stripe_id(session.get("customer"))
     subscription_raw = session.get("subscription")
     subscription_id = _stripe_id(subscription_raw)
-    row = _find_subscription(
+    row = _resolve_or_create_subscription(
         db,
         organization_id=organization_id,
         stripe_subscription_id=subscription_id,
         stripe_customer_id=customer_id,
     )
-    if row and row.organization_id != organization_id:
-        raise ValueError("Session Stripe rattachée à une autre organisation")
-    if not row:
-        row = Subscription(
-            organization_id=organization_id,
-            plan="pro",
-            status="incomplete",
-            price=19.0,
+    if customer_id:
+        conflict = (
+            db.query(Subscription)
+            .filter(
+                Subscription.stripe_customer_id == customer_id,
+                Subscription.id != getattr(row, "id", None),
+            )
+            .first()
         )
-    row.stripe_customer_id = customer_id or row.stripe_customer_id
-    row.stripe_subscription_id = subscription_id or row.stripe_subscription_id
+        if conflict is None:
+            row.stripe_customer_id = customer_id
+        elif conflict.organization_id == organization_id:
+            if row.id is None:
+                db.expunge(row)
+            elif row.id != conflict.id:
+                db.delete(row)
+                db.flush()
+            row = conflict
+    if subscription_id:
+        conflict = (
+            db.query(Subscription)
+            .filter(
+                Subscription.stripe_subscription_id == subscription_id,
+                Subscription.id != getattr(row, "id", None),
+            )
+            .first()
+        )
+        if conflict is None:
+            row.stripe_subscription_id = subscription_id
+        elif conflict.organization_id == organization_id:
+            if row.id is None:
+                db.expunge(row)
+            elif row.id != conflict.id:
+                db.delete(row)
+                db.flush()
+            row = conflict
+            row.stripe_subscription_id = subscription_id
+        else:
+            raise ValueError("Session Stripe rattachée à une autre organisation")
     row.stripe_price_id = settings.stripe_price_pro or row.stripe_price_id
+    if row.status in {"", "none"} or not row.status:
+        row.status = "incomplete"
     db.add(row)
+    db.flush()
 
     if isinstance(subscription_raw, dict) and subscription_raw.get("id"):
         sub_data = dict(subscription_raw)
@@ -521,6 +667,23 @@ def sync_checkout_session(
         try:
             _upsert_checkout(db, session_data)
             db.commit()
+        except IntegrityError:
+            db.rollback()
+            try:
+                _upsert_checkout(db, session_data)
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                raise HTTPException(
+                    502,
+                    detail={
+                        "code": "stripe_checkout_sync_failed",
+                        "message": (
+                            "Impossible d’enregistrer la session Stripe "
+                            f"(conflit résolu partiellement) : {str(exc)[:160]}"
+                        ),
+                    },
+                ) from exc
         except Exception as exc:
             db.rollback()
             raise HTTPException(
