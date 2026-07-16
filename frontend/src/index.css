@@ -1155,6 +1155,90 @@ textarea {
   line-height: 1.5;
 }
 
+.subscription-active-panel {
+  max-width: 640px;
+}
+
+.subscription-active-meta {
+  margin: 1.25rem 0;
+}
+
+.subscription-active-meta p {
+  margin: 0.35rem 0;
+}
+
+.subscription-active-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.trial-countdown {
+  margin: 1.4rem 0 0.5rem;
+  padding: 1.15rem 1.2rem;
+  border-radius: 18px;
+  border: 1px solid rgba(11, 61, 46, 0.16);
+  background:
+    linear-gradient(160deg, rgba(123, 196, 160, 0.18), rgba(255, 253, 248, 0.92));
+}
+
+.trial-countdown.ended {
+  background: rgba(180, 35, 24, 0.08);
+  border-color: rgba(180, 35, 24, 0.2);
+}
+
+.trial-countdown-label {
+  display: block;
+  margin-bottom: 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(16, 36, 28, 0.62);
+}
+
+.trial-countdown-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.trial-countdown-grid div {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
+  padding: 0.7rem 0.35rem;
+  border-radius: 14px;
+  background: rgba(255, 253, 248, 0.82);
+  border: 1px solid rgba(11, 61, 46, 0.1);
+}
+
+.trial-countdown-grid strong {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--forest);
+}
+
+.trial-countdown-grid span {
+  font-size: 0.72rem;
+  color: rgba(16, 36, 28, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.trial-countdown-date {
+  margin: 0.9rem 0 0;
+  color: rgba(16, 36, 28, 0.62);
+  font-size: 0.92rem;
+}
+
+.global-subscription-banner.trialing {
+  background: rgba(123, 196, 160, 0.22);
+}
+
 .organisation-subscription {
   margin-bottom: 1rem;
 }
@@ -1415,6 +1499,10 @@ textarea {
   .subscription-grid,
   .home-pricing-card {
     grid-template-columns: 1fr;
+  }
+
+  .trial-countdown-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .platform-stats {

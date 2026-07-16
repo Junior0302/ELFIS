@@ -5,6 +5,8 @@ import { useAuth } from '../auth'
 import {
   canOpenSubscriptionPortal,
   formatDate,
+  remainingTime,
+  subscriptionDeadline,
   subscriptionLabels,
   subscriptionTone,
 } from '../subscription'
@@ -18,6 +20,7 @@ export default function OrganisationPage() {
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [subscriptionError, setSubscriptionError] = useState('')
   const [openingPortal, setOpeningPortal] = useState(false)
+  const [now, setNow] = useState(Date.now())
   const activeMembership = memberships.find((item) => item.organization_id === orgId)
   const canManageSubscription = Boolean(
     activeMembership?.permissions.includes('*') ||
@@ -46,6 +49,12 @@ export default function OrganisationPage() {
         setSubscriptionError(reason instanceof Error ? reason.message : 'Abonnement indisponible')
       })
   }, [orgId, token])
+
+  useEffect(() => {
+    const tickMs = subscription?.status === 'trialing' ? 1000 : 60_000
+    const timer = window.setInterval(() => setNow(Date.now()), tickMs)
+    return () => window.clearInterval(timer)
+  }, [subscription?.status])
 
   const openPortal = async () => {
     if (!token || !orgId) return
@@ -123,11 +132,16 @@ export default function OrganisationPage() {
           <h3>ComptaPilot {subscription?.plan || detail.subscription?.plan || 'Pro'}</h3>
           {subscription ? (
             <p className="muted">
-              {formatEuro(subscription.price_eur || 19)} / mois · échéance{' '}
-              {formatDate(
-                subscription.status === 'trialing'
-                  ? subscription.trial_end
-                  : subscription.current_period_end,
+              {formatEuro(subscription.price_eur || 19)} / mois
+              {subscription.status === 'trialing' ? (
+                <>
+                  {' '}
+                  · essai ·{' '}
+                  <strong>{remainingTime(subscriptionDeadline(subscription), now) ?? '—'}</strong>{' '}
+                  restant
+                </>
+              ) : (
+                <> · échéance {formatDate(subscriptionDeadline(subscription))}</>
               )}
             </p>
           ) : (

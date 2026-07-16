@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { api, type SubscriptionInfo } from '../api'
 import { useAuth } from '../auth'
-import { remainingTime } from '../subscription'
+import { hasProductAccess, remainingTime, subscriptionDeadline } from '../subscription'
 
 function bannerMessage(subscription: SubscriptionInfo, now: number) {
+  const deadline = subscriptionDeadline(subscription)
   switch (subscription.status) {
     case 'trialing':
-      return `Essai Pro en cours · ${remainingTime(subscription.trial_end, now) ?? 'échéance à confirmer'} restant`
+      return `Essai Pro · ${remainingTime(deadline, now) ?? 'échéance à confirmer'} restant`
     case 'past_due':
       return 'Le dernier paiement a échoué. Mettez votre moyen de paiement à jour.'
     case 'unpaid':
@@ -31,6 +32,7 @@ function bannerMessage(subscription: SubscriptionInfo, now: number) {
 
 export default function SubscriptionBanner() {
   const { token, orgId, memberships } = useAuth()
+  const location = useLocation()
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [now, setNow] = useState(Date.now())
 
@@ -51,14 +53,31 @@ export default function SubscriptionBanner() {
     return () => {
       active = false
     }
-  }, [token, orgId])
+  }, [token, orgId, location.pathname])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    const tickMs = subscription?.status === 'trialing' ? 1000 : 60_000
+    const timer = window.setInterval(() => setNow(Date.now()), tickMs)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [subscription?.status])
 
-  if (!subscription || subscription.status === 'active' || subscription.access_granted) return null
+  if (!subscription || subscription.platform_bypass) return null
+  // Accès payant / essai : on n’affiche la bannière que pour l’essai (compte à rebours).
+  if (subscription.status === 'active') return null
+  if (subscription.status === 'trialing') {
+    const activeMembership = memberships.find((membership) => membership.organization_id === orgId)
+    const canManage = Boolean(
+      activeMembership?.permissions.includes('*') ||
+        activeMembership?.permissions.includes('subscription.manage'),
+    )
+    return (
+      <div className="global-subscription-banner trialing" role="status">
+        <span>{bannerMessage(subscription, now)}</span>
+        {canManage ? <Link to="/abonnement">Détails</Link> : null}
+      </div>
+    )
+  }
+  if (hasProductAccess(subscription)) return null
 
   const activeMembership = memberships.find((membership) => membership.organization_id === orgId)
   const canManage = Boolean(
