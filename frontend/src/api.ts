@@ -1001,7 +1001,17 @@ export const api = {
       default_option_id: string | null
     }>('/professional-emails/sender-options', undefined, { token, orgId }),
   platformProfessionalEmailRequests: (token: string, status?: string) =>
-    request<{ requests: ProfessionalEmailRecord[] }>(
+    request<{
+      requests: ProfessionalEmailRecord[]
+      counts?: {
+        all: number
+        pending: number
+        creating: number
+        active: number
+        suspended: number
+        rejected: number
+      }
+    }>(
       `/professional-emails/admin/requests${status ? `?status=${encodeURIComponent(status)}` : ''}`,
       undefined,
       { token },
@@ -1034,13 +1044,39 @@ export const api = {
       },
       { token },
     ),
+  platformSuspendProfessionalEmail: (
+    requestId: number,
+    payload: { notes?: string },
+    token: string,
+  ) =>
+    request<{ ok: boolean; email: ProfessionalEmailRecord }>(
+      `/professional-emails/admin/requests/${requestId}/suspend`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token },
+    ),
+  platformResetProfessionalEmail: (requestId: number, token: string) =>
+    request<{ ok: boolean; deleted: ProfessionalEmailRecord }>(
+      `/professional-emails/admin/requests/${requestId}/reset`,
+      { method: 'POST' },
+      { token },
+    ),
+  platformResetAllProfessionalEmails: (token: string) =>
+    request<{ ok: boolean; deleted_count: number }>(
+      '/professional-emails/admin/requests/reset-all',
+      { method: 'POST' },
+      { token },
+    ),
   platformOrganizations: (token: string) =>
     request<{ organizations: PlatformOrganization[] }>('/platform/organizations', undefined, { token }),
   platformUsers: (token: string) =>
     request<{ users: PlatformUser[] }>('/platform/users', undefined, { token }),
   updatePlatformUser: (
     userId: number,
-    payload: { status: 'active' | 'suspended' },
+    payload: { status: 'active' | 'suspended' | 'banned' },
     token: string,
   ) =>
     request<{ ok: boolean; user: PlatformUser }>(`/platform/users/${userId}`, {

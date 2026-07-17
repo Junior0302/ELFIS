@@ -14,8 +14,11 @@ from app.services.professional_emails import (
     get_user_professional_emails,
     list_all_requests,
     reject_professional_email,
+    reset_all_professional_email_requests,
+    reset_professional_email_request,
     sender_options_for_user,
     serialize_professional_email,
+    suspend_professional_email,
 )
 
 router = APIRouter(prefix="/professional-emails", tags=["professional-emails"])
@@ -122,6 +125,15 @@ def admin_list_requests(
     admin: User = Depends(require_platform_admin),
 ):
     rows = list_all_requests(db, status=status)
+    all_rows = list_all_requests(db)
+    counts = {
+        "all": len(all_rows),
+        "pending": sum(1 for r in all_rows if r.status == "pending"),
+        "creating": sum(1 for r in all_rows if r.status == "creating"),
+        "active": sum(1 for r in all_rows if r.status == "active"),
+        "suspended": sum(1 for r in all_rows if r.status == "suspended"),
+        "rejected": sum(1 for r in all_rows if r.status == "rejected"),
+    }
     items = []
     for row in rows:
         user = db.get(User, row.user_id)
@@ -134,7 +146,23 @@ def admin_list_requests(
             "status": user.status if user else "",
         }
         items.append(data)
-    return {"requests": items, "admin_id": admin.id}
+    return {"requests": items, "counts": counts, "admin_id": admin.id}
+
+
+@router.post("/admin/requests/reset-all")
+def admin_reset_all(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_platform_admin),
+):
+    result = reset_all_professional_email_requests(db, admin=admin)
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=None,
+        action=f"professional_email.reset_all:{result['deleted_count']}",
+        module="elfadmin",
+    )
+    return {"ok": True, **result}
 
 
 @router.post("/admin/requests/{request_id}/activate")
@@ -184,3 +212,44 @@ def admin_reject(
         module="elfadmin",
     )
     return {"ok": True, "email": serialize_professional_email(row)}
+
+
+@router.post("/admin/requests/{request_id}/suspend")
+def admin_suspend(
+    request_id: int,
+    payload: RejectIn,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_platform_admin),
+):
+    try:
+        row = suspend_professional_email(db, request_id, admin=admin, notes=payload.notes)
+    except RuntimeError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=row.organization_id,
+        action=f"professional_email.suspend:{row.id}",
+        module="elfadmin",
+    )
+    return {"ok": True, "email": serialize_professional_email(row)}
+
+
+@router.post("/admin/requests/{request_id}/reset")
+def admin_reset_one(
+    request_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_platform_admin),
+):
+    try:
+        result = reset_professional_email_request(db, request_id, admin=admin)
+    except RuntimeError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=None,
+        action=f"professional_email.reset:{request_id}",
+        module="elfadmin",
+    )
+    return {"ok": True, **result}

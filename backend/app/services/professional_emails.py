@@ -338,6 +338,47 @@ def reject_professional_email(
     return row
 
 
+def suspend_professional_email(
+    db: Session, row_id: int, *, admin: User, notes: str = ""
+) -> ProfessionalEmail:
+    row = db.get(ProfessionalEmail, row_id)
+    if not row:
+        raise RuntimeError("Demande introuvable")
+    if row.status != "active":
+        raise RuntimeError("Seule une adresse active peut être suspendue")
+    row.status = "suspended"
+    row.is_default = False
+    row.admin_notes = (notes or "").strip() or "Suspendue par l’administrateur"
+    row.activated_by = admin.id
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def reset_professional_email_request(
+    db: Session, row_id: int, *, admin: User
+) -> dict:
+    """Supprime une demande/adresse pour permettre une nouvelle demande utilisateur."""
+    row = db.get(ProfessionalEmail, row_id)
+    if not row:
+        raise RuntimeError("Demande introuvable")
+    payload = serialize_professional_email(row)
+    db.delete(row)
+    db.commit()
+    return {"deleted": payload, "reset_by": admin.id}
+
+
+def reset_all_professional_email_requests(db: Session, *, admin: User) -> dict:
+    """Réinitialise toutes les demandes (tests / reprise à zéro)."""
+    rows = db.query(ProfessionalEmail).all()
+    count = len(rows)
+    for row in rows:
+        db.delete(row)
+    db.commit()
+    return {"deleted_count": count, "reset_by": admin.id}
+
+
 def sender_options_for_user(
     db: Session,
     user: User,

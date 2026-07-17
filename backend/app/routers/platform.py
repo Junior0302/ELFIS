@@ -365,10 +365,10 @@ def update_platform_user(
 
     if payload.status is not None:
         status = payload.status.strip().lower()
-        if status not in {"active", "suspended"}:
-            raise HTTPException(400, detail="Statut non autorisé")
+        if status not in {"active", "suspended", "banned"}:
+            raise HTTPException(400, detail="Statut non autorisé (active, suspended, banned)")
         if user.is_platform_admin and status != "active":
-            raise HTTPException(400, detail="Un compte ELF Admin ne peut pas être suspendu")
+            raise HTTPException(400, detail="Un compte ELF Admin ne peut pas être suspendu ou banni")
         user.status = status
 
     db.add(user)

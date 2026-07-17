@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, type PlatformUser } from '../../api'
 import { useAuth } from '../../auth'
 
@@ -12,6 +13,13 @@ function formatWhen(value?: string | null) {
   } catch {
     return value
   }
+}
+
+function statusLabel(status: string) {
+  if (status === 'active') return 'Actif'
+  if (status === 'suspended') return 'Suspendu'
+  if (status === 'banned') return 'Banni'
+  return status
 }
 
 export default function PlatformUsersPage() {
@@ -31,13 +39,14 @@ export default function PlatformUsersPage() {
       .finally(() => setLoading(false))
   }, [token])
 
-  const updateStatus = async (item: PlatformUser, status: 'active' | 'suspended') => {
+  const updateStatus = async (item: PlatformUser, status: 'active' | 'suspended' | 'banned') => {
     if (!token) return
-    const confirmed = window.confirm(
-      status === 'suspended'
-        ? `Suspendre ${item.email} ? La personne ne pourra plus se connecter.`
-        : `Réactiver ${item.email} ?`,
-    )
+    const labels = {
+      suspended: `Suspendre ${item.email} ? Connexion bloquée temporairement.`,
+      banned: `Bannir ${item.email} ? Connexion définitivement bloquée jusqu’à réactivation.`,
+      active: `Réactiver ${item.email} ?`,
+    }
+    const confirmed = window.confirm(labels[status])
     if (!confirmed) return
     setPendingId(item.id)
     setError('')
@@ -48,9 +57,11 @@ export default function PlatformUsersPage() {
         current.map((row) => (row.id === result.user.id ? result.user : row)),
       )
       setMessage(
-        status === 'suspended'
-          ? `${item.email} a été suspendu (connexion bloquée).`
-          : `${item.email} a été réactivé.`,
+        status === 'active'
+          ? `${item.email} réactivé.`
+          : status === 'banned'
+            ? `${item.email} banni.`
+            : `${item.email} suspendu.`,
       )
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Mise à jour impossible')
@@ -64,7 +75,16 @@ export default function PlatformUsersPage() {
       <div className="platform-title">
         <span>ELF Admin</span>
         <h1>Utilisateurs</h1>
-        <p>Gérez tous les comptes ComptaPilot : statut, organisations et accès plateforme.</p>
+        <p>
+          Suivi des comptes : actif, suspendu ou banni. Demandes e-mail pro →{' '}
+          <Link to="/elfadmin/emails-pro">Emails pro</Link>.
+        </p>
+        <p className="platform-muted">
+          Lien :{' '}
+          <a href="https://elfis-core.com/elfadmin/utilisateurs">
+            https://elfis-core.com/elfadmin/utilisateurs
+          </a>
+        </p>
       </div>
       {error && <div className="platform-alert">{error}</div>}
       {message && <div className="platform-alert platform-alert-ok">{message}</div>}
@@ -103,7 +123,7 @@ export default function PlatformUsersPage() {
                       <span
                         className={`platform-pill ${item.status === 'active' ? '' : 'warn'}`}
                       >
-                        {item.status === 'active' ? 'Actif' : 'Suspendu'}
+                        {statusLabel(item.status)}
                       </span>
                     </td>
                     <td>
@@ -112,23 +132,38 @@ export default function PlatformUsersPage() {
                           {isSelf ? 'Votre compte' : 'Protégé'}
                         </span>
                       ) : (
-                        <button
-                          type="button"
-                          className="platform-action"
-                          disabled={busy}
-                          onClick={() =>
-                            void updateStatus(
-                              item,
-                              item.status === 'active' ? 'suspended' : 'active',
-                            )
-                          }
-                        >
-                          {busy
-                            ? '…'
-                            : item.status === 'active'
-                              ? 'Suspendre'
-                              : 'Réactiver'}
-                        </button>
+                        <div className="actions" style={{ margin: 0, flexWrap: 'wrap', gap: '0.35rem' }}>
+                          {item.status !== 'active' && (
+                            <button
+                              type="button"
+                              className="platform-action"
+                              disabled={busy}
+                              onClick={() => void updateStatus(item, 'active')}
+                            >
+                              {busy ? '…' : 'Réactiver'}
+                            </button>
+                          )}
+                          {item.status === 'active' && (
+                            <button
+                              type="button"
+                              className="platform-action"
+                              disabled={busy}
+                              onClick={() => void updateStatus(item, 'suspended')}
+                            >
+                              Suspendre
+                            </button>
+                          )}
+                          {item.status !== 'banned' && (
+                            <button
+                              type="button"
+                              className="platform-action"
+                              disabled={busy}
+                              onClick={() => void updateStatus(item, 'banned')}
+                            >
+                              Bannir
+                            </button>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>

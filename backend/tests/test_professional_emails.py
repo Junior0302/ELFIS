@@ -9,6 +9,8 @@ from app.models_saas import Organization, OrganizationMember, ProfessionalEmail,
 from app.services.professional_emails import (
     activate_professional_email,
     create_professional_email_request,
+    reset_all_professional_email_requests,
+    reset_professional_email_request,
     sender_options_for_user,
     suggest_elfis_email,
 )
@@ -74,3 +76,9 @@ def test_suggest_and_request_flow(monkeypatch):
     options = sender_options_for_user(db, user, organization=org)
     assert any(o["kind"] == "professional" and o["is_default"] for o in options)
     assert any(o["kind"] == "personal" for o in options)
+
+    reset_professional_email_request(db, activated.id, admin=admin)
+    row2, _ = create_professional_email_request(db, user, organization_id=org.id)
+    assert row2.status == "pending"
+    cleared = reset_all_professional_email_requests(db, admin=admin)
+    assert cleared["deleted_count"] == 1
