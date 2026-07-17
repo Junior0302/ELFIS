@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models_saas import Organization, OrganizationMember, ProfessionalEmail, Subscription, User
-from app.services.mailer import email_configured, send_email
+from app.services.mailer import email_configured, email_status_public, send_email
 
 logger = logging.getLogger(__name__)
 
@@ -130,11 +130,8 @@ def _build_snapshot(
     }
 
 
-def _send_admin_notification(snapshot: dict) -> bool:
-    """Envoie la demande à urequest@elfis-core.com. Retourne True si expédié."""
-    if not email_configured():
-        return False
-    body = (
+def build_admin_notification_body(snapshot: dict) -> str:
+    return (
         "Nouvelle demande de création d'adresse e-mail\n\n"
         f"Nom :\n{snapshot.get('last_name') or '—'}\n\n"
         f"Prénom :\n{snapshot.get('first_name') or '—'}\n\n"
@@ -146,17 +143,30 @@ def _send_admin_notification(snapshot: dict) -> bool:
         f"ID :\n{snapshot.get('user_code') or '—'}\n\n"
         f"Adresse proposée :\n{snapshot.get('suggested_email') or '—'}\n"
     )
+
+
+def _send_admin_notification(snapshot: dict) -> bool:
+    """Envoie la demande à urequest@elfis-core.com. Retourne True si expédié."""
+    if not email_configured():
+        raise RuntimeError(
+            "E-mail plateforme non configuré : renseignez BREVO_API_KEY et "
+            "PLATFORM_EMAIL_FROM=contact@elfis-core.com sur Render."
+        )
     send_email(
         to_email=ADMIN_NOTIFY_TO,
         subject="Nouvelle demande de création d'adresse e-mail",
-        body=body,
+        body=build_admin_notification_body(snapshot),
         reply_to_email=(snapshot.get("current_email") or None),
     )
     return True
 
 
 def _send_user_confirmation(user: User) -> bool:
-    if not email_configured() or not (user.email or "").strip():
+    if not email_configured():
+        raise RuntimeError(
+            "E-mail plateforme non configuré : renseignez BREVO_API_KEY et PLATFORM_EMAIL_FROM."
+        )
+    if not (user.email or "").strip():
         return False
     first = (user.first_name or "").strip() or "bonjour"
     body = (
@@ -177,6 +187,38 @@ def _send_user_confirmation(user: User) -> bool:
         body=body,
     )
     return True
+
+
+def resend_request_notifications(db: Session, row_id: int) -> dict:
+    """Renvoie les mails admin + confirmation pour une demande existante."""
+    row = db.get(ProfessionalEmail, row_id)
+    if not row:
+        raise RuntimeError("Demande introuvable")
+    try:
+        snapshot = json.loads(row.request_snapshot_json or "{}")
+    except json.JSONDecodeError:
+        snapshot = {}
+    if not snapshot:
+        user = db.get(User, row.user_id)
+        if not user:
+            raise RuntimeError("Utilisateur introuvable")
+        snapshot = _build_snapshot(db, user, row.organization_id)
+    user = db.get(User, row.user_id)
+    notify = {
+        "admin_notified": False,
+        "user_confirmed": False,
+        "notify_to": ADMIN_NOTIFY_TO,
+        "mail_status": email_status_public(),
+        "error": "",
+    }
+    try:
+        notify["admin_notified"] = _send_admin_notification(snapshot)
+        if user:
+            notify["user_confirmed"] = _send_user_confirmation(user)
+    except Exception as exc:  # noqa: BLE001
+        notify["error"] = str(exc)
+        logger.exception("Renvoi notification pro email #%s échoué: %s", row_id, exc)
+    return notify
 
 
 def create_professional_email_request(
@@ -228,21 +270,18 @@ def create_professional_email_request(
         "user_confirmed": False,
         "notify_to": ADMIN_NOTIFY_TO,
         "mail_configured": email_configured(),
+        "mail_status": email_status_public(),
         "error": "",
     }
     try:
         notify["admin_notified"] = _send_admin_notification(snapshot)
         notify["user_confirmed"] = _send_user_confirmation(user)
-        if not notify["mail_configured"]:
-            notify["error"] = (
-                "Service e-mail plateforme non configuré "
-                "(BREVO_API_KEY + PLATFORM_EMAIL_FROM)."
-            )
-            logger.error("Demande pro email #%s enregistrée mais e-mail non configuré", row.id)
-        elif not notify["admin_notified"]:
+        if not notify["admin_notified"]:
             notify["error"] = f"Échec d’envoi vers {ADMIN_NOTIFY_TO}"
     except Exception as exc:  # noqa: BLE001 — la demande reste enregistrée
         notify["error"] = str(exc)
+        notify["mail_configured"] = email_configured()
+        notify["mail_status"] = email_status_public()
         logger.exception(
             "Demande pro email #%s enregistrée mais notification échouée: %s",
             row.id,

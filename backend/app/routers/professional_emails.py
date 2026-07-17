@@ -14,6 +14,7 @@ from app.services.professional_emails import (
     get_user_professional_emails,
     list_all_requests,
     reject_professional_email,
+    resend_request_notifications,
     reset_all_professional_email_requests,
     reset_professional_email_request,
     sender_options_for_user,
@@ -233,6 +234,26 @@ def admin_suspend(
         module="elfadmin",
     )
     return {"ok": True, "email": serialize_professional_email(row)}
+
+
+@router.post("/admin/requests/{request_id}/resend")
+def admin_resend(
+    request_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_platform_admin),
+):
+    try:
+        notify = resend_request_notifications(db, request_id)
+    except RuntimeError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=None,
+        action=f"professional_email.resend:{request_id}",
+        module="elfadmin",
+    )
+    return {"ok": bool(notify.get("admin_notified")), "notify": notify}
 
 
 @router.post("/admin/requests/{request_id}/reset")

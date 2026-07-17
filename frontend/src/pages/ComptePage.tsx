@@ -148,10 +148,18 @@ export default function ComptePage() {
     setProMessage('')
     try {
       const res = await api.requestProfessionalEmail(token, orgId)
-      setProMessage(res.message)
       setProCanRequest(false)
       setProHasPending(true)
       setProEmails((current) => [res.email, ...current])
+      if (res.notify?.admin_notified) {
+        setProMessage(res.message)
+      } else {
+        setProMessage(res.message)
+        setProError(
+          res.notify?.error ||
+            'La demande est enregistrée, mais les e-mails automatiques n’ont pas été envoyés. Vérifiez BREVO_API_KEY + PLATFORM_EMAIL_FROM sur Render.',
+        )
+      }
     } catch (reason) {
       setProError(reason instanceof Error ? reason.message : 'Demande impossible')
     } finally {

@@ -41,6 +41,19 @@ def email_transport() -> str:
     return "none"
 
 
+def email_status_public() -> dict:
+    """État e-mail plateforme (sans secrets) pour diagnostic admin."""
+    from_email = settings.effective_platform_from
+    return {
+        "configured": email_configured(),
+        "transport": email_transport(),
+        "has_brevo_api_key": bool(settings.brevo_api_key.strip()),
+        "has_platform_from": bool(from_email),
+        "platform_from": from_email,
+        "platform_from_name": settings.effective_platform_from_name,
+    }
+
+
 def send_email(
     *,
     to_email: str,
@@ -153,8 +166,21 @@ def _send_via_brevo(
         timeout=30.0,
     )
     if response.status_code >= 400:
+        detail = ""
+        try:
+            data = response.json()
+            detail = str(
+                data.get("message")
+                or data.get("code")
+                or (data.get("error") if isinstance(data.get("error"), str) else "")
+                or response.text[:280]
+            )
+        except Exception:  # noqa: BLE001
+            detail = (response.text or "")[:280]
         raise RuntimeError(
-            "L’e-mail n’a pas pu être envoyé. Aucun message n’a été remis au destinataire."
+            "Brevo a refusé l’envoi"
+            + (f" ({detail})" if detail else f" (HTTP {response.status_code})")
+            + ". Vérifiez BREVO_API_KEY et que PLATFORM_EMAIL_FROM est un expéditeur validé."
         )
 
     message_id = ""

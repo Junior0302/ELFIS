@@ -1064,12 +1064,40 @@ export const api = {
       { method: 'POST' },
       { token },
     ),
+  platformResendProfessionalEmail: (requestId: number, token: string) =>
+    request<{
+      ok: boolean
+      notify: {
+        admin_notified?: boolean
+        user_confirmed?: boolean
+        notify_to?: string
+        error?: string
+        mail_status?: {
+          configured?: boolean
+          transport?: string
+          has_brevo_api_key?: boolean
+          has_platform_from?: boolean
+          platform_from?: string
+        }
+      }
+    }>(`/professional-emails/admin/requests/${requestId}/resend`, { method: 'POST' }, { token }),
   platformResetAllProfessionalEmails: (token: string) =>
     request<{ ok: boolean; deleted_count: number }>(
       '/professional-emails/admin/requests/reset-all',
       { method: 'POST' },
       { token },
     ),
+  platformEmailStatus: (token: string) =>
+    request<{
+      configured: boolean
+      transport: string
+      has_brevo_api_key: boolean
+      has_platform_from: boolean
+      platform_from: string
+      platform_from_name: string
+      notify_to: string
+      hint: string
+    }>('/platform/email-status', undefined, { token }),
   platformOrganizations: (token: string) =>
     request<{ organizations: PlatformOrganization[] }>('/platform/organizations', undefined, { token }),
   platformUsers: (token: string) =>

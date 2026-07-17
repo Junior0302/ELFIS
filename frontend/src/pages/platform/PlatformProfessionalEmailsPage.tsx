@@ -45,6 +45,7 @@ export default function PlatformProfessionalEmailsPage() {
   const [message, setMessage] = useState('')
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [emailDrafts, setEmailDrafts] = useState<Record<number, string>>({})
+  const [mailDiag, setMailDiag] = useState<string>('')
 
   const load = (statusFilter = filter) => {
     if (!token) return
@@ -62,6 +63,16 @@ export default function PlatformProfessionalEmailsPage() {
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : 'Liste indisponible'))
       .finally(() => setLoading(false))
+    api
+      .platformEmailStatus(token)
+      .then((s) => {
+        setMailDiag(
+          s.configured
+            ? `E-mail OK · From ${s.platform_from} → ${s.notify_to} (${s.transport})`
+            : `E-mail KO · ${s.hint} (clé Brevo: ${s.has_brevo_api_key ? 'oui' : 'NON'}, From: ${s.platform_from || 'vide'})`,
+        )
+      })
+      .catch(() => setMailDiag(''))
   }
 
   useEffect(() => {
@@ -120,6 +131,26 @@ export default function PlatformProfessionalEmailsPage() {
       load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Suspension impossible')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
+  const resend = async (row: ProfessionalEmailRecord) => {
+    if (!token) return
+    setPendingId(row.id)
+    setError('')
+    setMessage('')
+    try {
+      const res = await api.platformResendProfessionalEmail(row.id, token)
+      if (res.notify.admin_notified) {
+        setMessage(`Mails renvoyés vers ${res.notify.notify_to || 'urequest@'} et le client.`)
+      } else {
+        setError(res.notify.error || 'Échec d’envoi des mails automatiques.')
+      }
+      load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Renvoi impossible')
     } finally {
       setPendingId(null)
     }
@@ -246,6 +277,11 @@ export default function PlatformProfessionalEmailsPage() {
         </button>
       </div>
 
+      {mailDiag && (
+        <p className={mailDiag.startsWith('E-mail OK') ? 'muted' : 'form-error'} role="status">
+          {mailDiag}
+        </p>
+      )}
       {error && <p className="form-error">{error}</p>}
       {message && <p className="muted">{message}</p>}
       {loading ? (
@@ -324,6 +360,14 @@ export default function PlatformProfessionalEmailsPage() {
                     </>
                   )}
                   {row.status === 'suspended' && <span className="badge warn">Suspendue</span>}
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    disabled={pendingId === row.id}
+                    onClick={() => void resend(row)}
+                  >
+                    Renvoyer mails
+                  </button>
                   <button
                     type="button"
                     className="btn secondary"

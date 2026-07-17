@@ -164,6 +164,8 @@ app.include_router(modules.router, prefix="/api")
 
 @app.get("/api/health")
 def health():
+    from app.services.mailer import email_configured, email_transport
+
     firebase_ok = bool(settings.firebase_web_api_key and settings.firebase_project_id)
     stripe_ok = bool(settings.stripe_secret_key and settings.stripe_price_pro)
     return {
@@ -176,5 +178,7 @@ def health():
             "auth_required": settings.auth_required,
             "billing_ready": stripe_ok,
             "auth_ready": firebase_ok,
+            "email_ready": email_configured(),
+            "email_transport": email_transport(),
         },
     }

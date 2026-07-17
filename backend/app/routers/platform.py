@@ -9,6 +9,8 @@ from app.database import get_db
 from app.deps import require_platform_admin
 from app.models_saas import Organization, OrganizationMember, Role, Subscription, User
 from app.services.auth import write_audit
+from app.services.mailer import email_status_public
+from app.services.professional_emails import ADMIN_NOTIFY_TO
 from app.services.stripe_billing import serialize_subscription
 
 router = APIRouter(
@@ -16,6 +18,22 @@ router = APIRouter(
     tags=["platform", "elfadmin"],
     dependencies=[Depends(require_platform_admin)],
 )
+
+
+@router.get("/email-status")
+def platform_email_status():
+    """Diagnostic Brevo / PLATFORM_EMAIL_FROM (sans secrets)."""
+    status = email_status_public()
+    return {
+        **status,
+        "notify_to": ADMIN_NOTIFY_TO,
+        "hint": (
+            "OK pour envoyer les demandes vers urequest@"
+            if status["configured"]
+            else "Sur Render : BREVO_API_KEY + PLATFORM_EMAIL_FROM=contact@elfis-core.com "
+            "(expéditeur validé dans Brevo)."
+        ),
+    }
 
 
 class PlatformUserUpdateIn(BaseModel):
