@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import unicodedata
 from datetime import datetime
@@ -11,8 +12,11 @@ from app.config import settings
 from app.models_saas import Organization, OrganizationMember, ProfessionalEmail, Subscription, User
 from app.services.mailer import email_configured, send_email
 
+logger = logging.getLogger(__name__)
+
 ELFIS_EMAIL_DOMAIN = "elfis-core.com"
-ADMIN_NOTIFY_TO = "contact@elfis-core.com"
+# Boîte dédiée aux demandes d’adresse pro (configurée / validée dans Brevo)
+ADMIN_NOTIFY_TO = "urequest@elfis-core.com"
 
 
 def _slug_part(value: str) -> str:
@@ -126,9 +130,10 @@ def _build_snapshot(
     }
 
 
-def _send_admin_notification(snapshot: dict) -> None:
+def _send_admin_notification(snapshot: dict) -> bool:
+    """Envoie la demande à urequest@elfis-core.com. Retourne True si expédié."""
     if not email_configured():
-        return
+        return False
     body = (
         "Nouvelle demande de création d'adresse e-mail\n\n"
         f"Nom :\n{snapshot.get('last_name') or '—'}\n\n"
@@ -147,11 +152,12 @@ def _send_admin_notification(snapshot: dict) -> None:
         body=body,
         reply_to_email=(snapshot.get("current_email") or None),
     )
+    return True
 
 
-def _send_user_confirmation(user: User) -> None:
+def _send_user_confirmation(user: User) -> bool:
     if not email_configured() or not (user.email or "").strip():
-        return
+        return False
     first = (user.first_name or "").strip() or "bonjour"
     body = (
         f"Bonjour {first},\n\n"
@@ -170,6 +176,7 @@ def _send_user_confirmation(user: User) -> None:
         subject="Nous avons bien reçu votre demande",
         body=body,
     )
+    return True
 
 
 def create_professional_email_request(
@@ -177,7 +184,8 @@ def create_professional_email_request(
     user: User,
     *,
     organization_id: int | None,
-) -> ProfessionalEmail:
+) -> tuple[ProfessionalEmail, dict]:
+    """Crée la demande et tente l’envoi vers urequest@ + confirmation client."""
     existing_pending = (
         db.query(ProfessionalEmail)
         .filter(
@@ -215,13 +223,33 @@ def create_professional_email_request(
     db.commit()
     db.refresh(row)
 
+    notify: dict = {
+        "admin_notified": False,
+        "user_confirmed": False,
+        "notify_to": ADMIN_NOTIFY_TO,
+        "mail_configured": email_configured(),
+        "error": "",
+    }
     try:
-        _send_admin_notification(snapshot)
-        _send_user_confirmation(user)
-    except Exception:  # noqa: BLE001 — la demande reste enregistrée
-        pass
+        notify["admin_notified"] = _send_admin_notification(snapshot)
+        notify["user_confirmed"] = _send_user_confirmation(user)
+        if not notify["mail_configured"]:
+            notify["error"] = (
+                "Service e-mail plateforme non configuré "
+                "(BREVO_API_KEY + PLATFORM_EMAIL_FROM)."
+            )
+            logger.error("Demande pro email #%s enregistrée mais e-mail non configuré", row.id)
+        elif not notify["admin_notified"]:
+            notify["error"] = f"Échec d’envoi vers {ADMIN_NOTIFY_TO}"
+    except Exception as exc:  # noqa: BLE001 — la demande reste enregistrée
+        notify["error"] = str(exc)
+        logger.exception(
+            "Demande pro email #%s enregistrée mais notification échouée: %s",
+            row.id,
+            exc,
+        )
 
-    return row
+    return row, notify
 
 
 def list_all_requests(db: Session, *, status: str | None = None) -> list[ProfessionalEmail]:

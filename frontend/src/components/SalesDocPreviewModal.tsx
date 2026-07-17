@@ -41,13 +41,14 @@ function buildMailtoUrl(opts: {
   cc?: string
   bcc?: string
 }) {
-  const params = new URLSearchParams()
-  if (opts.subject) params.set('subject', opts.subject)
-  if (opts.body) params.set('body', opts.body)
-  if (opts.cc) params.set('cc', opts.cc)
-  if (opts.bcc) params.set('bcc', opts.bcc)
-  const qs = params.toString()
-  return `mailto:${encodeURIComponent(opts.to)}${qs ? `?${qs}` : ''}`
+  // encodeURIComponent (espaces → %20). URLSearchParams met des « + » que Outlook/Gmail affichent littéralement.
+  const parts: string[] = []
+  if (opts.subject) parts.push(`subject=${encodeURIComponent(opts.subject)}`)
+  if (opts.body) parts.push(`body=${encodeURIComponent(opts.body)}`)
+  if (opts.cc) parts.push(`cc=${encodeURIComponent(opts.cc)}`)
+  if (opts.bcc) parts.push(`bcc=${encodeURIComponent(opts.bcc)}`)
+  const to = opts.to.trim()
+  return `mailto:${to}${parts.length ? `?${parts.join('&')}` : ''}`
 }
 
 export default function SalesDocPreviewModal({

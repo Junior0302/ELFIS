@@ -402,7 +402,7 @@ export default function ComptePage() {
               <p className="muted">
                 Cliquez ci-dessous : aucune saisie. Nous récupérons nom, prénom, e-mail, téléphone,
                 société, abonnement et statut depuis votre compte, puis notifions{' '}
-                <strong>contact@elfis-core.com</strong>. Vous recevez aussi un accusé de réception.
+                <strong>urequest@elfis-core.com</strong>. Vous recevez aussi un accusé de réception.
               </p>
               <div className="actions">
                 <button

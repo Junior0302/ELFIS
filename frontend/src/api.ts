@@ -983,11 +983,18 @@ export const api = {
       can_request: boolean
     }>('/professional-emails/me', undefined, { token, orgId }),
   requestProfessionalEmail: (token?: string | null, orgId?: number | null) =>
-    request<{ ok: boolean; message: string; email: ProfessionalEmailRecord }>(
-      '/professional-emails/request',
-      { method: 'POST' },
-      { token, orgId },
-    ),
+    request<{
+      ok: boolean
+      message: string
+      email: ProfessionalEmailRecord
+      notify?: {
+        admin_notified?: boolean
+        user_confirmed?: boolean
+        notify_to?: string
+        mail_configured?: boolean
+        error?: string
+      }
+    }>('/professional-emails/request', { method: 'POST' }, { token, orgId }),
   professionalSenderOptions: (token?: string | null, orgId?: number | null) =>
     request<{
       options: EmailSenderOption[]

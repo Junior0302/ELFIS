@@ -50,9 +50,10 @@ def test_suggest_and_request_flow(monkeypatch):
     db.commit()
 
     assert suggest_elfis_email(user) == "jean.dupont@elfis-core.com"
-    row = create_professional_email_request(db, user, organization_id=org.id)
+    row, notify = create_professional_email_request(db, user, organization_id=org.id)
     assert row.status == "pending"
     assert row.suggested_email == "jean.dupont@elfis-core.com"
+    assert notify["notify_to"] == "urequest@elfis-core.com"
 
     admin = User(first_name="Admin", last_name="ELF", email="admin@elfis-core.com", status="active")
     db.add(admin)

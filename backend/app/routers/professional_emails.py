@@ -74,7 +74,7 @@ def request_professional_email(
     if not auth.user:
         raise HTTPException(401, detail="Authentification requise")
     try:
-        row = create_professional_email_request(
+        row, notify = create_professional_email_request(
             db,
             auth.user,
             organization_id=auth.organization_id,
@@ -88,14 +88,27 @@ def request_professional_email(
         action="professional_email.request",
         module="compte",
     )
+    message = (
+        "Votre demande a bien été enregistrée. "
+        "Notre équipe prépare actuellement votre adresse professionnelle. "
+        "Vous recevrez vos accès sous 24 heures maximum."
+    )
+    if notify.get("admin_notified"):
+        message = (
+            "Votre demande a bien été envoyée à notre équipe. "
+            "Vous recevrez vos accès sous 24 heures maximum."
+        )
+    elif notify.get("error"):
+        message = (
+            "Votre demande est enregistrée côté admin, mais la notification e-mail "
+            f"n’a pas pu partir ({notify['error']}). "
+            "Contactez le support si besoin."
+        )
     return {
         "ok": True,
-        "message": (
-            "Votre demande a bien été envoyée. "
-            "Notre équipe prépare actuellement votre adresse professionnelle. "
-            "Vous recevrez vos accès sous 24 heures maximum."
-        ),
+        "message": message,
         "email": serialize_professional_email(row),
+        "notify": notify,
     }
 
 
