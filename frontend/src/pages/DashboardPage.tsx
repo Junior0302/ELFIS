@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   api,
   formatEuro,
+  type BillingOverview,
   type DashboardStats,
   type PilotOverview,
   type SubscriptionInfo,
@@ -34,14 +35,23 @@ function isSubscriptionBlock(message: string) {
   )
 }
 
+function greetingHour() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bonjour'
+  if (h < 18) return 'Bon après-midi'
+  return 'Bonsoir'
+}
+
 export default function DashboardPage() {
   const { token, orgId, user, memberships } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [pilot, setPilot] = useState<PilotOverview | null>(null)
+  const [billing, setBilling] = useState<BillingOverview | null>(null)
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
   const [error, setError] = useState('')
   const [blocked, setBlocked] = useState(false)
   const [now, setNow] = useState(Date.now())
+  const welcomeRef = useRef<HTMLDivElement>(null)
 
   const activeMembership = memberships.find((item) => item.organization_id === orgId)
   const canManageSubscription = Boolean(
@@ -49,6 +59,7 @@ export default function DashboardPage() {
       activeMembership?.permissions.includes('subscription.manage'),
   )
   const isElfAdmin = Boolean(user?.is_platform_admin)
+  const firstName = user?.first_name?.trim() || 'là'
 
   useEffect(() => {
     if (!token || !orgId) return
@@ -63,18 +74,20 @@ export default function DashboardPage() {
           try {
             await api.syncSubscription(token, orgId)
           } catch {
-            /* sync optionnel : webhooks ou sync manuel */
+            /* sync optionnel */
           }
         }
-        const [s, p, sub] = await Promise.all([
+        const [s, p, sub, bill] = await Promise.all([
           api.dashboard(token, orgId),
           api.dashboardPilot(token, orgId).catch(() => null),
           api.currentSubscription(token, orgId).catch(() => null),
+          api.billingOverview(token, orgId).catch(() => null),
         ])
         if (cancelled) return
         setStats(s)
         setPilot(p)
         setSubscription(sub)
+        setBilling(bill)
         setBlocked(false)
         setError('')
       } catch (e) {
@@ -94,12 +107,48 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [token, orgId])
+  }, [token, orgId, isElfAdmin])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!stats || blocked) return
+    const root = welcomeRef.current
+    if (!root) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let cancelled = false
+    let revert: (() => void) | undefined
+
+    void (async () => {
+      const { default: gsap } = await import('gsap')
+      if (cancelled || !welcomeRef.current) return
+      const ctx = gsap.context(() => {
+        if (reduce) {
+          gsap.set('.dash-welcome > *, .dash-recap .stat, .dash-reveal', {
+            clearProps: 'all',
+            opacity: 1,
+            y: 0,
+          })
+          return
+        }
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+        tl.from('.dash-welcome-eyebrow', { y: 16, opacity: 0, duration: 0.45 })
+          .from('.dash-welcome-title', { y: 22, opacity: 0, duration: 0.55 }, '-=0.2')
+          .from('.dash-welcome-lead', { y: 14, opacity: 0, duration: 0.45 }, '-=0.25')
+          .from('.dash-recap .stat', { y: 20, opacity: 0, duration: 0.4, stagger: 0.06 }, '-=0.15')
+          .from('.dash-reveal', { y: 24, opacity: 0, duration: 0.5, stagger: 0.08 }, '-=0.2')
+      }, root)
+      revert = () => ctx.revert()
+    })()
+
+    return () => {
+      cancelled = true
+      revert?.()
+    }
+  }, [stats, blocked])
 
   if (blocked && !isElfAdmin) {
     const needsCheckout =
@@ -139,14 +188,16 @@ export default function DashboardPage() {
                   void (async () => {
                     try {
                       await api.syncSubscription(token, orgId)
-                      const [s, p, sub] = await Promise.all([
+                      const [s, p, sub, bill] = await Promise.all([
                         api.dashboard(token, orgId),
                         api.dashboardPilot(token, orgId).catch(() => null),
                         api.currentSubscription(token, orgId).catch(() => null),
+                        api.billingOverview(token, orgId).catch(() => null),
                       ])
                       setStats(s)
                       setPilot(p)
                       setSubscription(sub)
+                      setBilling(bill)
                     } catch (e) {
                       const message =
                         e instanceof Error ? e.message : 'Impossible de charger le dashboard'
@@ -177,26 +228,40 @@ export default function DashboardPage() {
       ? remainingTime(subscription.trial_end, now)
       : null
 
+  const recentSales = (billing?.documents ?? []).slice(0, 4)
+  const recentDocs = stats.recent.slice(0, 4)
+
   return (
-    <>
-      <div className="page-head">
-        <div>
-          <h2>Tableau de bord</h2>
-          <p>
-            {user
-              ? `Bonjour ${user.first_name} — vue d’ensemble de votre activité.`
-              : 'Pilotage de votre activité réelle.'}
-          </p>
+    <div className="dashboard-page" ref={welcomeRef}>
+      <section className="dash-welcome panel">
+        <span className="dash-welcome-eyebrow home-eyebrow">Copilote ComptaPilot</span>
+        <h2 className="dash-welcome-title">
+          {greetingHour()} {firstName}
+        </h2>
+        <p className="dash-welcome-lead muted">
+          Je suis votre copilote financier. Voici l’état de votre activité et les prochaines
+          actions utiles.
+        </p>
+
+        <div className="stats dash-recap">
+          <div className="stat">
+            <span>Chiffre d&apos;affaires</span>
+            <strong>{formatEuro(pilot?.ca ?? 0)}</strong>
+          </div>
+          <div className="stat">
+            <span>Impayés clients</span>
+            <strong>{formatEuro(pilot?.unpaid ?? billing?.stats.unpaid_amount ?? 0)}</strong>
+          </div>
+          <div className="stat">
+            <span>Documents</span>
+            <strong>{stats.invoice_count}</strong>
+          </div>
+          <div className="stat">
+            <span>Santé</span>
+            <strong>{pilot ? healthLabel[pilot.health] : '—'}</strong>
+          </div>
         </div>
-        <div className="actions" style={{ marginTop: 0 }}>
-          <Link className="btn" to="/deposit">
-            Déposer une facture
-          </Link>
-          <Link className="btn secondary" to="/copilote">
-            Parler au copilote
-          </Link>
-        </div>
-      </div>
+      </section>
 
       {subscription && subscription.status !== 'none' && (
         <div className={`dashboard-sub-strip ${subscriptionTone(subscription.status)}`}>
@@ -210,163 +275,145 @@ export default function DashboardPage() {
                 : ''}
             </span>
           </div>
-          {canManageSubscription && (
-            <Link to="/abonnement">Gérer</Link>
-          )}
+          {canManageSubscription && <Link to="/abonnement">Gérer</Link>}
         </div>
       )}
 
       {empty ? (
-        <section className="panel onboarding-panel">
+        <section className="panel onboarding-panel dash-reveal">
           <h3>Votre parcours de démarrage</h3>
           <p className="muted">
-            Une seule logique : activer l’accès, renseigner l’entreprise, puis nourrir le copilote
-            avec vos documents réels.
+            Activez l’accès, renseignez l’entreprise, puis nourrissez le copilote avec vos
+            documents et clients.
           </p>
           <ol className="onboarding-steps">
             <li>
-              <Link to="/settings">1. Paramètres — identité et TVA de l’entreprise</Link>
+              <Link to="/settings">1. Paramètres — identité et TVA</Link>
             </li>
             <li>
-              <Link to="/deposit">2. Déposer — première facture fournisseur (OCR)</Link>
+              <Link to="/clients">2. Clients — premier contact commercial</Link>
             </li>
             <li>
-              <Link to="/facturation">3. Facturation — premier devis ou facture client</Link>
+              <Link to="/deposit">3. Déposer — première facture fournisseur</Link>
             </li>
             <li>
-              <Link to="/copilote">4. Copilote — poser votre première question</Link>
+              <Link to="/copilote">4. Copilote — première question</Link>
             </li>
           </ol>
-          <div className="dashboard-next-links">
-            <Link to="/admin/equipe">Équipe & droits</Link>
-            <Link to="/abonnement">Abonnement</Link>
-          </div>
         </section>
       ) : (
-        <>
-          {pilot && (
-            <>
-              <div className={`health-banner health-${pilot.health}`}>
-                <strong>Santé activité — {healthLabel[pilot.health]}</strong>
-                {pilot.alerts[0] ? <span>{pilot.alerts[0]}</span> : <span>Aucune alerte</span>}
-              </div>
-
-              <div className="stats">
-                <div className="stat">
-                  <span>Chiffre d&apos;affaires</span>
-                  <strong>{formatEuro(pilot.ca)}</strong>
-                </div>
-                <div className="stat">
-                  <span>Bénéfice estimé</span>
-                  <strong>{formatEuro(pilot.benefice)}</strong>
-                </div>
-                <div className="stat">
-                  <span>Marge</span>
-                  <strong>{pilot.marge_pct}%</strong>
-                </div>
-                <div className="stat">
-                  <span>Impayés clients</span>
-                  <strong>{formatEuro(pilot.unpaid)}</strong>
-                </div>
-              </div>
-
-              {(pilot.alerts.length > 0 || pilot.recommendations.length > 0) && (
-                <section className="panel" style={{ marginBottom: '1rem' }}>
-                  <h3>Priorités</h3>
-                  <ul className="alert-list">
-                    {pilot.alerts.map((a) => (
-                      <li key={a}>{a}</li>
-                    ))}
-                    {pilot.recommendations.map((r) => (
-                      <li key={r} className="muted">
-                        → {r}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-            </>
-          )}
-
-          <div className="dashboard-work-grid">
-            <section className="panel">
-              <div className="dashboard-section-head">
-                <h3>Comptabilité fournisseur</h3>
-                <Link to="/history">Voir tout</Link>
-              </div>
-              <div className="stats dashboard-mini-stats">
-                <div className="stat">
-                  <span>Documents</span>
-                  <strong>{stats.invoice_count}</strong>
-                </div>
-                <div className="stat">
-                  <span>HT</span>
-                  <strong>{formatEuro(stats.total_ht)}</strong>
-                </div>
-                <div className="stat">
-                  <span>TVA</span>
-                  <strong>{formatEuro(stats.recoverable_vat)}</strong>
-                </div>
-                <div className="stat">
-                  <span>À vérifier</span>
-                  <strong>{stats.to_review}</strong>
-                </div>
-              </div>
-              {stats.recent.length === 0 ? (
-                <div className="empty">
-                  Aucun document.
-                  <div style={{ marginTop: '1rem' }}>
-                    <Link className="btn" to="/deposit">
-                      Déposer une facture
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <div className="list">
-                  {stats.recent.slice(0, 5).map((inv) => (
-                    <Link key={inv.id} to={`/result/${inv.id}`} className="list-item">
-                      <div>
-                        <strong>{inv.supplier || inv.filename}</strong>
-                        <span>
-                          {inv.invoice_number || 'Sans numéro'} · {inv.invoice_date || '—'}
-                        </span>
-                      </div>
-                      <div>{formatEuro(inv.amount_ht)}</div>
-                      <div>{formatEuro(inv.amount_tva)}</div>
-                      <div>
-                        <StatusBadge needsReview={inv.needs_review} status={inv.status} />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <aside className="panel dashboard-shortcuts">
-              <h3>Continuer</h3>
-              <p className="muted">Les prochaines actions utiles, dans l’ordre du produit.</p>
-              <div className="dashboard-shortcut-list">
-                <Link to="/deposit">
-                  <strong>Déposer</strong>
-                  <span>Importer une facture PDF ou photo</span>
-                </Link>
-                <Link to="/facturation">
-                  <strong>Facturation</strong>
-                  <span>Créer un devis ou une facture client</span>
-                </Link>
-                <Link to="/copilote">
-                  <strong>Copilote IA</strong>
-                  <span>Demander une explication sur vos chiffres</span>
-                </Link>
-                <Link to="/admin/equipe">
-                  <strong>Admin équipe</strong>
-                  <span>Ajouter, droits et suppression</span>
-                </Link>
-              </div>
-            </aside>
-          </div>
-        </>
+        pilot &&
+        (pilot.alerts.length > 0 || pilot.recommendations.length > 0) && (
+          <section className="panel dash-reveal">
+            <h3>Priorités</h3>
+            <ul className="alert-list">
+              {pilot.alerts.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+              {pilot.recommendations.map((r) => (
+                <li key={r} className="muted">
+                  → {r}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
       )}
-    </>
+
+      <section className="panel dash-reveal">
+        <div className="dashboard-section-head">
+          <h3>Que souhaitez-vous faire ?</h3>
+        </div>
+        <div className="dash-cta-grid">
+          <Link className="dash-cta" to="/deposit">
+            <strong>Déposer un document</strong>
+            <span>OCR facture fournisseur</span>
+          </Link>
+          <Link className="dash-cta" to="/facturation">
+            <strong>Créer une facture</strong>
+            <span>Devis ou facture client</span>
+          </Link>
+          <Link className="dash-cta" to="/clients">
+            <strong>Ajouter un client</strong>
+            <span>Fiche contact & TVA</span>
+          </Link>
+          <Link className="dash-cta" to="/catalogue">
+            <strong>Ajouter un produit</strong>
+            <span>Catalogue prix HT</span>
+          </Link>
+          <Link className="dash-cta" to="/copilote">
+            <strong>Parler au copilote</strong>
+            <span>Questions sur vos chiffres</span>
+          </Link>
+          <button type="button" className="dash-cta dash-cta-voice" disabled>
+            <strong>Assistant vocal</strong>
+            <span>Bientôt disponible</span>
+          </button>
+        </div>
+      </section>
+
+      <div className="dashboard-work-grid dash-reveal">
+        <section className="panel">
+          <div className="dashboard-section-head">
+            <h3>Modifications récentes</h3>
+            <Link to="/history">Comptabilité</Link>
+          </div>
+          {recentDocs.length === 0 && recentSales.length === 0 ? (
+            <div className="empty">Aucune activité récente.</div>
+          ) : (
+            <div className="list">
+              {recentDocs.map((inv) => (
+                <Link key={`doc-${inv.id}`} to={`/result/${inv.id}`} className="list-item">
+                  <div>
+                    <strong>{inv.supplier || inv.filename}</strong>
+                    <span>
+                      Document · {inv.invoice_date || '—'}
+                    </span>
+                  </div>
+                  <div>{formatEuro(inv.amount_ht)}</div>
+                  <div>
+                    <StatusBadge needsReview={inv.needs_review} status={inv.status} />
+                  </div>
+                </Link>
+              ))}
+              {recentSales.map((doc) => (
+                <Link key={`sale-${doc.id}`} to="/facturation" className="list-item">
+                  <div>
+                    <strong>
+                      {doc.number} — {doc.customer_name}
+                    </strong>
+                    <span>
+                      {doc.doc_type} · {doc.issue_date || '—'}
+                    </span>
+                  </div>
+                  <div>{formatEuro(doc.amount_ttc)}</div>
+                  <div>
+                    <span className="badge">{doc.status}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <aside className="panel dashboard-shortcuts">
+          <h3>Raccourcis</h3>
+          <div className="dashboard-shortcut-list">
+            <Link to="/activites">
+              <strong>Activités</strong>
+              <span>Agenda commercial</span>
+            </Link>
+            <Link to="/organisation">
+              <strong>Organisation</strong>
+              <span>Siège & coordonnées</span>
+            </Link>
+            <Link to="/admin/equipe">
+              <strong>Équipe</strong>
+              <span>Comptes et droits</span>
+            </Link>
+          </div>
+        </aside>
+      </div>
+    </div>
   )
 }

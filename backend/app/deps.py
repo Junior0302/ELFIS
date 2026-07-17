@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models_saas import Organization, Subscription, User
+from app.models_saas import Organization, User
 from app.services.auth import decode_token, get_user_memberships, user_has_permission
 
 
@@ -111,11 +111,9 @@ def require_active_subscription(
             403,
             detail={"code": "organization_not_found", "message": "Organisation introuvable"},
         )
-    # Le mode local sans authentification reste utilisable explicitement avec X-Organization-Id.
     if auth.user is None and not settings.auth_required:
         return auth
 
-    # ELF Admin : accès produit complet, indépendant de l’abonnement Stripe de l’org.
     if _is_platform_admin_user(auth.user):
         if not auth.user.is_platform_admin:
             auth.user.is_platform_admin = True
@@ -124,49 +122,42 @@ def require_active_subscription(
             db.refresh(auth.user)
         return auth
 
-    subscription = (
-        db.query(Subscription)
-        .filter(Subscription.organization_id == organization_id)
-        .order_by(Subscription.id.desc())
-        .first()
-    )
-    if not subscription:
+    from app.subscriptions.access import get_subscription_access
+    from app.subscriptions.permissions import subscription_error
+
+    access = get_subscription_access(db, organization_id, user=auth.user)
+    if access.has_access and access.read_only and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
         raise HTTPException(
             402,
             detail={
-                "code": "subscription_required",
-                "message": "Un abonnement ComptaPilot Pro est requis",
+                **subscription_error("PAYMENT_REQUIRED", status=access.subscription_status, action="UPDATE_PAYMENT"),
+                "code": "subscription_past_due_read_only",
+                "message": (
+                    "Le paiement a échoué : l’accès reste disponible en lecture seule "
+                    "pendant la période de grâce"
+                ),
+                "status": access.raw_status,
             },
         )
-
-    now = datetime.utcnow()
-    allowed = subscription.status in {"active", "trialing"}
-    if subscription.status == "past_due":
-        grace_until = (
-            subscription.past_due_since + timedelta(days=settings.stripe_past_due_grace_days)
-            if subscription.past_due_since
-            else None
-        )
-        allowed = bool(grace_until and now <= grace_until)
-        if allowed and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
-            raise HTTPException(
-                402,
-                detail={
-                    "code": "subscription_past_due_read_only",
-                    "message": (
-                        "Le paiement a échoué : l’accès reste disponible en lecture seule "
-                        "pendant la période de grâce"
-                    ),
-                    "status": subscription.status,
-                },
-            )
-    if not allowed:
+    if not access.has_access:
+        code = "SUBSCRIPTION_SUSPENDED" if access.admin_revoked else "SUBSCRIPTION_REQUIRED"
+        action = "CONTACT_SUPPORT" if access.admin_revoked else "START_TRIAL"
+        if access.subscription_status in {"canceled", "expired"}:
+            code = "SUBSCRIPTION_CANCELED"
+            action = "REACTIVATE"
         raise HTTPException(
             402,
             detail={
-                "code": "subscription_inactive",
-                "message": "L’abonnement ComptaPilot Pro n’est pas actif",
-                "status": subscription.status,
+                **subscription_error(code, status=access.subscription_status, action=action),
+                "code": "subscription_inactive" if access.subscription_id else "subscription_required",
+                "message": access.label
+                if access.admin_revoked
+                else (
+                    "Un abonnement ComptaPilot Pro est requis"
+                    if not access.subscription_id
+                    else "L’abonnement ComptaPilot Pro n’est pas actif"
+                ),
+                "status": access.subscription_status,
             },
         )
     return auth

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -9,7 +10,15 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context, require_active_subscription
-from app.models_saas import Customer, Organization, Payment, Reminder, SalesDocument
+from app.models_saas import (
+    CatalogItem,
+    CommercialActivity,
+    Customer,
+    Organization,
+    Payment,
+    Reminder,
+    SalesDocument,
+)
 from app.services.auth import write_audit
 from app.services.billing import (
     convert_quote_to_invoice,
@@ -39,6 +48,50 @@ class CustomerIn(BaseModel):
     phone: str = ""
     address: str = ""
     vat_number: str = ""
+
+
+class CustomerUpdateIn(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    vat_number: str | None = None
+
+
+class CatalogItemIn(BaseModel):
+    name: str
+    kind: str = "produit"
+    unit: str = "unité"
+    unit_price_ht: float = 0.0
+    vat_rate: float = 20.0
+    active: bool = True
+
+
+class CatalogItemUpdateIn(BaseModel):
+    name: str | None = None
+    kind: str | None = None
+    unit: str | None = None
+    unit_price_ht: float | None = None
+    vat_rate: float | None = None
+    active: bool | None = None
+
+
+class ActivityIn(BaseModel):
+    title: str
+    kind: str = "rdv"
+    customer_id: int | None = None
+    scheduled_at: str | None = None
+    status: str = "planifie"
+    notes: str = ""
+
+
+class ActivityUpdateIn(BaseModel):
+    title: str | None = None
+    kind: str | None = None
+    customer_id: int | None = None
+    scheduled_at: str | None = None
+    status: str | None = None
+    notes: str | None = None
 
 
 class SalesDocIn(BaseModel):
@@ -125,6 +178,85 @@ def _serialize_email_log(log) -> dict:
     }
 
 
+def _serialize_customer(c: Customer) -> dict:
+    return {
+        "id": c.id,
+        "organization_id": c.organization_id,
+        "name": c.name,
+        "email": c.email or "",
+        "phone": c.phone or "",
+        "address": c.address or "",
+        "vat_number": c.vat_number or "",
+        "created_at": c.created_at,
+    }
+
+
+def _serialize_catalog(item: CatalogItem) -> dict:
+    return {
+        "id": item.id,
+        "organization_id": item.organization_id,
+        "name": item.name,
+        "kind": item.kind,
+        "unit": item.unit,
+        "unit_price_ht": item.unit_price_ht,
+        "vat_rate": item.vat_rate,
+        "active": item.active,
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+    }
+
+
+def _parse_scheduled_at(value: str | None):
+    if not value:
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        return datetime.fromisoformat(raw)
+    except ValueError as exc:
+        raise HTTPException(400, detail="Date/heure invalide (ISO attendu)") from exc
+
+
+def _serialize_activity(act: CommercialActivity, customer_name: str = "") -> dict:
+    return {
+        "id": act.id,
+        "organization_id": act.organization_id,
+        "title": act.title,
+        "kind": act.kind,
+        "customer_id": act.customer_id,
+        "customer_name": customer_name,
+        "scheduled_at": act.scheduled_at.isoformat() if act.scheduled_at else None,
+        "status": act.status,
+        "notes": act.notes or "",
+        "created_at": act.created_at,
+        "updated_at": act.updated_at,
+    }
+
+
+def _get_customer(db: Session, auth: AuthContext, customer_id: int) -> Customer:
+    customer = db.get(Customer, customer_id)
+    if not customer or customer.organization_id != _org_id(auth):
+        raise HTTPException(404, detail="Client introuvable")
+    return customer
+
+
+def _get_catalog_item(db: Session, auth: AuthContext, item_id: int) -> CatalogItem:
+    item = db.get(CatalogItem, item_id)
+    if not item or item.organization_id != _org_id(auth):
+        raise HTTPException(404, detail="Article introuvable")
+    return item
+
+
+def _get_activity(db: Session, auth: AuthContext, activity_id: int) -> CommercialActivity:
+    act = db.get(CommercialActivity, activity_id)
+    if not act or act.organization_id != _org_id(auth):
+        raise HTTPException(404, detail="Activité introuvable")
+    return act
+
+
 @router.get("/overview")
 def billing_overview(
     auth: AuthContext = Depends(get_auth_context),
@@ -183,6 +315,26 @@ def billing_overview(
     }
 
 
+@router.get("/customers")
+def list_customers(
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+    q: str | None = None,
+):
+    auth.require("invoice.read")
+    org_id = _org_id(auth)
+    query = db.query(Customer).filter(Customer.organization_id == org_id)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (Customer.name.ilike(like))
+            | (Customer.email.ilike(like))
+            | (Customer.phone.ilike(like))
+        )
+    customers = query.order_by(Customer.name.asc()).all()
+    return {"customers": [_serialize_customer(c) for c in customers]}
+
+
 @router.post("/customers")
 def create_customer(
     payload: CustomerIn,
@@ -191,11 +343,235 @@ def create_customer(
 ):
     auth.require("invoice.create")
     org_id = _org_id(auth)
+    if not payload.name.strip():
+        raise HTTPException(400, detail="Nom requis")
     customer = Customer(organization_id=org_id, **payload.model_dump())
     db.add(customer)
     db.commit()
     db.refresh(customer)
-    return {"id": customer.id, "name": customer.name, "email": customer.email}
+    write_audit(
+        db,
+        user_id=auth.user.id if auth.user else None,
+        organization_id=org_id,
+        action=f"create_customer:{customer.id}",
+        module="facturation",
+    )
+    return _serialize_customer(customer)
+
+
+@router.get("/customers/{customer_id}")
+def get_customer(
+    customer_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.read")
+    return _serialize_customer(_get_customer(db, auth, customer_id))
+
+
+@router.patch("/customers/{customer_id}")
+def update_customer(
+    customer_id: int,
+    payload: CustomerUpdateIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    customer = _get_customer(db, auth, customer_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "name" in data and not str(data["name"] or "").strip():
+        raise HTTPException(400, detail="Nom requis")
+    for key, value in data.items():
+        setattr(customer, key, value)
+    db.commit()
+    db.refresh(customer)
+    return _serialize_customer(customer)
+
+
+@router.delete("/customers/{customer_id}")
+def delete_customer(
+    customer_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    customer = _get_customer(db, auth, customer_id)
+    db.delete(customer)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/catalog")
+def list_catalog(
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+    active_only: bool = False,
+):
+    auth.require("invoice.read")
+    org_id = _org_id(auth)
+    query = db.query(CatalogItem).filter(CatalogItem.organization_id == org_id)
+    if active_only:
+        query = query.filter(CatalogItem.active.is_(True))
+    items = query.order_by(CatalogItem.name.asc()).all()
+    return {"items": [_serialize_catalog(i) for i in items]}
+
+
+@router.post("/catalog")
+def create_catalog_item(
+    payload: CatalogItemIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    if payload.kind not in ("produit", "service"):
+        raise HTTPException(400, detail="Type invalide (produit|service)")
+    if not payload.name.strip():
+        raise HTTPException(400, detail="Nom requis")
+    item = CatalogItem(organization_id=_org_id(auth), **payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return _serialize_catalog(item)
+
+
+@router.patch("/catalog/{item_id}")
+def update_catalog_item(
+    item_id: int,
+    payload: CatalogItemUpdateIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    item = _get_catalog_item(db, auth, item_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "kind" in data and data["kind"] not in ("produit", "service"):
+        raise HTTPException(400, detail="Type invalide (produit|service)")
+    if "name" in data and not str(data["name"] or "").strip():
+        raise HTTPException(400, detail="Nom requis")
+    for key, value in data.items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return _serialize_catalog(item)
+
+
+@router.delete("/catalog/{item_id}")
+def delete_catalog_item(
+    item_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    item = _get_catalog_item(db, auth, item_id)
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/activities")
+def list_activities(
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+    status: str | None = None,
+    kind: str | None = None,
+):
+    auth.require("invoice.read")
+    org_id = _org_id(auth)
+    query = db.query(CommercialActivity).filter(CommercialActivity.organization_id == org_id)
+    if status:
+        query = query.filter(CommercialActivity.status == status.strip().lower())
+    if kind:
+        query = query.filter(CommercialActivity.kind == kind.strip().lower())
+    activities = query.order_by(CommercialActivity.id.desc()).all()
+    customer_ids = {a.customer_id for a in activities if a.customer_id}
+    names: dict[int, str] = {}
+    if customer_ids:
+        for c in db.query(Customer).filter(Customer.id.in_(customer_ids)).all():
+            names[c.id] = c.name
+    return {
+        "activities": [
+            _serialize_activity(a, names.get(a.customer_id or 0, "")) for a in activities
+        ]
+    }
+
+
+@router.post("/activities")
+def create_activity(
+    payload: ActivityIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    if payload.kind not in ("vente", "service", "rdv", "suivi"):
+        raise HTTPException(400, detail="Type invalide")
+    if payload.status not in ("planifie", "fait", "annule"):
+        raise HTTPException(400, detail="Statut invalide")
+    if not payload.title.strip():
+        raise HTTPException(400, detail="Titre requis")
+    org_id = _org_id(auth)
+    if payload.customer_id is not None:
+        _get_customer(db, auth, payload.customer_id)
+    act = CommercialActivity(
+        organization_id=org_id,
+        title=payload.title.strip(),
+        kind=payload.kind,
+        customer_id=payload.customer_id,
+        scheduled_at=_parse_scheduled_at(payload.scheduled_at),
+        status=payload.status,
+        notes=payload.notes or "",
+    )
+    db.add(act)
+    db.commit()
+    db.refresh(act)
+    name = ""
+    if act.customer_id:
+        c = db.get(Customer, act.customer_id)
+        name = c.name if c else ""
+    return _serialize_activity(act, name)
+
+
+@router.patch("/activities/{activity_id}")
+def update_activity(
+    activity_id: int,
+    payload: ActivityUpdateIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    act = _get_activity(db, auth, activity_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "kind" in data and data["kind"] not in ("vente", "service", "rdv", "suivi"):
+        raise HTTPException(400, detail="Type invalide")
+    if "status" in data and data["status"] not in ("planifie", "fait", "annule"):
+        raise HTTPException(400, detail="Statut invalide")
+    if "title" in data and not str(data["title"] or "").strip():
+        raise HTTPException(400, detail="Titre requis")
+    if "customer_id" in data and data["customer_id"] is not None:
+        _get_customer(db, auth, data["customer_id"])
+    if "scheduled_at" in data:
+        data["scheduled_at"] = _parse_scheduled_at(data["scheduled_at"])
+    for key, value in data.items():
+        setattr(act, key, value)
+    db.commit()
+    db.refresh(act)
+    name = ""
+    if act.customer_id:
+        c = db.get(Customer, act.customer_id)
+        name = c.name if c else ""
+    return _serialize_activity(act, name)
+
+
+@router.delete("/activities/{activity_id}")
+def delete_activity(
+    activity_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    act = _get_activity(db, auth, activity_id)
+    db.delete(act)
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/documents")

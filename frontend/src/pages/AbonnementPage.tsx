@@ -6,6 +6,7 @@ import {
   canStartSubscriptionCheckout,
   countdownParts,
   formatDate,
+  formatDateTime,
   hasProductAccess,
   remainingTime,
   subscriptionCheckoutLabel,
@@ -13,6 +14,14 @@ import {
   subscriptionLabels,
   subscriptionTone,
 } from '../subscription'
+
+const FEATURES = [
+  'Analyse intelligente de documents comptables',
+  'Extraction des informations de factures',
+  'Assistance comptable par intelligence artificielle',
+  'Gestion des factures, devis, clients et catalogue',
+  'Tableaux de bord, historique et exports',
+]
 
 function openStripe(url: string) {
   const target = new URL(url, window.location.origin)
@@ -64,9 +73,32 @@ function CountdownBoard({
           <span>sec</span>
         </div>
       </div>
-      <p className="trial-countdown-date">Jusqu’au {formatDate(deadline)}</p>
+      <p className="trial-countdown-date">Jusqu’au {formatDateTime(deadline)}</p>
     </div>
   )
+}
+
+function statusDescription(sub: SubscriptionInfo): string {
+  switch (sub.status) {
+    case 'none':
+      return 'Votre compte est actif, mais aucun abonnement ComptaPilot IA n’est associé à ce compte.'
+    case 'checkout_pending':
+    case 'incomplete':
+      return 'Votre souscription n’est pas encore finalisée. Aucun prélèvement actif n’a été confirmé.'
+    case 'trialing':
+      return `Votre essai gratuit est actif jusqu’au ${formatDateTime(sub.trial_end)}. À la fin, renouvellement automatique à 19 €/mois sauf annulation.`
+    case 'cancel_scheduled':
+      return `Votre abonnement a été résilié. Vous conservez l’accès jusqu’au ${formatDateTime(sub.access_ends_at || sub.current_period_end)}.`
+    case 'past_due':
+      return `Nous n’avons pas pu renouveler votre abonnement. Mettez à jour votre moyen de paiement avant le ${formatDate(sub.grace_until)}.`
+    case 'admin_revoked':
+      return `Accès suspendu par l’administration. Motif : ${sub.admin_revoked_reason_public || 'non précisé'}.`
+    case 'canceled':
+    case 'expired':
+      return `Votre abonnement n’est plus actif. Vos données sont conservées ; les fonctionnalités premium sont désactivées.`
+    default:
+      return sub.label || subscriptionLabels[sub.status]
+  }
 }
 
 export default function AbonnementPage() {
@@ -77,6 +109,8 @@ export default function AbonnementPage() {
   const [error, setError] = useState('')
   const [returnNotice, setReturnNotice] = useState('')
   const [now, setNow] = useState(Date.now())
+  const [renewalOk, setRenewalOk] = useState(false)
+  const [termsOk, setTermsOk] = useState(false)
 
   const loadSubscription = useCallback(
     async (checkoutReturn?: 'success' | 'cancel', sessionId?: string | null) => {
@@ -104,7 +138,7 @@ export default function AbonnementPage() {
             }
           }
           if (hasProductAccess(current)) {
-            setReturnNotice('Essai activé. Votre accès ComptaPilot Pro est ouvert.')
+            setReturnNotice('Essai activé. Votre accès ComptaPilot IA est ouvert.')
           } else {
             setReturnNotice(
               syncError
@@ -141,19 +175,29 @@ export default function AbonnementPage() {
   }, [loadSubscription])
 
   useEffect(() => {
-    const tickMs = subscription?.status === 'trialing' ? 1000 : 60_000
+    const tickMs =
+      subscription?.status === 'trialing' || subscription?.status === 'cancel_scheduled'
+        ? 1000
+        : 60_000
     const timer = window.setInterval(() => setNow(Date.now()), tickMs)
     return () => window.clearInterval(timer)
   }, [subscription?.status])
 
   const startAction = async (kind: 'checkout' | 'portal') => {
     if (!token || !orgId) return
+    if (kind === 'checkout' && (!renewalOk || !termsOk)) {
+      setError('Veuillez accepter le renouvellement automatique et les conditions.')
+      return
+    }
     setAction(kind)
     setError('')
     try {
       const result =
         kind === 'checkout'
-          ? await api.createSubscriptionCheckout(token, orgId)
+          ? await api.createSubscriptionCheckout(token, orgId, {
+              automatic_renewal_accepted: renewalOk,
+              terms_accepted: termsOk,
+            })
           : await api.createSubscriptionPortal(token, orgId)
       openStripe(result.url)
     } catch (reason) {
@@ -162,8 +206,7 @@ export default function AbonnementPage() {
     }
   }
 
-  const statusForActions = (subscription?.raw_status ||
-    subscription?.status) as SubscriptionInfo['status']
+  const statusForActions = (subscription?.status || 'none') as SubscriptionInfo['status']
   const canUsePortal =
     subscription &&
     !subscription.platform_bypass &&
@@ -186,14 +229,8 @@ export default function AbonnementPage() {
     <>
       <div className="page-head">
         <div>
-          <h2>Abonnement</h2>
-          <p>
-            {isTrialing
-              ? 'Votre essai Pro est actif. Voici le temps restant avant la facturation.'
-              : isActiveAccess
-                ? 'Votre abonnement ComptaPilot Pro est actif.'
-                : 'Démarrez l’essai de 14 jours pour ouvrir tout le produit.'}
-          </p>
+          <h2>Abonnement et facturation</h2>
+          <p>Offre ComptaPilot IA — 19 € / mois, essai 14 jours, renouvellement automatique.</p>
         </div>
       </div>
 
@@ -213,24 +250,40 @@ export default function AbonnementPage() {
             <span className={`subscription-badge ${subscriptionTone(subscription.status)}`}>
               {subscription.platform_bypass
                 ? 'Accès ELF Admin'
-                : subscriptionLabels[subscription.status]}
+                : subscription.label || subscriptionLabels[subscription.status]}
             </span>
-            <strong>ComptaPilot Pro · {formatEuro(subscription.price_eur || 19)} / mois</strong>
+            <strong>ComptaPilot IA · {formatEuro(subscription.price_eur || 19)} / mois</strong>
           </div>
 
+          <p className="muted">{statusDescription(subscription)}</p>
+
           {isTrialing ? (
-            <CountdownBoard deadline={deadline} now={now} label="Temps restant d’essai" />
+            <>
+              <CountdownBoard deadline={deadline} now={now} label="Essai gratuit — temps restant" />
+              <div className="dashboard-sub-strip warn" style={{ marginTop: '1rem' }}>
+                <div>
+                  <strong>Essai gratuit — {remainingTime(deadline, now) || '…'}</strong>
+                  <span>
+                    Premier prélèvement prévu le {formatDate(subscription.trial_end)} : 19 € ·
+                    Renouvellement mensuel automatique
+                  </span>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="subscription-active-meta">
               <p>
-                Prochaine échéance : <strong>{formatDate(deadline)}</strong>
+                {subscription.status === 'cancel_scheduled' ? 'Fin d’accès' : 'Prochaine échéance'} :{' '}
+                <strong>{formatDate(deadline)}</strong>
               </p>
               {deadline && <p className="muted">{remainingTime(deadline, now)} restant</p>}
+              {subscription.next_billing_amount_cents != null &&
+                subscription.status !== 'cancel_scheduled' && (
+                  <p className="muted">
+                    Montant prévu : {formatEuro(subscription.next_billing_amount_cents / 100)}
+                  </p>
+                )}
             </div>
-          )}
-
-          {subscription.cancel_at_period_end && (
-            <p className="muted">Résiliation prévue à la fin de la période en cours.</p>
           )}
 
           <div className="subscription-active-actions">
@@ -241,7 +294,7 @@ export default function AbonnementPage() {
                 disabled={Boolean(action)}
                 onClick={() => void startAction('portal')}
               >
-                {action === 'portal' ? 'Ouverture…' : 'Gérer la carte et les factures'}
+                {action === 'portal' ? 'Ouverture…' : 'Gérer la carte, annuler ou factures'}
               </button>
             )}
             {canManage && (
@@ -274,37 +327,66 @@ export default function AbonnementPage() {
         <div className="subscription-grid">
           <section className="panel pricing-card">
             <span className="home-eyebrow">Offre unique</span>
-            <h3>ComptaPilot Pro</h3>
+            <h3>ComptaPilot IA</h3>
             <div className="pricing-amount">
               <strong>19 €</strong>
               <span>/ mois</span>
             </div>
-            <p className="muted">14 jours d’essai, puis 19 € / mois. Carte demandée au départ.</p>
+            <p className="muted">
+              14 jours d’essai gratuit · Renouvellement mensuel automatique · Annulation avant
+              échéance
+            </p>
             <ul className="pricing-features">
-              <li>Pilotage financier et comptable</li>
-              <li>Copilote IA</li>
-              <li>Facturation, OCR et exports</li>
-              <li>Gestion d’équipe</li>
+              {FEATURES.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
             </ul>
+
             {canCheckout && canManage && (
-              <button
-                className="btn subscription-main-action"
-                type="button"
-                disabled={Boolean(action) || subscription?.configured === false}
-                onClick={() => void startAction('checkout')}
-              >
-                {action === 'checkout'
-                  ? 'Ouverture de Stripe…'
-                  : subscription?.configured === false
-                    ? 'Paiement bientôt disponible'
-                    : subscriptionCheckoutLabel(subscription!.status)}
-              </button>
+              <div className="subscription-consents">
+                <label className="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    checked={renewalOk}
+                    onChange={(e) => setRenewalOk(e.target.checked)}
+                  />
+                  J’ai compris que je bénéficie d’un essai gratuit de 14 jours et qu’à son terme,
+                  mon abonnement sera automatiquement renouvelé au tarif de 19 € par mois, sauf
+                  annulation avant la fin de l’essai.
+                </label>
+                <label className="checkbox-inline">
+                  <input
+                    type="checkbox"
+                    checked={termsOk}
+                    onChange={(e) => setTermsOk(e.target.checked)}
+                  />
+                  J’accepte les conditions générales d’utilisation, les conditions de l’abonnement
+                  et la politique de confidentialité.
+                </label>
+                <button
+                  className="btn subscription-main-action"
+                  type="button"
+                  disabled={Boolean(action) || subscription?.configured === false || !renewalOk || !termsOk}
+                  onClick={() => void startAction('checkout')}
+                >
+                  {action === 'checkout'
+                    ? 'Ouverture de Stripe…'
+                    : subscription?.configured === false
+                      ? 'Paiement bientôt disponible'
+                      : subscriptionCheckoutLabel(
+                          subscription!.status,
+                          subscription?.trial_used,
+                        )}
+                </button>
+                <p className="muted" style={{ marginTop: '0.75rem', fontSize: '0.88rem' }}>
+                  Aucun prélèvement aujourd’hui. Premier prélèvement prévu dans 14 jours : 19 €,
+                  puis 19 € par mois jusqu’à résiliation.
+                </p>
+              </div>
             )}
             {!canManage && (
               <p className="muted">
-                Contactez le propriétaire de l’organisation pour modifier l’abonnement. En tant que
-                membre, vous utilisez le plan de l’organisation — aucun abonnement personnel n’est
-                requis.
+                Contactez le propriétaire de l’organisation pour modifier l’abonnement.
               </p>
             )}
           </section>
@@ -315,11 +397,11 @@ export default function AbonnementPage() {
               <>
                 <div className="subscription-status-line">
                   <span className={`subscription-badge ${subscriptionTone(subscription.status)}`}>
-                    {subscriptionLabels[subscription.status]}
+                    {subscription.label || subscriptionLabels[subscription.status]}
                   </span>
                 </div>
                 <p className="muted" style={{ marginTop: '1rem' }}>
-                  Aucun essai actif pour cette organisation.
+                  {statusDescription(subscription)}
                 </p>
                 {canManage && (
                   <button

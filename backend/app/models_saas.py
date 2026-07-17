@@ -155,13 +155,30 @@ class Subscription(Base):
         String(255), nullable=True, unique=True, index=True
     )
     stripe_price_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_product_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     trial_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     trial_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    trial_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    trial_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    trial_source_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    trial_eligibility_status: Mapped[str] = mapped_column(
+        String(32), default="eligible"
+    )  # eligible|already_used|blocked|admin_granted
     current_period_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     past_due_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     canceled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    access_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    payment_failure_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_payment_failure_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_payment_succeeded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    admin_revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    admin_revoked_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    admin_revoked_reason_public: Mapped[str] = mapped_column(Text, default="")
+    admin_revoked_reason_internal: Mapped[str] = mapped_column(Text, default="")
 
 
 class StripeWebhookEvent(Base):
@@ -170,7 +187,53 @@ class StripeWebhookEvent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     stripe_event_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     event_type: Mapped[str] = mapped_column(String(128))
-    processed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    stripe_object_id: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(32), default="processed")  # received|processed|failed
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1)
+    payload_hash: Mapped[str] = mapped_column(String(64), default="")
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SubscriptionConsent(Base):
+    __tablename__ = "subscription_consents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True)
+    subscription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    consent_type: Mapped[str] = mapped_column(String(64), default="trial_checkout")
+    terms_version: Mapped[str] = mapped_column(String(32), default="v1")
+    price_amount: Mapped[int] = mapped_column(Integer, default=1900)  # centimes
+    currency: Mapped[str] = mapped_column(String(8), default="EUR")
+    trial_days: Mapped[int] = mapped_column(Integer, default=14)
+    automatic_renewal_accepted: Mapped[bool] = mapped_column(Boolean, default=False)
+    terms_accepted: Mapped[bool] = mapped_column(Boolean, default=False)
+    accepted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    ip_address: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(512), default="")
+    checkout_session_id: Mapped[str] = mapped_column(String(255), default="")
+
+
+class SubscriptionNotification(Base):
+    __tablename__ = "subscription_notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True)
+    subscription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    notification_type: Mapped[str] = mapped_column(String(64))
+    channel: Mapped[str] = mapped_column(String(32), default="email")  # email|in_app
+    recipient: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(32), default="pending")  # pending|sent|failed
+    provider_message_id: Mapped[str] = mapped_column(String(255), default="")
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    failure_reason: Mapped[str] = mapped_column(Text, default="")
+    deduplication_key: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class AIAgent(Base):
@@ -221,6 +284,44 @@ class Customer(Base):
     address: Mapped[str] = mapped_column(Text, default="")
     vat_number: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CatalogItem(Base):
+    """Produit ou service du catalogue commercial."""
+
+    __tablename__ = "catalog_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True, default=1)
+    name: Mapped[str] = mapped_column(String(255))
+    kind: Mapped[str] = mapped_column(String(32), default="produit")  # produit|service
+    unit: Mapped[str] = mapped_column(String(64), default="unité")
+    unit_price_ht: Mapped[float] = mapped_column(Float, default=0.0)
+    vat_rate: Mapped[float] = mapped_column(Float, default=20.0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class CommercialActivity(Base):
+    """Activité commerciale (vente, service, rdv, suivi)."""
+
+    __tablename__ = "commercial_activities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True, default=1)
+    title: Mapped[str] = mapped_column(String(255))
+    kind: Mapped[str] = mapped_column(String(32), default="rdv")  # vente|service|rdv|suivi
+    customer_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("customers.id"), nullable=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="planifie")  # planifie|fait|annule
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
 
 class SalesDocument(Base):

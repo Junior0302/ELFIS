@@ -92,7 +92,27 @@ def serialize_subscription(
     subscription: Subscription | None,
     *,
     platform_bypass: bool = False,
+    db: Session | None = None,
+    organization_id: int | None = None,
+    user=None,
 ) -> dict[str, Any]:
+    """Sérialisation enrichie via get_subscription_access lorsque possible."""
+    if db is not None and organization_id is not None:
+        from app.subscriptions.access import get_subscription_access, serialize_access
+
+        access = get_subscription_access(db, organization_id, user=user)
+        payload = serialize_access(access)
+        if subscription and subscription.stripe_price_id:
+            payload["stripe_price_id"] = subscription.stripe_price_id
+        if subscription and subscription.past_due_since:
+            payload["past_due_since"] = subscription.past_due_since
+        # Compat : si bypass forcé (tests) aligner
+        if platform_bypass:
+            payload["platform_bypass"] = True
+            payload["access_granted"] = True
+            payload["status"] = "active"
+        return payload
+
     configured = bool(settings.stripe_secret_key and settings.stripe_price_pro)
     if not subscription:
         return {
@@ -109,9 +129,13 @@ def serialize_subscription(
             "configured": configured,
             "platform_bypass": platform_bypass,
             "access_granted": platform_bypass,
+            "trial_used": False,
+            "trial_eligibility_status": "eligible",
         }
     status = subscription.status
     access_granted = platform_bypass or status in ACCESS_STATUSES
+    if getattr(subscription, "admin_revoked_at", None):
+        access_granted = platform_bypass
     return {
         "id": subscription.id,
         "plan": "elfadmin" if platform_bypass and status == "none" else subscription.plan,
@@ -129,6 +153,9 @@ def serialize_subscription(
         "platform_bypass": platform_bypass,
         "access_granted": access_granted,
         "raw_status": status,
+        "trial_used": bool(getattr(subscription, "trial_used", False)),
+        "trial_eligibility_status": getattr(subscription, "trial_eligibility_status", "eligible"),
+        "admin_revoked": bool(getattr(subscription, "admin_revoked_at", None)),
     }
 
 
@@ -137,8 +164,12 @@ def create_checkout_session(
     *,
     organization_id: int,
     customer_email: str,
-) -> str:
+    trial_period_days: int | None = None,
+) -> tuple[str, str]:
+    """Crée une session Checkout. Retourne (url, session_id)."""
     _require_stripe()
+    from app.subscriptions.consent import assert_trial_eligible, trial_days_for_checkout
+
     price_id = settings.stripe_price_pro
     if not price_id.startswith("price_"):
         raise HTTPException(
@@ -152,23 +183,16 @@ def create_checkout_session(
                 "value_prefix": price_id[:5],
             },
         )
-    current = _subscription_for_org(db, organization_id)
-    if current and current.status in ACCESS_STATUSES:
-        raise HTTPException(
-            409,
-            detail={
-                "code": "subscription_already_active",
-                "message": "Cette organisation possède déjà un abonnement actif",
-            },
-        )
+    current = assert_trial_eligible(db, organization_id)
     metadata = {"organization_id": str(organization_id), "plan": "pro"}
+    trial_days = trial_days_for_checkout(current) if trial_period_days is None else trial_period_days
+
     params: dict[str, Any] = {
         "mode": "subscription",
         "line_items": [{"price": price_id, "quantity": 1}],
         "payment_method_collection": "always",
         "client_reference_id": str(organization_id),
         "subscription_data": {
-            "trial_period_days": settings.stripe_trial_days,
             "metadata": metadata,
         },
         "metadata": metadata,
@@ -178,6 +202,8 @@ def create_checkout_session(
         ),
         "cancel_url": f"{settings.frontend_url.rstrip('/')}/abonnement?checkout=cancel",
     }
+    if trial_days and trial_days > 0:
+        params["subscription_data"]["trial_period_days"] = trial_days
     if current and current.stripe_customer_id:
         params["customer"] = current.stripe_customer_id
     else:
@@ -200,7 +226,24 @@ def create_checkout_session(
                 "message": "Stripe n’a pas renvoyé d’URL de paiement",
             },
         )
-    return session.url
+    session_id = getattr(session, "id", None) or ""
+    if current is not None:
+        current.stripe_checkout_session_id = session_id or current.stripe_checkout_session_id
+        if current.status in {"", "none", None} or current.status == "canceled":
+            current.status = "incomplete"
+        db.add(current)
+        db.flush()
+    elif session_id:
+        row = Subscription(
+            organization_id=organization_id,
+            plan="pro",
+            status="incomplete",
+            price=19.0,
+            stripe_checkout_session_id=session_id,
+        )
+        db.add(row)
+        db.flush()
+    return session.url, session_id
 
 
 def create_portal_session(db: Session, *, organization_id: int) -> str:
@@ -471,8 +514,26 @@ def _upsert_stripe_subscription(db: Session, obj: dict[str, Any]) -> None:
     )
     row.cancel_at_period_end = bool(obj.get("cancel_at_period_end"))
     row.canceled_at = _timestamp(obj.get("canceled_at"))
+    if row.cancel_at_period_end and row.cancel_requested_at is None:
+        row.cancel_requested_at = datetime.utcnow()
+    if not row.cancel_at_period_end:
+        row.cancel_requested_at = None
     if row.status == "canceled" and row.canceled_at is None:
         row.canceled_at = datetime.utcnow()
+    row.access_ends_at = row.current_period_end if row.cancel_at_period_end else row.access_ends_at
+    if row.status == "trialing" and not row.trial_used:
+        row.trial_used = True
+        row.trial_used_at = row.trial_start or datetime.utcnow()
+        row.trial_source_subscription_id = stripe_subscription_id
+        if row.trial_eligibility_status != "admin_granted":
+            row.trial_eligibility_status = "already_used"
+    if row.status == "past_due":
+        row.payment_failure_count = int(row.payment_failure_count or 0) + 0  # conservé; incrément invoice
+    product = price_obj.get("product")
+    if isinstance(product, str):
+        row.stripe_product_id = product
+    elif isinstance(product, dict) and product.get("id"):
+        row.stripe_product_id = str(product["id"])
     row.end_date = row.current_period_end
     db.add(row)
     db.flush()
@@ -541,6 +602,9 @@ def _upsert_checkout(db: Session, session: dict[str, Any]) -> None:
         else:
             raise ValueError("Session Stripe rattachée à une autre organisation")
     row.stripe_price_id = settings.stripe_price_pro or row.stripe_price_id
+    session_id = _stripe_id(session.get("id"))
+    if session_id:
+        row.stripe_checkout_session_id = session_id
     if row.status in {"", "none"} or not row.status:
         row.status = "incomplete"
     db.add(row)
@@ -786,41 +850,115 @@ def _invoice_subscription_id(invoice: dict[str, Any]) -> str | None:
 
 
 def _apply_invoice_status(db: Session, invoice: dict[str, Any], status: str) -> None:
-    row = _find_subscription(
-        db,
-        stripe_subscription_id=_invoice_subscription_id(invoice),
-        stripe_customer_id=_stripe_id(invoice.get("customer")),
-    )
-    if row:
-        if status == "active" and row.status not in {"incomplete", "past_due", "unpaid"}:
-            return
-        if status == "past_due" and row.status in {
-            "canceled",
-            "incomplete_expired",
-            "paused",
-        }:
-            return
+    subscription_id = _invoice_subscription_id(invoice)
+    if not subscription_id:
+        return
+    row = _find_subscription(db, stripe_subscription_id=subscription_id)
+    if not row:
+        return
+    if row.status in {"canceled", "incomplete_expired", "paused"}:
+        return
+    if status == "past_due":
+        row.status = "past_due"
+        row.past_due_since = row.past_due_since or datetime.utcnow()
+        row.payment_failure_count = int(row.payment_failure_count or 0) + 1
+        row.last_payment_failure_at = datetime.utcnow()
+    elif status == "active":
+        if row.status == "trialing":
+            # Ne pas écraser un essai encore en cours
+            row.last_payment_succeeded_at = datetime.utcnow()
+        else:
+            row.status = "active"
+            row.past_due_since = None
+            row.last_payment_succeeded_at = datetime.utcnow()
+    else:
         row.status = status
         row.past_due_since = datetime.utcnow() if status == "past_due" else None
-        db.add(row)
-        _sync_organization_plan(db, row)
+    db.add(row)
+    _sync_organization_plan(db, row)
+
+
+def sync_subscription_from_stripe(db: Session, stripe_subscription_id: str) -> Subscription | None:
+    """Source de vérité Stripe pour un abonnement donné."""
+    _require_stripe()
+    try:
+        obj = stripe.Subscription.retrieve(stripe_subscription_id)
+    except stripe.StripeError as exc:
+        raise HTTPException(
+            502,
+            detail={
+                "code": "STRIPE_SUBSCRIPTION_NOT_FOUND",
+                "message": _stripe_error_message(exc),
+            },
+        ) from exc
+    data = _as_dict(obj)
+    _upsert_stripe_subscription(db, data)
+    db.flush()
+    return _find_subscription(db, stripe_subscription_id=stripe_subscription_id)
 
 
 def apply_webhook_event(db: Session, event: dict[str, Any]) -> None:
     event_type = event.get("type", "")
     obj = ((event.get("data") or {}).get("object") or {})
-    if event_type == "checkout.session.completed":
+    if event_type in {
+        "checkout.session.completed",
+        "checkout.session.async_payment_succeeded",
+    }:
         _upsert_checkout(db, obj)
+    elif event_type == "checkout.session.async_payment_failed":
+        organization_id = _organization_id(_meta_dict(obj.get("metadata")))
+        if organization_id:
+            row = _subscription_for_org(db, organization_id)
+            if row and row.status == "incomplete":
+                row.status = "incomplete_expired"
+                db.add(row)
     elif event_type in {
         "customer.subscription.created",
         "customer.subscription.updated",
         "customer.subscription.deleted",
+        "customer.subscription.trial_will_end",
     }:
         if event_type == "customer.subscription.deleted" and not obj.get("status"):
             obj = dict(obj)
             obj["status"] = "canceled"
         _upsert_stripe_subscription(db, obj)
-    elif event_type == "invoice.paid":
+        if event_type == "customer.subscription.trial_will_end":
+            from app.subscriptions.notifications import notify_org_owners
+
+            row = _find_subscription(db, stripe_subscription_id=_stripe_id(obj.get("id")))
+            if row:
+                notify_org_owners(
+                    db,
+                    organization_id=row.organization_id,
+                    notification_type="trial_ending",
+                    subscription=row,
+                    suffix=f"stripe_trial_will_end:{row.stripe_subscription_id}",
+                    template_kwargs={
+                        "trial_end": row.trial_end.isoformat() if row.trial_end else None
+                    },
+                )
+    elif event_type in {"invoice.paid", "invoice.payment_succeeded"}:
         _apply_invoice_status(db, obj, "active")
-    elif event_type == "invoice.payment_failed":
+    elif event_type in {"invoice.payment_failed", "invoice.payment_action_required"}:
         _apply_invoice_status(db, obj, "past_due")
+        row = _find_subscription(db, stripe_subscription_id=_invoice_subscription_id(obj))
+        if row:
+            from app.subscriptions.notifications import notify_org_owners
+
+            notify_org_owners(
+                db,
+                organization_id=row.organization_id,
+                notification_type="payment_failed",
+                subscription=row,
+                suffix=f"invoice:{obj.get('id')}",
+                template_kwargs={
+                    "grace_until": (
+                        (row.past_due_since.isoformat() if row.past_due_since else None)
+                    )
+                },
+            )
+    elif event_type in {"invoice.created", "invoice.finalized", "payment_method.attached", "customer.updated"}:
+        # Événements journalisés sans mutation critique
+        return
+    else:
+        return

@@ -69,10 +69,16 @@ export type CompanySettings = {
 function apiRoot(): string {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL as string
   if (import.meta.env.DEV) return '/api'
-  // Production Firebase Hosting → API Render
+  // Production Firebase Hosting / domaine custom → API Render
   if (typeof window !== 'undefined') {
     const host = window.location.hostname
-    if (host === 'elfis-core.web.app' || host === 'elfis-core.firebaseapp.com') {
+    const productionHosts = new Set([
+      'elfis-core.web.app',
+      'elfis-core.firebaseapp.com',
+      'elfis-core.com',
+      'www.elfis-core.com',
+    ])
+    if (productionHosts.has(host)) {
       return 'https://elfis-core-api.onrender.com/api'
     }
   }
@@ -422,6 +428,141 @@ export const api = {
       orgId,
     })
   },
+  listCustomers: (token?: string | null, orgId?: number | null, q?: string) => {
+    const qs = q ? `?q=${encodeURIComponent(q)}` : ''
+    return request<{ customers: CustomerRecord[] }>(`/billing/customers${qs}`, undefined, {
+      token,
+      orgId,
+    })
+  },
+  createCustomer: (
+    payload: {
+      name: string
+      email?: string
+      phone?: string
+      address?: string
+      vat_number?: string
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<CustomerRecord>('/billing/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  updateCustomer: (
+    id: number,
+    payload: Partial<{
+      name: string
+      email: string
+      phone: string
+      address: string
+      vat_number: string
+    }>,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<CustomerRecord>(`/billing/customers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  deleteCustomer: (id: number, token?: string | null, orgId?: number | null) =>
+    request<{ ok: boolean }>(`/billing/customers/${id}`, { method: 'DELETE' }, { token, orgId }),
+  listCatalog: (token?: string | null, orgId?: number | null, activeOnly?: boolean) => {
+    const qs = activeOnly ? '?active_only=true' : ''
+    return request<{ items: CatalogItem[] }>(`/billing/catalog${qs}`, undefined, { token, orgId })
+  },
+  createCatalogItem: (
+    payload: {
+      name: string
+      kind?: string
+      unit?: string
+      unit_price_ht?: number
+      vat_rate?: number
+      active?: boolean
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<CatalogItem>('/billing/catalog', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  updateCatalogItem: (
+    id: number,
+    payload: Partial<{
+      name: string
+      kind: string
+      unit: string
+      unit_price_ht: number
+      vat_rate: number
+      active: boolean
+    }>,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<CatalogItem>(`/billing/catalog/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  deleteCatalogItem: (id: number, token?: string | null, orgId?: number | null) =>
+    request<{ ok: boolean }>(`/billing/catalog/${id}`, { method: 'DELETE' }, { token, orgId }),
+  listActivities: (
+    token?: string | null,
+    orgId?: number | null,
+    params?: { status?: string; kind?: string },
+  ) => {
+    const search = new URLSearchParams()
+    if (params?.status) search.set('status', params.status)
+    if (params?.kind) search.set('kind', params.kind)
+    const qs = search.toString()
+    return request<{ activities: CommercialActivity[] }>(
+      `/billing/activities${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token, orgId },
+    )
+  },
+  createActivity: (
+    payload: {
+      title: string
+      kind?: string
+      customer_id?: number | null
+      scheduled_at?: string | null
+      status?: string
+      notes?: string
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<CommercialActivity>('/billing/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  updateActivity: (
+    id: number,
+    payload: Partial<{
+      title: string
+      kind: string
+      customer_id: number | null
+      scheduled_at: string | null
+      status: string
+      notes: string
+    }>,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<CommercialActivity>(`/billing/activities/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  deleteActivity: (id: number, token?: string | null, orgId?: number | null) =>
+    request<{ ok: boolean }>(`/billing/activities/${id}`, { method: 'DELETE' }, { token, orgId }),
   createSalesDoc: (
     payload: {
       doc_type: string
@@ -607,8 +748,32 @@ export const api = {
     )
     return result.subscription
   },
-  createSubscriptionCheckout: (token: string, orgId?: number | null) =>
-    request<{ url: string }>('/subscriptions/checkout', { method: 'POST' }, { token, orgId }),
+  createSubscriptionCheckout: (
+    token: string,
+    orgId?: number | null,
+    consents?: { automatic_renewal_accepted: boolean; terms_accepted: boolean },
+  ) =>
+    request<{ url: string; session_id?: string }>(
+      '/subscriptions/checkout',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          consents || { automatic_renewal_accepted: false, terms_accepted: false },
+        ),
+      },
+      { token, orgId },
+    ),
+  subscriptionPlan: () =>
+    request<{
+      plan_code: string
+      name: string
+      price_amount_cents: number
+      currency: string
+      trial_days: number
+      feature_labels: string[]
+      terms_version: string
+    }>('/subscriptions/plan'),
   createSubscriptionPortal: (token: string, orgId?: number | null) =>
     request<{ url: string }>('/subscriptions/portal', { method: 'POST' }, { token, orgId }),
   syncSubscription: (token: string, orgId?: number | null, sessionId?: string | null) =>
@@ -637,6 +802,77 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }, { token }),
+  platformSyncSubscription: (organizationId: number, token: string) =>
+    request<{ subscription: SubscriptionInfo }>(
+      `/platform/organizations/${organizationId}/subscriptions/sync`,
+      { method: 'POST' },
+      { token },
+    ),
+  platformRevokeSubscription: (
+    organizationId: number,
+    payload: { reason_public: string; reason_internal?: string },
+    token: string,
+  ) =>
+    request<{ subscription: SubscriptionInfo }>(
+      `/platform/organizations/${organizationId}/subscriptions/revoke`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token },
+    ),
+  platformRestoreSubscription: (
+    organizationId: number,
+    payload: { reason?: string },
+    token: string,
+  ) =>
+    request<{ subscription: SubscriptionInfo }>(
+      `/platform/organizations/${organizationId}/subscriptions/restore`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token },
+    ),
+  platformGrantTrial: (
+    organizationId: number,
+    payload: { reason: string },
+    token: string,
+  ) =>
+    request<{ subscription: SubscriptionInfo }>(
+      `/platform/organizations/${organizationId}/subscriptions/grant-trial`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token },
+    ),
+  platformOrphanSubscriptions: (token: string) =>
+    request<{
+      orphans: {
+        subscription_id: number
+        organization_id: number
+        stripe_subscription_id: string | null
+        status: string
+      }[]
+    }>('/platform/subscriptions/orphans', undefined, { token }),
+  platformAiSubscriptionSummary: (organizationId: number, token: string) =>
+    request<{
+      summary: string
+      suggestions: string[]
+      requires_human_confirmation: boolean
+    }>(
+      '/platform/subscriptions/ai-summary',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization_id: organizationId }),
+      },
+      { token },
+    ),
 }
 
 
@@ -673,10 +909,14 @@ export type SubscriptionStatus =
   | 'incomplete_expired'
   | 'paused'
   | 'none'
+  | 'checkout_pending'
+  | 'cancel_scheduled'
+  | 'admin_revoked'
 
 export type SubscriptionInfo = {
-  id?: number
+  id?: number | null
   plan: string
+  plan_code?: string
   status: SubscriptionStatus
   price_eur: number
   configured: boolean
@@ -686,10 +926,22 @@ export type SubscriptionInfo = {
   current_period_start?: string | null
   current_period_end: string | null
   past_due_since?: string | null
+  grace_until?: string | null
   cancel_at_period_end: boolean
   canceled_at?: string | null
+  access_ends_at?: string | null
+  next_billing_at?: string | null
+  next_billing_amount_cents?: number | null
   platform_bypass?: boolean
   access_granted?: boolean
+  read_only?: boolean
+  is_trial?: boolean
+  access_reason?: string
+  label?: string
+  trial_used?: boolean
+  trial_eligibility_status?: string
+  admin_revoked?: boolean
+  admin_revoked_reason_public?: string
   raw_status?: string
 }
 
@@ -815,6 +1067,42 @@ export type BillingOverview = {
   }
   documents: SalesDoc[]
   customers: { id: number; name: string; email: string; phone?: string; address?: string }[]
+}
+
+export type CustomerRecord = {
+  id: number
+  organization_id?: number
+  name: string
+  email: string
+  phone: string
+  address: string
+  vat_number: string
+  created_at?: string
+}
+
+export type CatalogItem = {
+  id: number
+  name: string
+  kind: string
+  unit: string
+  unit_price_ht: number
+  vat_rate: number
+  active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export type CommercialActivity = {
+  id: number
+  title: string
+  kind: string
+  customer_id: number | null
+  customer_name?: string
+  scheduled_at: string | null
+  status: string
+  notes: string
+  created_at?: string
+  updated_at?: string
 }
 
 export type OrgDetail = {

@@ -1,22 +1,34 @@
 import type { SubscriptionInfo, SubscriptionStatus } from './api'
 
 export const subscriptionLabels: Record<SubscriptionStatus, string> = {
-  trialing: 'Essai en cours',
-  active: 'Actif',
-  past_due: 'Paiement en retard',
+  trialing: 'Essai gratuit',
+  active: 'Abonnement actif',
+  past_due: 'Paiement à régulariser',
   unpaid: 'Impayé',
-  canceled: 'Résilié',
-  expired: 'Expiré',
+  canceled: 'Abonnement terminé',
+  expired: 'Abonnement expiré',
   incomplete: 'Paiement incomplet',
   incomplete_expired: 'Paiement expiré',
   paused: 'Suspendu',
   none: 'Aucun abonnement',
+  checkout_pending: 'Souscription non finalisée',
+  cancel_scheduled: 'Résiliation programmée',
+  admin_revoked: 'Accès suspendu',
 }
 
 export function subscriptionTone(status: SubscriptionStatus) {
-  if (status === 'past_due' || status === 'incomplete') return 'warn'
-  if (status === 'unpaid' || status === 'expired' || status === 'incomplete_expired') return 'danger'
-  if (status === 'canceled' || status === 'none' || status === 'paused') return 'neutral'
+  if (status === 'past_due' || status === 'incomplete' || status === 'checkout_pending') return 'warn'
+  if (
+    status === 'unpaid' ||
+    status === 'expired' ||
+    status === 'incomplete_expired' ||
+    status === 'admin_revoked'
+  ) {
+    return 'danger'
+  }
+  if (status === 'canceled' || status === 'none' || status === 'paused' || status === 'cancel_scheduled') {
+    return 'neutral'
+  }
   return 'ok'
 }
 
@@ -28,20 +40,33 @@ export function canOpenSubscriptionPortal(status: SubscriptionStatus) {
     'unpaid',
     'incomplete',
     'incomplete_expired',
+    'checkout_pending',
     'paused',
     'canceled',
+    'cancel_scheduled',
   ].includes(status)
 }
 
 export function canStartSubscriptionCheckout(status: SubscriptionStatus) {
-  return ['none', 'canceled', 'expired', 'incomplete', 'incomplete_expired'].includes(status)
+  return [
+    'none',
+    'canceled',
+    'expired',
+    'incomplete',
+    'incomplete_expired',
+    'checkout_pending',
+    'admin_revoked',
+  ].includes(status)
 }
 
-export function subscriptionCheckoutLabel(status: SubscriptionStatus) {
-  if (status === 'canceled' || status === 'expired') return 'Souscrire à nouveau'
-  if (status === 'incomplete') return 'Reprendre le paiement'
+export function subscriptionCheckoutLabel(status: SubscriptionStatus, trialUsed?: boolean) {
+  if (status === 'canceled' || status === 'expired') {
+    return trialUsed ? 'Souscrire à nouveau (19 €/mois)' : 'Souscrire à nouveau'
+  }
+  if (status === 'incomplete' || status === 'checkout_pending') return 'Reprendre le paiement'
   if (status === 'incomplete_expired') return 'Relancer la souscription'
-  return 'Démarrer mon essai de 14 jours'
+  if (trialUsed) return 'Souscrire à ComptaPilot IA — 19 €/mois'
+  return 'Commencer mon essai gratuit de 14 jours'
 }
 
 export function subscriptionDeadline(subscription: SubscriptionInfo | null | undefined) {
@@ -49,12 +74,25 @@ export function subscriptionDeadline(subscription: SubscriptionInfo | null | und
   if (subscription.status === 'trialing') {
     return subscription.trial_end || subscription.current_period_end || null
   }
+  if (subscription.status === 'cancel_scheduled') {
+    return subscription.access_ends_at || subscription.current_period_end || null
+  }
+  if (subscription.status === 'past_due') {
+    return subscription.grace_until || subscription.current_period_end || null
+  }
   return subscription.current_period_end || subscription.trial_end || null
 }
 
 export function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' }).format(new Date(value))
+}
+
+export function formatDateTime(value: string | null | undefined) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(
+    new Date(value),
+  )
 }
 
 export type CountdownParts = {
@@ -92,5 +130,10 @@ export function remainingTime(value: string | null | undefined, now = Date.now()
 export function hasProductAccess(subscription: SubscriptionInfo | null | undefined) {
   if (!subscription) return false
   if (subscription.platform_bypass || subscription.access_granted) return true
-  return subscription.status === 'trialing' || subscription.status === 'active'
+  return false
+}
+
+export function statusMessage(subscription: SubscriptionInfo): string {
+  if (subscription.label) return subscription.label
+  return subscriptionLabels[subscription.status] || subscription.status
 }

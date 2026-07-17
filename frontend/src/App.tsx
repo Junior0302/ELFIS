@@ -6,7 +6,10 @@ import PlatformLayout from './components/PlatformLayout'
 import RequireAuth from './components/RequireAuth'
 import RequirePlatformAdmin from './components/RequirePlatformAdmin'
 import AbonnementPage from './pages/AbonnementPage'
+import ActivitesPage from './pages/ActivitesPage'
 import AdminEquipePage from './pages/AdminEquipePage'
+import CataloguePage from './pages/CataloguePage'
+import ClientsPage from './pages/ClientsPage'
 import ComptePage from './pages/ComptePage'
 import CopilotePage from './pages/CopilotePage'
 import DashboardPage from './pages/DashboardPage'
@@ -48,6 +51,9 @@ export default function App() {
               <Route path="history" element={<HistoryPage />} />
               <Route path="facturation" element={<FacturationPage />} />
               <Route path="devis" element={<DevisPage />} />
+              <Route path="clients" element={<ClientsPage />} />
+              <Route path="catalogue" element={<CataloguePage />} />
+              <Route path="activites" element={<ActivitesPage />} />
               <Route path="abonnement" element={<AbonnementPage />} />
               <Route path="copilote" element={<CopilotePage />} />
               <Route path="organisation" element={<OrganisationPage />} />

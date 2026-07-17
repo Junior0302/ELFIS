@@ -115,14 +115,17 @@ class StripeBillingTests(unittest.TestCase):
             patch.object(settings, "frontend_url", "https://app.example"),
             patch(
                 "app.services.stripe_billing.stripe.checkout.Session.create",
-                return_value=SimpleNamespace(url="https://checkout.stripe.test/session"),
+                return_value=SimpleNamespace(
+                    url="https://checkout.stripe.test/session",
+                    id="cs_test_42",
+                ),
             ) as checkout_create,
             patch(
                 "app.services.stripe_billing.stripe.billing_portal.Session.create",
                 return_value=SimpleNamespace(url="https://billing.stripe.test/session"),
             ) as portal_create,
         ):
-            checkout_url = create_checkout_session(
+            checkout_url, checkout_session_id = create_checkout_session(
                 self.db,
                 organization_id=42,
                 customer_email="owner@example.com",
@@ -132,6 +135,7 @@ class StripeBillingTests(unittest.TestCase):
                 create_portal_session(self.db, organization_id=999)
 
         self.assertEqual(checkout_url, "https://checkout.stripe.test/session")
+        self.assertEqual(checkout_session_id, "cs_test_42")
         checkout_params = checkout_create.call_args.kwargs
         self.assertEqual(checkout_params["customer"], "cus_org_42")
         self.assertEqual(checkout_params["metadata"]["organization_id"], "42")

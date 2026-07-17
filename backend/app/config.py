@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     stripe_price_pro: str = ""
     stripe_trial_days: int = 14
     stripe_past_due_grace_days: int = 3
+    subscription_terms_version: str = "v1"
+    subscription_cron_token: str = ""
     frontend_url: str = "http://localhost:5173"
     platform_admin_emails: str = ""
     smtp_host: str = ""

@@ -52,6 +52,11 @@ Un propriétaire ou administrateur peut ajouter un utilisateur déjà inscrit de
 5. Définir `APP_ENV=production`, un `JWT_SECRET` aléatoire d’au moins 32 caractères,
    les origines exactes dans `CORS_ORIGINS` et les variables Firebase
 
+Après un push Git vers Render, `init_db` crée automatiquement les tables CRM
+(`catalog_items`, `commercial_activities`) et les colonnes manquantes. Les routes
+`/api/billing/customers`, `/catalog` et `/activities` nécessitent donc un redéploiement
+backend pour être disponibles en production.
+
 En production, l’API refuse de démarrer avec le secret JWT de développement, un CORS ouvert ou
 une configuration Firebase absente.
 

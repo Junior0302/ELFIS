@@ -43,16 +43,41 @@ def init_db() -> None:
         "stripe_customer_id": "stripe_customer_id VARCHAR(255)",
         "stripe_subscription_id": "stripe_subscription_id VARCHAR(255)",
         "stripe_price_id": "stripe_price_id VARCHAR(255)",
+        "stripe_product_id": "stripe_product_id VARCHAR(255)",
+        "stripe_checkout_session_id": "stripe_checkout_session_id VARCHAR(255)",
         "trial_start": "trial_start DATETIME",
         "trial_end": "trial_end DATETIME",
+        "trial_used": "trial_used BOOLEAN NOT NULL DEFAULT 0",
+        "trial_used_at": "trial_used_at DATETIME",
+        "trial_source_subscription_id": "trial_source_subscription_id VARCHAR(255)",
+        "trial_eligibility_status": "trial_eligibility_status VARCHAR(32) DEFAULT 'eligible'",
         "current_period_start": "current_period_start DATETIME",
         "current_period_end": "current_period_end DATETIME",
         "past_due_since": "past_due_since DATETIME",
         "cancel_at_period_end": "cancel_at_period_end BOOLEAN NOT NULL DEFAULT 0",
+        "cancel_requested_at": "cancel_requested_at DATETIME",
         "canceled_at": "canceled_at DATETIME",
+        "access_ends_at": "access_ends_at DATETIME",
+        "payment_failure_count": "payment_failure_count INTEGER DEFAULT 0",
+        "last_payment_failure_at": "last_payment_failure_at DATETIME",
+        "last_payment_succeeded_at": "last_payment_succeeded_at DATETIME",
+        "admin_revoked_at": "admin_revoked_at DATETIME",
+        "admin_revoked_by": "admin_revoked_by INTEGER",
+        "admin_revoked_reason_public": "admin_revoked_reason_public TEXT DEFAULT ''",
+        "admin_revoked_reason_internal": "admin_revoked_reason_internal TEXT DEFAULT ''",
     }
     for column, ddl in subscription_columns.items():
         _sqlite_add_column_if_missing("subscriptions", column, ddl)
+    webhook_columns = {
+        "stripe_object_id": "stripe_object_id VARCHAR(255) DEFAULT ''",
+        "status": "status VARCHAR(32) DEFAULT 'processed'",
+        "attempt_count": "attempt_count INTEGER DEFAULT 1",
+        "payload_hash": "payload_hash VARCHAR(64) DEFAULT ''",
+        "last_error": "last_error TEXT DEFAULT ''",
+        "received_at": "received_at DATETIME",
+    }
+    for column, ddl in webhook_columns.items():
+        _sqlite_add_column_if_missing("stripe_webhook_events", column, ddl)
     if settings.database_url.startswith("sqlite"):
         with engine.begin() as conn:
             conn.execute(

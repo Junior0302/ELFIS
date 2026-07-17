@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div className="auth-card">
       <div className="auth-card-head">
         <h2>Connexion</h2>
-        <p>Authentification Firebase — email et mot de passe.</p>
+        <p>Accédez à votre espace ComptaPilot avec votre compte Firebase.</p>
       </div>
 
       {!firebaseReady && (

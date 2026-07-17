@@ -26,6 +26,9 @@ const navSections: { title: string; items: NavItem[] }[] = [
         permission: 'invoice.read',
       },
       { to: '/devis', label: 'Devis', hint: 'Liste & envoi', permission: 'invoice.read' },
+      { to: '/clients', label: 'Clients', hint: 'Fiches & contacts', permission: 'invoice.read' },
+      { to: '/catalogue', label: 'Catalogue', hint: 'Produits & services', permission: 'invoice.read' },
+      { to: '/activites', label: 'Activités', hint: 'Agenda commercial', permission: 'invoice.read' },
     ],
   },
   {

@@ -63,7 +63,9 @@ def platform_organizations(db: Session = Depends(get_db)):
                 .filter(OrganizationMember.organization_id == organization.id)
                 .count(),
                 "subscription": serialize_subscription(
-                    _latest_subscription(db, organization.id)
+                    _latest_subscription(db, organization.id),
+                    db=db,
+                    organization_id=organization.id,
                 ),
             }
             for organization in organizations
@@ -142,6 +144,20 @@ def platform_user_detail(user_id: int, db: Session = Depends(get_db)):
         .filter(OrganizationMember.user_id == user_id)
         .all()
     )
+    from app.subscriptions.access import get_subscription_access, serialize_access
+
+    org_subs = []
+    for member, organization, role in memberships:
+        access = get_subscription_access(db, organization.id)
+        org_subs.append(
+            {
+                "organization_id": organization.id,
+                "organization_name": organization.name,
+                "role": role.name,
+                "status": member.status,
+                "subscription": serialize_access(access),
+            }
+        )
     return {
         "user": {
             "id": user.id,
@@ -154,15 +170,183 @@ def platform_user_detail(user_id: int, db: Session = Depends(get_db)):
             "last_login": user.last_login,
             "created_at": user.created_at,
         },
-        "memberships": [
-            {
-                "organization_id": organization.id,
-                "organization_name": organization.name,
-                "role": role.name,
-                "status": member.status,
-            }
-            for member, organization, role in memberships
-        ],
+        "memberships": org_subs,
+    }
+
+
+class SubscriptionAdminIn(BaseModel):
+    reason_public: str = ""
+    reason_internal: str = ""
+    reason: str = ""
+
+
+@router.post("/organizations/{organization_id}/subscriptions/sync")
+def platform_sync_subscription(
+    organization_id: int,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.services.stripe_billing import sync_subscription_from_stripe
+    from app.subscriptions.access import get_subscription_access, serialize_access
+
+    row = _latest_subscription(db, organization_id)
+    if not row or not row.stripe_subscription_id:
+        raise HTTPException(404, detail="Aucun abonnement Stripe à synchroniser")
+    sync_subscription_from_stripe(db, row.stripe_subscription_id)
+    db.commit()
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=organization_id,
+        action=f"elfadmin.subscription.sync:{row.stripe_subscription_id}",
+        module="platform",
+    )
+    return {"subscription": serialize_access(get_subscription_access(db, organization_id))}
+
+
+@router.post("/organizations/{organization_id}/subscriptions/revoke")
+def platform_revoke_subscription(
+    organization_id: int,
+    payload: SubscriptionAdminIn,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.subscriptions.admin_actions import admin_revoke_access
+    from app.subscriptions.access import get_subscription_access, serialize_access
+    from app.subscriptions.notifications import notify_org_owners
+
+    row = _latest_subscription(db, organization_id)
+    if not row:
+        raise HTTPException(404, detail="Abonnement introuvable")
+    if not (payload.reason_public or "").strip():
+        raise HTTPException(400, detail="Motif public requis")
+    admin_revoke_access(
+        db,
+        subscription=row,
+        admin_user_id=admin.id,
+        reason_public=payload.reason_public,
+        reason_internal=payload.reason_internal,
+    )
+    notify_org_owners(
+        db,
+        organization_id=organization_id,
+        notification_type="admin_revoked",
+        subscription=row,
+        suffix=f"revoke:{row.id}:{row.admin_revoked_at}",
+        template_kwargs={"reason": payload.reason_public},
+    )
+    db.commit()
+    return {"subscription": serialize_access(get_subscription_access(db, organization_id))}
+
+
+@router.post("/organizations/{organization_id}/subscriptions/restore")
+def platform_restore_subscription(
+    organization_id: int,
+    payload: SubscriptionAdminIn,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.subscriptions.admin_actions import admin_restore_access
+    from app.subscriptions.access import get_subscription_access, serialize_access
+
+    row = _latest_subscription(db, organization_id)
+    if not row:
+        raise HTTPException(404, detail="Abonnement introuvable")
+    admin_restore_access(db, subscription=row, admin_user_id=admin.id, reason=payload.reason)
+    db.commit()
+    return {"subscription": serialize_access(get_subscription_access(db, organization_id))}
+
+
+@router.post("/organizations/{organization_id}/subscriptions/grant-trial")
+def platform_grant_trial(
+    organization_id: int,
+    payload: SubscriptionAdminIn,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.subscriptions.admin_actions import admin_grant_trial
+    from app.subscriptions.access import get_subscription_access, serialize_access
+
+    if not (payload.reason or payload.reason_internal or payload.reason_public).strip():
+        raise HTTPException(400, detail="Motif requis pour réattribuer un essai")
+    row = _latest_subscription(db, organization_id)
+    admin_grant_trial(
+        db,
+        subscription=row,
+        organization_id=organization_id,
+        admin_user_id=admin.id,
+        reason=payload.reason or payload.reason_internal or payload.reason_public,
+    )
+    db.commit()
+    return {"subscription": serialize_access(get_subscription_access(db, organization_id))}
+
+
+@router.get("/subscriptions/orphans")
+def platform_orphan_subscriptions(db: Session = Depends(get_db)):
+    """Abonnements Stripe sans organisation valide (anomalies)."""
+    rows = (
+        db.query(Subscription)
+        .filter(Subscription.stripe_subscription_id.isnot(None))
+        .order_by(Subscription.id.desc())
+        .limit(200)
+        .all()
+    )
+    orphans = []
+    for row in rows:
+        org = db.get(Organization, row.organization_id)
+        if org is None:
+            orphans.append(
+                {
+                    "subscription_id": row.id,
+                    "organization_id": row.organization_id,
+                    "stripe_subscription_id": row.stripe_subscription_id,
+                    "stripe_customer_id": row.stripe_customer_id,
+                    "status": row.status,
+                }
+            )
+    return {"orphans": orphans}
+
+
+@router.post("/subscriptions/ai-summary")
+def platform_ai_subscription_summary(
+    payload: dict,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    """Résumé lecture seule + suggestion (aucune action automatique)."""
+    organization_id = int(payload.get("organization_id") or 0)
+    if not organization_id:
+        raise HTTPException(400, detail="organization_id requis")
+    from app.subscriptions.access import get_subscription_access
+
+    access = get_subscription_access(db, organization_id)
+    suggestions: list[str] = []
+    if access.subscription_status == "trialing" and access.trial_ends_at:
+        suggestions.append("Envoyer le rappel de fin d’essai")
+    if access.subscription_status == "past_due":
+        suggestions.append("Contacter le client pour mettre à jour le moyen de paiement")
+    if access.subscription_status == "checkout_pending":
+        suggestions.append("Proposer de reprendre la session Stripe Checkout")
+    if not access.stripe_subscription_id and access.subscription_status == "none":
+        suggestions.append("Inviter le client à démarrer l’essai gratuit")
+    summary = (
+        f"Organisation {organization_id} — statut {access.label} ({access.subscription_status}). "
+        f"Accès produit : {'oui' if access.has_access else 'non'}. "
+        f"Raison : {access.access_reason}."
+    )
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=organization_id,
+        action="elfadmin.ai_summary",
+        module="platform",
+    )
+    db.commit()
+    return {
+        "summary": summary,
+        "suggestions": suggestions,
+        "requires_human_confirmation": True,
+        "subscription": access.to_dict(),
     }
 
 

@@ -49,6 +49,8 @@ app = FastAPI(
 )
 
 DEFAULT_CORS_ORIGINS = [
+    "https://elfis-core.com",
+    "https://www.elfis-core.com",
     "https://elfis-core.web.app",
     "https://elfis-core.firebaseapp.com",
     "http://localhost:5173",
@@ -137,6 +139,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router, prefix="/api")
 app.include_router(org.router, prefix="/api")
 app.include_router(subscriptions.router, prefix="/api")
+app.include_router(subscriptions.webhook_alias_router, prefix="/api")
 app.include_router(platform.router, prefix="/api")
 app.include_router(billing.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
