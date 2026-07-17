@@ -75,7 +75,17 @@ def test_sales_document_delete_removes_email_logs():
 
 def test_sales_pdf_bytes():
     db = _session()
-    org = Organization(name="Demo SA", siren="123", vat_number="FRX", address="1 rue Test")
+    org = Organization(
+        name="Atelier Nord",
+        legal_name="Atelier Nord SAS",
+        siren="12345678900012",
+        vat_number="FR12345678901",
+        address="1 rue Test",
+        postal_code="75001",
+        city="Paris",
+        phone="01 23 45 67 89",
+        email="contact@atelier-nord.test",
+    )
     db.add(org)
     db.commit()
     db.refresh(org)
@@ -90,3 +100,11 @@ def test_sales_pdf_bytes():
     )
     pdf = sales_document_to_pdf(doc, org)
     assert pdf[:4] == b"%PDF"
+    # Identité entreprise, jamais la marque produit
+    assert b"ComptaPilot" not in pdf
+    from app.services.document_branding import brand_from_organization
+
+    brand = brand_from_organization(org)
+    assert "Atelier Nord" in (brand.legal_name or brand.display_name)
+    assert any("SIRET" in line or "SIREN" in line for line in brand.legal_id_lines())
+    assert brand.footer_parts()

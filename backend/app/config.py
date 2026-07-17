@@ -35,13 +35,39 @@ class Settings(BaseSettings):
     subscription_terms_version: str = "v1"
     subscription_cron_token: str = ""
     frontend_url: str = "http://localhost:5173"
+    # URL publique HTTPS de l’API (Render) — pour avatars / liens absolus
+    public_api_url: str = ""
     platform_admin_emails: str = ""
+    # E-mail transactionnel : clé Brevo = plateforme uniquement (jamais par org)
+    brevo_api_key: str = ""
+    brevo_webhook_secret: str = ""
+    # Adresse technique authentifiée (ex. documents@elfiscore.com)
+    platform_email_from: str = ""
+    platform_email_from_name: str = "ComptaPilot"
+    # Alias rétrocompatibles
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_use_tls: bool = True
+    # OAuth boîtes org + chiffrement des jetons
+    email_credentials_encryption_key: str = ""
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_oauth_redirect_uri: str = ""
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    microsoft_tenant_id: str = "common"
+    microsoft_oauth_redirect_uri: str = ""
+
+    @property
+    def effective_platform_from(self) -> str:
+        return (self.platform_email_from or self.smtp_from or "").strip()
+
+    @property
+    def effective_platform_from_name(self) -> str:
+        return (self.platform_email_from_name or self.product_name or "ComptaPilot").strip()
 
     @model_validator(mode="after")
     def validate_production_security(self):

@@ -18,12 +18,16 @@ from app.routers import (
     dashboard,
     documents,
     elfis_ai,
+    email_connections,
     exports,
     modules,
     org,
+    org_email,
     platform,
+    professional_emails,
     settings as settings_router,
     subscriptions,
+    webhooks_brevo,
 )
 from app.services.auth import seed_auth
 from app.services.banking import purge_demo_finance_data
@@ -141,10 +145,14 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(org.router, prefix="/api")
+app.include_router(org_email.router, prefix="/api")
+app.include_router(email_connections.router, prefix="/api")
+app.include_router(professional_emails.router, prefix="/api")
 app.include_router(subscriptions.router, prefix="/api")
 app.include_router(subscriptions.webhook_alias_router, prefix="/api")
 app.include_router(platform.router, prefix="/api")
 app.include_router(billing.router, prefix="/api")
+app.include_router(webhooks_brevo.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(elfis_ai.router, prefix="/api")

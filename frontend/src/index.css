@@ -777,7 +777,7 @@ textarea {
   color: #8a4f12;
 }
 
-/* ─── Auth pages ─── */
+/* â”€â”€â”€ Auth pages â”€â”€â”€ */
 .auth-page {
   min-height: 100vh;
   display: grid;
@@ -831,7 +831,7 @@ textarea {
 }
 
 .auth-features li::before {
-  content: '✓';
+  content: 'âœ“';
   position: absolute;
   left: 0;
   color: var(--mint);
@@ -1379,7 +1379,7 @@ textarea {
 }
 
 .pricing-features li::before {
-  content: "✓";
+  content: "âœ“";
   margin-right: 0.6rem;
   color: var(--forest);
   font-weight: 800;
@@ -3582,7 +3582,7 @@ textarea {
 }
 
 .dash-cta-voice strong::after {
-  content: ' · live';
+  content: ' Â· live';
   font-weight: 500;
   color: rgba(11, 61, 46, 0.55);
   font-size: 0.82rem;
@@ -3898,6 +3898,36 @@ textarea {
   margin: 0 0 0.55rem;
 }
 
+.email-identity-box {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--border, #d0d7de) 80%, transparent);
+  background: color-mix(in srgb, var(--surface-2, #f6f8fa) 90%, transparent);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.email-identity-box p {
+  margin: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.email-identity-box strong {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
 .sales-filters {
   display: flex;
   flex-wrap: wrap;
@@ -4068,7 +4098,7 @@ textarea {
   }
 }
 
-/* ——— Facturation / documents ——— */
+/* â€”â€”â€” Facturation / documents â€”â€”â€” */
 .billing-page {
   display: flex;
   flex-direction: column;
@@ -4717,4 +4747,213 @@ textarea {
     flex-direction: column;
     gap: 0.65rem;
   }
+}
+/* Identité documentaire — Paramètres Entreprise / Organisation */
+.brand-logo-block {
+  margin: 0.5rem 0 1.25rem;
+}
+
+.brand-logo-block > h4 {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--forest);
+  margin: 0 0 0.55rem;
+}
+
+.brand-logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand-logo-row.compact {
+  gap: 0.75rem;
+}
+
+.brand-logo-preview {
+  width: 160px;
+  height: 84px;
+  border: 1px dashed rgba(11, 61, 46, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(231, 242, 236, 0.85), rgba(255, 255, 255, 0.95));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: rgba(16, 36, 28, 0.45);
+  font-size: 0.85rem;
+}
+
+.brand-logo-preview.small {
+  width: 96px;
+  height: 56px;
+  border-radius: 10px;
+}
+
+.brand-logo-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.brand-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  position: relative;
+}
+
+.brand-logo-actions input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.brand-preview-card {
+  margin-top: 1.5rem;
+  padding: 1.1rem 1.2rem 1.25rem;
+  border-radius: 14px;
+  border: 1px solid rgba(11, 61, 46, 0.12);
+  background: linear-gradient(160deg, rgba(231, 242, 236, 0.55), rgba(255, 255, 255, 0.92));
+}
+
+.brand-preview-card > h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--forest);
+}
+
+.brand-preview-sheet {
+  background: #fff;
+  border: 1px solid rgba(11, 61, 46, 0.1);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 8px 24px rgba(7, 40, 30, 0.05);
+}
+
+.brand-preview-head {
+  display: grid;
+  grid-template-columns: minmax(72px, 110px) 1fr;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 2px solid var(--forest, #0b3d2e);
+  margin-bottom: 0.85rem;
+}
+
+.brand-preview-logo {
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  background: rgba(231, 242, 236, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+  font-weight: 700;
+  color: var(--forest);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 0.35rem;
+}
+
+.brand-preview-logo img {
+  max-width: 100%;
+  max-height: 64px;
+  object-fit: contain;
+}
+
+.brand-preview-meta {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(16, 36, 28, 0.78);
+}
+
+.brand-preview-meta strong {
+  display: block;
+  font-size: 1rem;
+  color: var(--forest);
+  margin-bottom: 0.25rem;
+}
+
+.brand-preview-meta p {
+  margin: 0.1rem 0;
+}
+
+.brand-preview-swatches {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.brand-preview-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(11, 61, 46, 0.15);
+}
+
+@media (max-width: 720px) {
+  .brand-preview-head {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brand-preview-card > h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--forest);
+}
+
+.brand-preview-meta span {
+  display: block;
+}
+
+.email-connections-panel {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(11, 61, 46, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(160deg, rgba(231, 242, 236, 0.4), rgba(255, 255, 255, 0.95));
+}
+
+.email-connections-panel h4 {
+  margin: 0 0 0.4rem;
+  color: var(--forest);
+}
+
+.email-sender-notice {
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(196, 120, 43, 0.35);
+  background: rgba(196, 120, 43, 0.1);
+  color: var(--ink);
+}
+
+.email-sender-notice strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #8a4f12;
+}
+
+.email-sender-notice p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.email-ack-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.email-ack-row input {
+  margin-top: 0.2rem;
+  flex: 0 0 auto;
 }

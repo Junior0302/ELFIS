@@ -43,6 +43,40 @@ services:
         value: "3"
       - key: PLATFORM_ADMIN_EMAILS
         value: johnjuniort40@gmail.com
+      - key: BREVO_API_KEY
+        sync: false
+      - key: PLATFORM_EMAIL_FROM
+        sync: false
+      - key: PLATFORM_EMAIL_FROM_NAME
+        value: ComptaPilot
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: EMAIL_CREDENTIALS_ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_TENANT_ID
+        value: common
+      - key: MICROSOFT_OAUTH_REDIRECT_URI
+        sync: false
     disk:
       name: elfis-core-data
       mountPath: /data

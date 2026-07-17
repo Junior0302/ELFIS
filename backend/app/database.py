@@ -106,6 +106,22 @@ def init_db() -> None:
         "bank_accounts", "organization_id", "organization_id INTEGER DEFAULT 0"
     )
     _sqlite_add_column_if_missing("organizations", "address", "address TEXT DEFAULT ''")
+    for column, ddl in {
+        "postal_code": "postal_code VARCHAR(32) DEFAULT ''",
+        "city": "city VARCHAR(128) DEFAULT ''",
+        "phone": "phone VARCHAR(64) DEFAULT ''",
+        "email": "email VARCHAR(255) DEFAULT ''",
+        "website": "website VARCHAR(255) DEFAULT ''",
+        "iban": "iban VARCHAR(64) DEFAULT ''",
+        "bic": "bic VARCHAR(32) DEFAULT ''",
+        "share_capital": "share_capital VARCHAR(64) DEFAULT ''",
+        "legal_form": "legal_form VARCHAR(64) DEFAULT ''",
+        "legal_mentions": "legal_mentions TEXT DEFAULT ''",
+        "primary_color": "primary_color VARCHAR(16) DEFAULT '#0B3D2E'",
+        "secondary_color": "secondary_color VARCHAR(16) DEFAULT '#E7F2EC'",
+        "logo": "logo VARCHAR(512) DEFAULT ''",
+    }.items():
+        _sqlite_add_column_if_missing("organizations", column, ddl)
     _sqlite_add_column_if_missing(
         "sales_documents", "customer_email", "customer_email VARCHAR(255) DEFAULT ''"
     )
@@ -117,3 +133,25 @@ def init_db() -> None:
         "updated_at",
         "updated_at DATETIME",
     )
+    email_log_columns = {
+        "document_type": "document_type VARCHAR(32) DEFAULT ''",
+        "sent_by_user_id": "sent_by_user_id INTEGER",
+        "recipient_email": "recipient_email VARCHAR(255) DEFAULT ''",
+        "cc_email": "cc_email VARCHAR(255) DEFAULT ''",
+        "bcc_email": "bcc_email VARCHAR(255) DEFAULT ''",
+        "sender_name": "sender_name VARCHAR(255) DEFAULT ''",
+        "sender_email": "sender_email VARCHAR(255) DEFAULT ''",
+        "reply_to_email": "reply_to_email VARCHAR(255) DEFAULT ''",
+        "provider": "provider VARCHAR(32) DEFAULT ''",
+        "provider_message_id": "provider_message_id VARCHAR(255) DEFAULT ''",
+        "email_connection_id": "email_connection_id INTEGER",
+        "idempotency_key": "idempotency_key VARCHAR(128) DEFAULT ''",
+        "error_code": "error_code VARCHAR(64) DEFAULT ''",
+        "delivered_at": "delivered_at DATETIME",
+        "opened_at": "opened_at DATETIME",
+        "bounced_at": "bounced_at DATETIME",
+        "created_at": "created_at DATETIME",
+        "updated_at": "updated_at DATETIME",
+    }
+    for column, ddl in email_log_columns.items():
+        _sqlite_add_column_if_missing("document_email_logs", column, ddl)

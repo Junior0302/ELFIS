@@ -6,6 +6,7 @@ const elfAdminLinks = [
   { to: '/elfadmin/utilisateurs', label: 'Utilisateurs' },
   { to: '/elfadmin/organisations', label: 'Organisations' },
   { to: '/elfadmin/abonnements', label: 'Abonnements' },
+  { to: '/elfadmin/emails-pro', label: 'Emails pro' },
 ]
 
 export default function PlatformLayout() {

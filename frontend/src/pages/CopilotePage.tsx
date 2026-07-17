@@ -106,8 +106,9 @@ export default function CopilotePage() {
   }, [orgId, token, user?.first_name])
 
   useEffect(() => {
+    if (!token) return
     api
-      .aiSuggestions()
+      .aiSuggestions(token, orgId)
       .then((r) => setSuggestions(r.suggestions))
       .catch(() =>
         setSuggestions([
@@ -117,7 +118,7 @@ export default function CopilotePage() {
           'Quels clients sont en retard ?',
         ]),
       )
-  }, [])
+  }, [token, orgId])
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' })

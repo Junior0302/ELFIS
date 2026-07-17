@@ -78,6 +78,27 @@ class ProfileUpdateIn(BaseModel):
     password: str | None = None
 
 
+def _is_allowed_avatar_url(avatar: str) -> bool:
+    value = (avatar or "").strip()
+    if not value:
+        return True
+    if value.startswith("/api/auth/avatars/"):
+        return True
+    lower = value.lower()
+    return lower.startswith("https://") or lower.startswith("http://")
+
+
+def _public_api_base(request: Request) -> str:
+    configured = settings.public_api_url.strip().rstrip("/")
+    if configured:
+        return configured
+    forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip()
+    forwarded_host = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+    if forwarded_proto and forwarded_host:
+        return f"{forwarded_proto}://{forwarded_host}".rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
 class InvitationActionIn(BaseModel):
     token: str | None = None
     invitation_id: int | None = None
@@ -340,8 +361,11 @@ def update_profile(
         user.phone = payload.phone.strip()
     if payload.avatar is not None:
         avatar = payload.avatar.strip()
-        if avatar and not avatar.startswith("https://"):
+        if avatar and not _is_allowed_avatar_url(avatar):
             raise HTTPException(400, detail="URL de photo invalide")
+        # Normalise http→https pour les avatars hébergés sur l’API publique
+        if avatar.startswith("http://") and "/api/auth/avatars/" in avatar:
+            avatar = "https://" + avatar[len("http://") :]
         user.avatar = avatar
     if payload.password:
         if user.firebase_uid:
@@ -402,8 +426,10 @@ async def upload_avatar(
         if old_path.exists():
             old_path.unlink(missing_ok=True)
 
-    base = str(request.base_url).rstrip("/")
+    base = _public_api_base(request)
     user.avatar = f"{base}/api/auth/avatars/{filename}"
+    if user.avatar.startswith("http://") and "onrender.com" in user.avatar:
+        user.avatar = "https://" + user.avatar[len("http://") :]
     user.updated_at = datetime.utcnow()
     db.add(user)
     db.commit()

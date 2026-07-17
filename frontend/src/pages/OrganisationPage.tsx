@@ -17,6 +17,16 @@ const emptyForm = {
   siren: '',
   vat_number: '',
   address: '',
+  postal_code: '',
+  city: '',
+  phone: '',
+  email: '',
+  website: '',
+  iban: '',
+  bic: '',
+  share_capital: '',
+  legal_form: '',
+  legal_mentions: '',
   logo: '',
   industry: '',
   country: 'FR',
@@ -63,6 +73,16 @@ export default function OrganisationPage() {
           siren: org.siren || '',
           vat_number: org.vat_number || '',
           address: org.address || '',
+          postal_code: org.postal_code || '',
+          city: org.city || '',
+          phone: org.phone || '',
+          email: org.email || '',
+          website: org.website || '',
+          iban: org.iban || '',
+          bic: org.bic || '',
+          share_capital: org.share_capital || '',
+          legal_form: org.legal_form || '',
+          legal_mentions: org.legal_mentions || '',
           logo: org.logo || '',
           industry: org.industry || '',
           country: org.country || 'FR',
@@ -287,21 +307,148 @@ export default function OrganisationPage() {
             />
           </div>
           <div className="field">
-            <label>Logo (URL)</label>
-            <input
-              value={form.logo}
-              disabled={!canEdit}
-              placeholder="https://…"
-              onChange={(e) => setForm({ ...form, logo: e.target.value })}
-            />
+            <label>Logo</label>
+            <div className="brand-logo-row compact">
+              <div className="brand-logo-preview small" aria-hidden>
+                {form.logo ? <img src={form.logo} alt="" /> : <span>—</span>}
+              </div>
+              {canEdit && (
+                <div className="brand-logo-actions">
+                  <label className="btn secondary" htmlFor="org_logo">
+                    Importer
+                  </label>
+                  <input
+                    id="org_logo"
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/svg+xml,.png,.jpg,.jpeg,.svg"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.currentTarget.value = ''
+                      if (!file || !token || !orgId) return
+                      void api
+                        .uploadOrganizationLogo(orgId, file, token)
+                        .then((res) => {
+                          setForm((f) => ({ ...f, logo: res.organization.logo || '' }))
+                          setMessage('Logo mis à jour.')
+                        })
+                        .catch((err) =>
+                          setError(err instanceof Error ? err.message : 'Upload impossible'),
+                        )
+                    }}
+                  />
+                  {form.logo ? (
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      onClick={() => {
+                        if (!token || !orgId) return
+                        void api
+                          .deleteOrganizationLogo(orgId, token)
+                          .then((res) => {
+                            setForm((f) => ({ ...f, logo: res.organization.logo || '' }))
+                            setMessage('Logo supprimé.')
+                          })
+                          .catch((err) =>
+                            setError(err instanceof Error ? err.message : 'Suppression impossible'),
+                          )
+                      }}
+                    >
+                      Supprimer
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
           <div className="field full">
             <label>Adresse</label>
             <textarea
-              rows={3}
+              rows={2}
               value={form.address}
               disabled={!canEdit}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Code postal</label>
+            <input
+              value={form.postal_code}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, postal_code: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Ville</label>
+            <input
+              value={form.city}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Téléphone</label>
+            <input
+              value={form.phone}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>E-mail</label>
+            <input
+              type="email"
+              value={form.email}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Site internet</label>
+            <input
+              value={form.website}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, website: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>IBAN</label>
+            <input
+              value={form.iban}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, iban: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>BIC</label>
+            <input
+              value={form.bic}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, bic: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Forme juridique</label>
+            <input
+              value={form.legal_form}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, legal_form: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Capital social</label>
+            <input
+              value={form.share_capital}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, share_capital: e.target.value })}
+            />
+          </div>
+          <div className="field full">
+            <label>Mentions légales</label>
+            <textarea
+              rows={2}
+              value={form.legal_mentions}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, legal_mentions: e.target.value })}
             />
           </div>
         </div>

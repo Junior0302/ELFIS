@@ -8,16 +8,14 @@ from app.database import get_db
 from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.services.finance_agent import answer_finance_question, list_conversations
 
-router = APIRouter(
-    prefix="/ai", tags=["ai"], dependencies=[Depends(require_active_subscription)]
-)
+router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 class ChatIn(BaseModel):
     question: str = Field(min_length=3, max_length=2000)
 
 
-@router.post("/chat")
+@router.post("/chat", dependencies=[Depends(require_active_subscription)])
 def ai_chat(
     payload: ChatIn,
     db: Session = Depends(get_db),
@@ -37,7 +35,7 @@ def ai_chat(
     return {"ok": True, **result}
 
 
-@router.get("/conversations")
+@router.get("/conversations", dependencies=[Depends(require_active_subscription)])
 def ai_conversations(
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
@@ -50,7 +48,10 @@ def ai_conversations(
 
 
 @router.get("/suggestions")
-def ai_suggestions():
+def ai_suggestions(auth: AuthContext = Depends(get_auth_context)):
+    """Liste statique — auth requise, abonnement non bloquant."""
+    if not auth.user:
+        raise HTTPException(401, detail="Non authentifié")
     return {
         "agent": "Finance Agent",
         "suggestions": [

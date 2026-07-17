@@ -44,6 +44,18 @@ class Organization(Base):
     logo: Mapped[str] = mapped_column(String(512), default="")
     industry: Mapped[str] = mapped_column(String(128), default="")
     address: Mapped[str] = mapped_column(Text, default="")
+    postal_code: Mapped[str] = mapped_column(String(32), default="")
+    city: Mapped[str] = mapped_column(String(128), default="")
+    phone: Mapped[str] = mapped_column(String(64), default="")
+    email: Mapped[str] = mapped_column(String(255), default="")
+    website: Mapped[str] = mapped_column(String(255), default="")
+    iban: Mapped[str] = mapped_column(String(64), default="")
+    bic: Mapped[str] = mapped_column(String(32), default="")
+    share_capital: Mapped[str] = mapped_column(String(64), default="")
+    legal_form: Mapped[str] = mapped_column(String(64), default="")
+    legal_mentions: Mapped[str] = mapped_column(Text, default="")
+    primary_color: Mapped[str] = mapped_column(String(16), default="#0B3D2E")
+    secondary_color: Mapped[str] = mapped_column(String(16), default="#E7F2EC")
     subscription_plan: Mapped[str] = mapped_column(String(64), default="starter")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -383,10 +395,122 @@ class DocumentEmailLog(Base):
     __tablename__ = "document_email_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    sales_document_id: Mapped[int] = mapped_column(Integer, ForeignKey("sales_documents.id"), index=True)
+    sales_document_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("sales_documents.id"), index=True, nullable=True
+    )
     organization_id: Mapped[int] = mapped_column(Integer, index=True, default=1)
+    document_type: Mapped[str] = mapped_column(String(32), default="")
+    sent_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     recipient: Mapped[str] = mapped_column(String(255), default="")
+    recipient_email: Mapped[str] = mapped_column(String(255), default="")
+    cc_email: Mapped[str] = mapped_column(String(255), default="")
+    bcc_email: Mapped[str] = mapped_column(String(255), default="")
+    sender_name: Mapped[str] = mapped_column(String(255), default="")
+    sender_email: Mapped[str] = mapped_column(String(255), default="")
+    reply_to_email: Mapped[str] = mapped_column(String(255), default="")
     subject: Mapped[str] = mapped_column(String(255), default="")
-    status: Mapped[str] = mapped_column(String(32), default="pending")  # pending|sent|failed
+    provider: Mapped[str] = mapped_column(String(32), default="")
+    provider_message_id: Mapped[str] = mapped_column(String(255), default="", index=True)
+    email_connection_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), default="", index=True)
+    status: Mapped[str] = mapped_column(String(32), default="preparing")
+    # preparing|queued|sent|delivered|opened|bounced|blocked|failed
+    error_code: Mapped[str] = mapped_column(String(64), default="")
     error_message: Mapped[str] = mapped_column(Text, default="")
     sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    bounced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class OrganizationEmailSettings(Base):
+    """Paramètres d'expédition par organisation (identité visible, pas de clé Brevo)."""
+
+    __tablename__ = "organization_email_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    sender_mode: Mapped[str] = mapped_column(String(32), default="platform")  # platform|custom_sender
+    sender_name: Mapped[str] = mapped_column(String(255), default="")
+    reply_to_email: Mapped[str] = mapped_column(String(255), default="")
+    reply_to_name: Mapped[str] = mapped_column(String(255), default="")
+    cc_email: Mapped[str] = mapped_column(String(255), default="")
+    bcc_email: Mapped[str] = mapped_column(String(255), default="")
+    invoice_default_subject: Mapped[str] = mapped_column(String(255), default="")
+    invoice_default_message: Mapped[str] = mapped_column(Text, default="")
+    quote_default_subject: Mapped[str] = mapped_column(String(255), default="")
+    quote_default_message: Mapped[str] = mapped_column(Text, default="")
+    email_signature: Mapped[str] = mapped_column(Text, default="")
+    send_copy_to_organization: Mapped[bool] = mapped_column(Boolean, default=True)
+    custom_sender_email: Mapped[str] = mapped_column(String(255), default="")
+    custom_sender_status: Mapped[str] = mapped_column(String(32), default="not_configured")
+    # not_configured|pending|verified|rejected|disabled
+    custom_sender_provider_id: Mapped[str] = mapped_column(String(255), default="")
+    custom_domain: Mapped[str] = mapped_column(String(255), default="")
+    custom_domain_status: Mapped[str] = mapped_column(String(32), default="not_configured")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class OrganizationEmailConnection(Base):
+    """Boîte mail d’expédition appartenant à l’organisation (OAuth / SMTP / platform)."""
+
+    __tablename__ = "organization_email_connections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True)
+    provider: Mapped[str] = mapped_column(String(32), default="platform")
+    # platform | google | microsoft | custom_smtp
+    email_address: Mapped[str] = mapped_column(String(255), default="")
+    display_name: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(32), default="connected")
+    # connected | expired | revoked | error | disconnected
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    connected_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    provider_account_id: Mapped[str] = mapped_column(String(255), default="")
+    encrypted_access_token: Mapped[str] = mapped_column(Text, default="")
+    encrypted_refresh_token: Mapped[str] = mapped_column(Text, default="")
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    encrypted_smtp_password: Mapped[str] = mapped_column(Text, default="")
+    smtp_host: Mapped[str] = mapped_column(String(255), default="")
+    smtp_port: Mapped[int] = mapped_column(Integer, default=587)
+    smtp_username: Mapped[str] = mapped_column(String(255), default="")
+    smtp_security: Mapped[str] = mapped_column(String(16), default="starttls")
+    # starttls | ssl | none
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error_code: Mapped[str] = mapped_column(String(64), default="")
+    last_error_message: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class ProfessionalEmail(Base):
+    """Adresse e-mail professionnelle ELFIS Core (@elfis-core.com) liée à un utilisateur."""
+
+    __tablename__ = "professional_emails"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), default="", index=True)
+    suggested_email: Mapped[str] = mapped_column(String(255), default="")
+    provider: Mapped[str] = mapped_column(String(32), default="brevo")
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    # pending | creating | active | suspended | rejected
+    request_snapshot_json: Mapped[str] = mapped_column(Text, default="{}")
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    activated_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    admin_notes: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )

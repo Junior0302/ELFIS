@@ -236,10 +236,13 @@ def sign_document(db: Session, doc: SalesDocument) -> SalesDocument:
     return doc
 
 
-def list_email_logs(db: Session, doc_id: int) -> list[DocumentEmailLog]:
-    return (
-        db.query(DocumentEmailLog)
-        .filter(DocumentEmailLog.sales_document_id == doc_id)
-        .order_by(DocumentEmailLog.id.desc())
-        .all()
-    )
+def list_email_logs(
+    db: Session,
+    doc_id: int,
+    *,
+    organization_id: int | None = None,
+) -> list[DocumentEmailLog]:
+    q = db.query(DocumentEmailLog).filter(DocumentEmailLog.sales_document_id == doc_id)
+    if organization_id is not None:
+        q = q.filter(DocumentEmailLog.organization_id == organization_id)
+    return q.order_by(DocumentEmailLog.id.desc()).all()

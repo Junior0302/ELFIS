@@ -1,6 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { api, type OrgInvitation, type TeamNotificationItem } from '../api'
+import {
+  api,
+  type OrgInvitation,
+  type ProfessionalEmailRecord,
+  type TeamNotificationItem,
+} from '../api'
 import { useAuth } from '../auth'
 import {
   mapFirebaseError,
@@ -37,6 +42,13 @@ export default function ComptePage() {
   const [invitations, setInvitations] = useState<OrgInvitation[]>([])
   const [notifications, setNotifications] = useState<TeamNotificationItem[]>([])
   const [inviteBusy, setInviteBusy] = useState<number | string | null>(null)
+  const [proEmails, setProEmails] = useState<ProfessionalEmailRecord[]>([])
+  const [proCanRequest, setProCanRequest] = useState(false)
+  const [proHasPending, setProHasPending] = useState(false)
+  const [proHasActive, setProHasActive] = useState(false)
+  const [proBusy, setProBusy] = useState(false)
+  const [proMessage, setProMessage] = useState('')
+  const [proError, setProError] = useState('')
 
   useEffect(() => {
     const checkout = new URLSearchParams(location.search).get('checkout')
@@ -49,6 +61,15 @@ export default function ComptePage() {
     if (!token) return
     void api.myInvitations(token, orgId).then((data) => setInvitations(data.invitations))
     void api.myNotifications(token, orgId).then((data) => setNotifications(data.notifications))
+    void api
+      .myProfessionalEmails(token, orgId)
+      .then((data) => {
+        setProEmails(data.emails)
+        setProCanRequest(data.can_request)
+        setProHasPending(data.has_pending)
+        setProHasActive(data.has_active)
+      })
+      .catch(() => undefined)
   }, [token, orgId, memberships.length])
 
   useEffect(() => {
@@ -118,6 +139,24 @@ export default function ComptePage() {
         </div>
       </div>
     )
+  }
+
+  const requestProEmail = async () => {
+    if (!token) return
+    setProBusy(true)
+    setProError('')
+    setProMessage('')
+    try {
+      const res = await api.requestProfessionalEmail(token, orgId)
+      setProMessage(res.message)
+      setProCanRequest(false)
+      setProHasPending(true)
+      setProEmails((current) => [res.email, ...current])
+    } catch (reason) {
+      setProError(reason instanceof Error ? reason.message : 'Demande impossible')
+    } finally {
+      setProBusy(false)
+    }
   }
 
   const acceptInvite = async (payload: { invitation_id?: number; token?: string }) => {
@@ -321,6 +360,56 @@ export default function ComptePage() {
               </button>
             </div>
           </form>
+        </section>
+
+        <section className="panel account-card" aria-label="Adresse e-mail professionnelle">
+          <h3>Adresse e-mail professionnelle</h3>
+          {proHasActive ? (
+            <>
+              <p className="muted">Votre adresse ELFIS Core est active et utilisable pour les devis / factures.</p>
+              <div className="list">
+                {proEmails
+                  .filter((row) => row.status === 'active')
+                  .map((row) => (
+                    <div key={row.id} className="membership-chip">
+                      <strong>{row.email}</strong>
+                      <span className="badge">Active{row.is_default ? ' · Par défaut' : ''}</span>
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : proHasPending ? (
+            <div className="email-sender-notice" role="status">
+              <strong>Votre demande a bien été envoyée.</strong>
+              <p>
+                Notre équipe prépare actuellement votre adresse professionnelle. Vous recevrez vos
+                accès sous 24 heures maximum.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p>
+                Vous ne possédez pas encore d’adresse ELFIS Core.
+              </p>
+              <p className="muted">
+                Obtenez gratuitement une adresse professionnelle pour envoyer vos devis et factures
+                (ex. prenom.nom@elfis-core.com). Aucun formulaire à remplir : vos informations de
+                compte sont utilisées automatiquement.
+              </p>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={proBusy || !proCanRequest}
+                  onClick={() => void requestProEmail()}
+                >
+                  {proBusy ? 'Envoi…' : 'Demander mon adresse'}
+                </button>
+              </div>
+            </>
+          )}
+          {proError && <p className="form-error">{proError}</p>}
+          {proMessage && <p className="muted">{proMessage}</p>}
         </section>
 
         <aside className="panel account-side">

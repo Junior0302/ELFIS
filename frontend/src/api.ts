@@ -405,8 +405,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
     }, { token, orgId }),
-  aiSuggestions: () =>
-    request<{ agent: string; suggestions: string[] }>('/ai/suggestions'),
+  aiSuggestions: (token?: string | null, orgId?: number | null) =>
+    request<{ agent: string; suggestions: string[] }>(
+      '/ai/suggestions',
+      undefined,
+      { token, orgId },
+    ),
   aiConversations: (token: string, orgId?: number | null) =>
     request<{ conversations: { id: number; question: string; answer: string; created_at: string | null }[] }>(
       '/ai/conversations',
@@ -618,7 +622,20 @@ export const api = {
   },
   emailSalesDoc: (
     docId: number,
-    payload: { recipient?: string; message?: string; subject?: string },
+    payload: {
+      recipient?: string
+      message?: string
+      subject?: string
+      cc?: string
+      bcc?: string
+      is_test?: boolean
+      idempotency_key?: string
+      connection_id?: number | null
+      send_mode?: 'mailto' | 'server' | string
+      sender_acknowledged?: boolean
+      preferred_from_email?: string
+      preferred_from_label?: string
+    },
     token?: string | null,
     orgId?: number | null,
   ) =>
@@ -626,6 +643,10 @@ export const api = {
       document: SalesDoc
       email_log: DocumentEmailLog
       smtp_configured: boolean
+      email_configured?: boolean
+      send_mode?: string
+      sender_email?: string
+      can_send_direct?: boolean
     }>(
       `/billing/documents/${docId}/email`,
       {
@@ -636,10 +657,149 @@ export const api = {
       { token, orgId },
     ),
   salesDocEmails: (docId: number, token?: string | null, orgId?: number | null) =>
-    request<{ email_logs: DocumentEmailLog[] }>(`/billing/documents/${docId}/emails`, undefined, {
-      token,
-      orgId,
-    }),
+    request<{
+      email_logs: DocumentEmailLog[]
+      smtp_configured?: boolean
+      email_configured?: boolean
+      preview?: EmailSendPreview
+      connections?: EmailConnection[]
+      default_connection_id?: number | null
+      can_send_direct?: boolean
+    }>(`/billing/documents/${docId}/emails`, undefined, { token, orgId }),
+  listEmailConnections: (token?: string | null, orgId?: number | null) =>
+    request<{
+      connections: EmailConnection[]
+      sendable: EmailConnection[]
+      platform_configured: boolean
+      google_oauth_configured: boolean
+      microsoft_oauth_configured: boolean
+      can_manage: boolean
+    }>('/email-connections', undefined, { token, orgId }),
+  activatePlatformEmail: (token?: string | null, orgId?: number | null) =>
+    request<{ connection: EmailConnection }>(
+      '/email-connections/platform/activate',
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  startGoogleEmailOAuth: (token?: string | null, orgId?: number | null, connectionId?: number) =>
+    request<{ redirect_url: string; provider: string }>(
+      `/email-connections/google/start${connectionId ? `?connection_id=${connectionId}` : ''}`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  startMicrosoftEmailOAuth: (token?: string | null, orgId?: number | null, connectionId?: number) =>
+    request<{ redirect_url: string; provider: string }>(
+      `/email-connections/microsoft/start${connectionId ? `?connection_id=${connectionId}` : ''}`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  upsertCustomSmtp: (
+    payload: {
+      email_address: string
+      display_name?: string
+      smtp_host: string
+      smtp_port?: number
+      smtp_username?: string
+      smtp_password?: string | null
+      smtp_security?: string
+      connection_id?: number | null
+      make_default?: boolean
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{ connection: EmailConnection }>(
+      '/email-connections/custom-smtp',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  testCustomSmtp: (
+    payload: {
+      email_address: string
+      smtp_host: string
+      smtp_port?: number
+      smtp_username?: string
+      smtp_password?: string
+      smtp_security?: string
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; message: string }>(
+      '/email-connections/custom-smtp/test',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  setDefaultEmailConnection: (connectionId: number, token?: string | null, orgId?: number | null) =>
+    request<{ connection: EmailConnection }>(
+      `/email-connections/${connectionId}/set-default`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  disconnectEmailConnection: (connectionId: number, token?: string | null, orgId?: number | null) =>
+    request<{ connection: EmailConnection }>(
+      `/email-connections/${connectionId}/disconnect`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  reconnectEmailConnection: (connectionId: number, token?: string | null, orgId?: number | null) =>
+    request<{ redirect_url?: string; provider?: string; connection?: EmailConnection }>(
+      `/email-connections/${connectionId}/reconnect`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  testEmailConnection: (
+    connectionId: number,
+    toEmail: string,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{
+      ok: boolean
+      provider: string
+      sender_email: string
+      sender_name: string
+      provider_message_id: string
+    }>(
+      `/email-connections/${connectionId}/test`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_email: toEmail }),
+      },
+      { token, orgId },
+    ),
+  getOrgEmailSettings: (token?: string | null, orgId?: number | null) =>
+    request<OrgEmailSettings>('/org/email-settings', undefined, { token, orgId }),
+  updateOrgEmailSettings: (
+    payload: Partial<OrgEmailSettingsUpdate>,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<OrgEmailSettings>('/org/email-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  testOrgEmailSettings: (token?: string | null, orgId?: number | null) =>
+    request<{
+      ok: boolean
+      status: string
+      recipient: string
+      subject: string
+      sender_name: string
+      sender_email: string
+      reply_to_email: string
+      error_message: string
+    }>('/org/email-settings/test', { method: 'POST' }, { token, orgId }),
   billingAction: (docId: number, action: string, token?: string | null, orgId?: number | null, body?: object) =>
     request<unknown>(`/billing/documents/${docId}/${action}`, {
       method: 'POST',
@@ -650,17 +810,29 @@ export const api = {
     request<OrgDetail>(`/org/${organizationId}`, undefined, { token, orgId: organizationId }),
   updateOrganization: (
     organizationId: number,
-    payload: {
-      name?: string
-      legal_name?: string
-      siren?: string
-      vat_number?: string
-      address?: string
-      logo?: string
-      industry?: string
-      country?: string
-      currency?: string
-    },
+    payload: Partial<{
+      name: string
+      legal_name: string
+      siren: string
+      vat_number: string
+      address: string
+      postal_code: string
+      city: string
+      phone: string
+      email: string
+      website: string
+      iban: string
+      bic: string
+      share_capital: string
+      legal_form: string
+      legal_mentions: string
+      logo: string
+      industry: string
+      country: string
+      currency: string
+      primary_color: string
+      secondary_color: string
+    }>,
     token: string,
   ) =>
     request<{ organization: OrgDetail['organization'] }>(
@@ -670,6 +842,21 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       },
+      { token, orgId: organizationId },
+    ),
+  uploadOrganizationLogo: (organizationId: number, file: File, token: string) => {
+    const body = new FormData()
+    body.append('file', file)
+    return request<{ ok: boolean; organization: OrgDetail['organization'] }>(
+      `/org/${organizationId}/logo`,
+      { method: 'POST', body },
+      { token, orgId: organizationId },
+    )
+  },
+  deleteOrganizationLogo: (organizationId: number, token: string) =>
+    request<{ ok: boolean; organization: OrgDetail['organization'] }>(
+      `/org/${organizationId}/logo`,
+      { method: 'DELETE' },
       { token, orgId: organizationId },
     ),
   orgMembers: (organizationId: number, token: string) =>
@@ -788,6 +975,58 @@ export const api = {
     ).then((result) => result.subscription),
   platformOverview: (token: string) =>
     request<PlatformOverview>('/platform/overview', undefined, { token }),
+  myProfessionalEmails: (token?: string | null, orgId?: number | null) =>
+    request<{
+      emails: ProfessionalEmailRecord[]
+      has_active: boolean
+      has_pending: boolean
+      can_request: boolean
+    }>('/professional-emails/me', undefined, { token, orgId }),
+  requestProfessionalEmail: (token?: string | null, orgId?: number | null) =>
+    request<{ ok: boolean; message: string; email: ProfessionalEmailRecord }>(
+      '/professional-emails/request',
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  professionalSenderOptions: (token?: string | null, orgId?: number | null) =>
+    request<{
+      options: EmailSenderOption[]
+      default_option_id: string | null
+    }>('/professional-emails/sender-options', undefined, { token, orgId }),
+  platformProfessionalEmailRequests: (token: string, status?: string) =>
+    request<{ requests: ProfessionalEmailRecord[] }>(
+      `/professional-emails/admin/requests${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+      undefined,
+      { token },
+    ),
+  platformActivateProfessionalEmail: (
+    requestId: number,
+    payload: { email?: string; notes?: string; make_default?: boolean },
+    token: string,
+  ) =>
+    request<{ ok: boolean; email: ProfessionalEmailRecord }>(
+      `/professional-emails/admin/requests/${requestId}/activate`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token },
+    ),
+  platformRejectProfessionalEmail: (
+    requestId: number,
+    payload: { notes?: string },
+    token: string,
+  ) =>
+    request<{ ok: boolean; email: ProfessionalEmailRecord }>(
+      `/professional-emails/admin/requests/${requestId}/reject`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token },
+    ),
   platformOrganizations: (token: string) =>
     request<{ organizations: PlatformOrganization[] }>('/platform/organizations', undefined, { token }),
   platformUsers: (token: string) =>
@@ -973,6 +1212,38 @@ export type PlatformUser = {
   created_at: string | null
 }
 
+export type ProfessionalEmailRecord = {
+  id: number
+  user_id: number
+  organization_id?: number | null
+  email: string
+  suggested_email: string
+  provider: string
+  status: string
+  is_default: boolean
+  created_at?: string | null
+  activated_at?: string | null
+  activated_by?: number | null
+  admin_notes?: string
+  request_snapshot?: Record<string, unknown>
+  user?: {
+    id: number | null
+    first_name: string
+    last_name: string
+    email: string
+    status: string
+  }
+}
+
+export type EmailSenderOption = {
+  id: string
+  kind: 'professional' | 'personal' | 'organization' | string
+  email: string
+  label: string
+  is_default: boolean
+  professional_email_id?: number | null
+}
+
 export type PilotOverview = {
   health: 'ok' | 'attention' | 'critique' | 'setup'
   ca: number
@@ -1045,12 +1316,112 @@ export type SalesDoc = {
 
 export type DocumentEmailLog = {
   id: number
-  sales_document_id: number
+  sales_document_id: number | null
+  organization_id?: number
+  document_type?: string
+  sent_by_user_id?: number | null
+  sent_by_email?: string
+  sent_by_name?: string
   recipient: string
+  recipient_email?: string
+  cc_email?: string
+  bcc_email?: string
+  sender_name?: string
+  sender_email?: string
+  reply_to_email?: string
   subject: string
-  status: 'pending' | 'sent' | 'failed' | string
+  provider?: string
+  provider_message_id?: string
+  status: 'preparing' | 'queued' | 'sent' | 'delivered' | 'opened' | 'bounced' | 'blocked' | 'failed' | string
+  error_code?: string
   error_message: string
   sent_at: string
+  delivered_at?: string | null
+  opened_at?: string | null
+  bounced_at?: string | null
+  updated_at?: string | null
+}
+
+export type EmailSendPreview = {
+  recipient: string
+  cc: string
+  bcc: string
+  subject: string
+  message: string
+  pdf_filename: string
+  sender_name: string
+  sender_email: string
+  reply_to_email: string
+  sender_mode: string
+  connection_id?: number | null
+  user_email?: string
+  org_email?: string
+  preferred_send_mode?: string
+}
+
+export type EmailConnection = {
+  id: number
+  organization_id: number
+  provider: 'platform' | 'google' | 'microsoft' | 'custom_smtp' | string
+  email_address: string
+  display_name: string
+  status: string
+  is_default: boolean
+  connected_by_user_id?: number | null
+  provider_account_id?: string
+  smtp_host?: string
+  smtp_port?: number | null
+  smtp_username?: string
+  smtp_security?: string
+  has_smtp_password?: boolean
+  token_expires_at?: string | null
+  last_used_at?: string | null
+  last_error_code?: string
+  last_error_message?: string
+  created_at?: string | null
+  updated_at?: string | null
+  from_preview?: string
+}
+
+export type OrgEmailSettings = {
+  organization_id: number
+  sender_mode: 'platform' | 'custom_sender' | string
+  sender_name: string
+  reply_to_email: string
+  reply_to_name: string
+  cc_email: string
+  bcc_email: string
+  invoice_default_subject: string
+  invoice_default_message: string
+  quote_default_subject: string
+  quote_default_message: string
+  email_signature: string
+  send_copy_to_organization: boolean
+  custom_sender_email: string
+  custom_sender_status: string
+  custom_domain: string
+  custom_domain_status: string
+  platform_configured: boolean
+  configuration_state: string
+  effective_from_preview: string
+  updated_at: string | null
+}
+
+export type OrgEmailSettingsUpdate = {
+  sender_mode: string
+  sender_name: string
+  reply_to_email: string
+  reply_to_name: string
+  cc_email: string
+  bcc_email: string
+  invoice_default_subject: string
+  invoice_default_message: string
+  quote_default_subject: string
+  quote_default_message: string
+  email_signature: string
+  send_copy_to_organization: boolean
+  custom_sender_email: string
+  custom_domain: string
 }
 
 export type BillingOverview = {
@@ -1116,7 +1487,19 @@ export type OrgDetail = {
     currency: string
     industry: string
     address: string
+    postal_code: string
+    city: string
+    phone: string
+    email: string
+    website: string
+    iban: string
+    bic: string
+    share_capital: string
+    legal_form: string
+    legal_mentions: string
     logo: string
+    primary_color: string
+    secondary_color: string
     subscription_plan: string
   }
   can_edit?: boolean

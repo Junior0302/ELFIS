@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.models_saas import Organization, OrganizationMember, Subscription
@@ -10,6 +12,7 @@ PLAN_FEATURES: dict[str, list[str]] = {
         "document_analysis",
         "basic_exports",
         "basic_invoicing",
+        "document_email",
     ],
     "pro": [
         "document_analysis",
@@ -21,6 +24,8 @@ PLAN_FEATURES: dict[str, list[str]] = {
         "basic_exports",
         "intelligence_dashboard",
         "elfis_chat",
+        "document_email",
+        "custom_email_sender",
     ],
     "business": [
         "document_analysis",
@@ -33,6 +38,8 @@ PLAN_FEATURES: dict[str, list[str]] = {
         "basic_exports",
         "intelligence_dashboard",
         "elfis_chat",
+        "document_email",
+        "custom_email_sender",
     ],
 }
 
@@ -41,6 +48,28 @@ PLAN_SEAT_LIMITS: dict[str, int] = {
     "starter": 1,
     "pro": 5,
     "business": 25,
+}
+
+# Limites d'envoi documentaire (par organisation / mois calendaire UTC)
+PLAN_EMAIL_LIMITS: dict[str, dict[str, int | bool]] = {
+    "starter": {
+        "monthly_emails": 50,
+        "max_recipients": 1,
+        "custom_sender": False,
+        "history_days": 90,
+    },
+    "pro": {
+        "monthly_emails": 500,
+        "max_recipients": 5,
+        "custom_sender": True,
+        "history_days": 365,
+    },
+    "business": {
+        "monthly_emails": 2000,
+        "max_recipients": 10,
+        "custom_sender": True,
+        "history_days": 730,
+    },
 }
 
 ROLE_LABELS_FR: dict[str, str] = {
@@ -84,6 +113,49 @@ def plan_includes_feature(plan: str, feature: str) -> bool:
 
 def seat_limit_for_plan(plan: str) -> int:
     return PLAN_SEAT_LIMITS.get(normalize_plan(plan), 1)
+
+
+def email_limits_for_plan(plan: str) -> dict[str, int | bool]:
+    return dict(PLAN_EMAIL_LIMITS.get(normalize_plan(plan), PLAN_EMAIL_LIMITS["starter"]))
+
+
+def count_org_emails_sent_this_month(db: Session, organization_id: int) -> int:
+    from app.models_saas import DocumentEmailLog
+
+    now = datetime.utcnow()
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return (
+        db.query(DocumentEmailLog)
+        .filter(
+            DocumentEmailLog.organization_id == organization_id,
+            DocumentEmailLog.status.in_(("sent", "delivered", "opened", "queued")),
+            DocumentEmailLog.sent_at >= start,
+        )
+        .count()
+    )
+
+
+def can_send_document_email(
+    db: Session,
+    organization_id: int,
+    *,
+    recipient_count: int = 1,
+) -> tuple[bool, str]:
+    """Vérifie feature + quotas e-mail pour l'organisation (pas le membre)."""
+    plan, status = org_effective_plan(db, organization_id)
+    if status in {"active", "trialing", "past_due"} and plan == "starter":
+        plan = "pro"
+    if not plan_includes_feature(plan, "document_email"):
+        return False, "plan_missing_feature"
+    limits = email_limits_for_plan(plan)
+    monthly = int(limits["monthly_emails"])
+    used = count_org_emails_sent_this_month(db, organization_id)
+    if used >= monthly:
+        return False, "email_monthly_limit"
+    max_recipients = int(limits["max_recipients"])
+    if recipient_count > max_recipients:
+        return False, "email_recipient_limit"
+    return True, "ok"
 
 
 def count_org_seats_used(db: Session, organization_id: int) -> dict[str, int]:

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+import aiofiles
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context
 from app.models_saas import (
@@ -36,6 +41,13 @@ from app.services.plan_features import (
 router = APIRouter(prefix="/org", tags=["organisation"])
 
 MANAGEABLE_ROLES = {"admin", "cfo", "comptable", "employe", "auditeur"}
+MAX_LOGO_BYTES = 2 * 1024 * 1024
+LOGO_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/svg+xml": ".svg",
+}
 
 
 class MemberCreateIn(BaseModel):
@@ -54,10 +66,50 @@ class OrganizationUpdateIn(BaseModel):
     siren: str | None = None
     vat_number: str | None = None
     address: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    website: str | None = None
+    iban: str | None = None
+    bic: str | None = None
+    share_capital: str | None = None
+    legal_form: str | None = None
+    legal_mentions: str | None = None
     logo: str | None = None
     industry: str | None = None
     country: str | None = None
     currency: str | None = None
+    primary_color: str | None = None
+    secondary_color: str | None = None
+
+
+def _org_public(org: Organization) -> dict:
+    return {
+        "id": org.id,
+        "name": org.name,
+        "legal_name": org.legal_name or "",
+        "siren": org.siren or "",
+        "vat_number": org.vat_number or "",
+        "country": org.country or "FR",
+        "currency": org.currency or "EUR",
+        "industry": org.industry or "",
+        "address": org.address or "",
+        "postal_code": getattr(org, "postal_code", None) or "",
+        "city": getattr(org, "city", None) or "",
+        "phone": getattr(org, "phone", None) or "",
+        "email": getattr(org, "email", None) or "",
+        "website": getattr(org, "website", None) or "",
+        "iban": getattr(org, "iban", None) or "",
+        "bic": getattr(org, "bic", None) or "",
+        "share_capital": getattr(org, "share_capital", None) or "",
+        "legal_form": getattr(org, "legal_form", None) or "",
+        "legal_mentions": getattr(org, "legal_mentions", None) or "",
+        "logo": org.logo or "",
+        "primary_color": getattr(org, "primary_color", None) or "#0B3D2E",
+        "secondary_color": getattr(org, "secondary_color", None) or "#E7F2EC",
+        "subscription_plan": org.subscription_plan,
+    }
 
 
 def _require_org_manager(auth: AuthContext, organization_id: int) -> None:
@@ -66,6 +118,36 @@ def _require_org_manager(auth: AuthContext, organization_id: int) -> None:
     if auth.organization_id != organization_id:
         raise HTTPException(403, detail="Organisation active incorrecte")
     auth.require("users.manage")
+
+
+def _delete_local_logo(logo_url: str) -> None:
+    marker = "/api/org/logos/"
+    if marker not in (logo_url or ""):
+        return
+    previous = Path(logo_url).name
+    if not previous:
+        return
+    path = settings.storage_path / "logos" / previous
+    thumb = settings.storage_path / "logos" / f"thumb_{previous}"
+    if path.is_file():
+        path.unlink(missing_ok=True)
+    if thumb.is_file():
+        thumb.unlink(missing_ok=True)
+
+
+def _make_thumbnail(source: Path) -> None:
+    if source.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+        return
+    try:
+        from PIL import Image  # type: ignore
+
+        with Image.open(source) as img:
+            img = img.convert("RGBA") if img.mode in ("P", "RGBA") else img.convert("RGB")
+            img.thumbnail((320, 160))
+            thumb = source.parent / f"thumb_{source.name}"
+            img.save(thumb)
+    except Exception:
+        return
 
 
 def _member_public(member: OrganizationMember, user: User, role: Role) -> dict:
@@ -119,6 +201,32 @@ def organization_tree(
     return {"memberships": get_user_memberships(db, auth.user.id)}
 
 
+@router.get("/logos/{filename}")
+def get_organization_logo(filename: str):
+    safe_name = Path(filename).name
+    if safe_name != filename:
+        raise HTTPException(404, detail="Logo introuvable")
+    path = settings.storage_path / "logos" / safe_name
+    if not path.is_file():
+        raise HTTPException(404, detail="Logo introuvable")
+    media_type = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".svg": "image/svg+xml",
+        ".webp": "image/webp",
+    }.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, max-age=3600",
+            "Content-Disposition": f'inline; filename="{safe_name}"',
+        },
+    )
+
+
 @router.get("/{organization_id}")
 def organization_detail(
     organization_id: int,
@@ -140,19 +248,7 @@ def organization_detail(
         .first()
     )
     return {
-        "organization": {
-            "id": org.id,
-            "name": org.name,
-            "legal_name": org.legal_name,
-            "siren": org.siren,
-            "vat_number": org.vat_number,
-            "country": org.country,
-            "currency": org.currency,
-            "industry": org.industry,
-            "address": org.address or "",
-            "logo": org.logo or "",
-            "subscription_plan": org.subscription_plan,
-        },
+        "organization": _org_public(org),
         "can_edit": "*" in auth.permissions or "settings.manage" in auth.permissions,
         "subscription": (
             {
@@ -180,6 +276,90 @@ def organization_detail(
     }
 
 
+@router.post("/{organization_id}/logo")
+async def upload_organization_logo(
+    organization_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user or auth.organization_id != organization_id:
+        raise HTTPException(403, detail="Accès organisation refusé")
+    auth.require("settings.manage")
+    org = db.get(Organization, organization_id)
+    if not org:
+        raise HTTPException(404, detail="Organisation introuvable")
+
+    extension = LOGO_TYPES.get((file.content_type or "").lower())
+    name_lower = (file.filename or "").lower()
+    if not extension:
+        if name_lower.endswith(".svg"):
+            extension = ".svg"
+        elif name_lower.endswith(".png"):
+            extension = ".png"
+        elif name_lower.endswith((".jpg", ".jpeg")):
+            extension = ".jpg"
+        else:
+            raise HTTPException(400, detail="Formats acceptés : PNG, JPG, JPEG ou SVG")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, detail="Fichier vide")
+    if len(content) > MAX_LOGO_BYTES:
+        raise HTTPException(400, detail="Le logo ne doit pas dépasser 2 Mo")
+
+    logo_dir = settings.storage_path / "logos"
+    logo_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"org{organization_id}-{uuid4().hex}{extension}"
+    target = logo_dir / filename
+    async with aiofiles.open(target, "wb") as output:
+        await output.write(content)
+    _make_thumbnail(target)
+
+    _delete_local_logo(org.logo or "")
+    base = str(request.base_url).rstrip("/")
+    org.logo = f"{base}/api/org/logos/{filename}"
+    db.add(org)
+    db.commit()
+    db.refresh(org)
+    write_audit(
+        db,
+        user_id=auth.user.id,
+        organization_id=organization_id,
+        action="organization.logo.update",
+        module="organisation",
+    )
+    return {"ok": True, "organization": _org_public(org)}
+
+
+@router.delete("/{organization_id}/logo")
+def delete_organization_logo(
+    organization_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if not auth.user or auth.organization_id != organization_id:
+        raise HTTPException(403, detail="Accès organisation refusé")
+    auth.require("settings.manage")
+    org = db.get(Organization, organization_id)
+    if not org:
+        raise HTTPException(404, detail="Organisation introuvable")
+    _delete_local_logo(org.logo or "")
+    org.logo = ""
+    db.add(org)
+    db.commit()
+    db.refresh(org)
+    write_audit(
+        db,
+        user_id=auth.user.id,
+        organization_id=organization_id,
+        action="organization.logo.delete",
+        module="organisation",
+    )
+    return {"ok": True, "organization": _org_public(org)}
+
+
 @router.patch("/{organization_id}")
 def update_organization(
     organization_id: int,
@@ -198,6 +378,8 @@ def update_organization(
     for key, value in data.items():
         if isinstance(value, str):
             value = value.strip()
+        if key in {"primary_color", "secondary_color"} and value and not str(value).startswith("#"):
+            continue
         setattr(org, key, value)
     db.add(org)
     db.commit()
@@ -209,21 +391,10 @@ def update_organization(
         action="organization.update",
         module="organisation",
     )
-    return {
-        "organization": {
-            "id": org.id,
-            "name": org.name,
-            "legal_name": org.legal_name,
-            "siren": org.siren,
-            "vat_number": org.vat_number,
-            "country": org.country,
-            "currency": org.currency,
-            "industry": org.industry,
-            "address": org.address or "",
-            "logo": org.logo or "",
-            "subscription_plan": org.subscription_plan,
-        }
-    }
+    return {"organization": _org_public(org)}
+
+
+# NOTE: keep members routes below — patch organization was moved above members.
 
 
 @router.get("/{organization_id}/members")

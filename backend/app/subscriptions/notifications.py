@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import smtplib
 from datetime import datetime
-from email.message import EmailMessage
 from typing import Callable
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models_saas import OrganizationMember, Subscription, SubscriptionNotification, User
 from app.subscriptions.messages import trial_disclosure
 
@@ -131,24 +128,16 @@ def _revoked(first_name: str, reason: str | None = None, **_) -> tuple[str, str]
 
 
 def _smtp_ready() -> bool:
-    return bool(settings.smtp_host and settings.smtp_from)
+    from app.services.mailer import email_configured
+
+    return email_configured()
 
 
 def _send_email(recipient: str, subject: str, body: str) -> str:
-    if not _smtp_ready():
-        raise RuntimeError("SMTP non configuré")
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = recipient
-    msg.set_content(body)
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
-        if settings.smtp_use_tls:
-            smtp.starttls()
-        if settings.smtp_user:
-            smtp.login(settings.smtp_user, settings.smtp_password)
-        smtp.send_message(msg)
-    return f"smtp:{recipient}"
+    from app.services.mailer import send_email
+
+    send_email(to_email=recipient, subject=subject, body=body)
+    return f"mail:{recipient}"
 
 
 def enqueue_notification(

@@ -28,6 +28,7 @@ import ResultPage from './pages/ResultPage'
 import SettingsPage from './pages/SettingsPage'
 import PlatformOrganizationsPage from './pages/platform/PlatformOrganizationsPage'
 import PlatformOverviewPage from './pages/platform/PlatformOverviewPage'
+import PlatformProfessionalEmailsPage from './pages/platform/PlatformProfessionalEmailsPage'
 import PlatformSubscriptionsPage from './pages/platform/PlatformSubscriptionsPage'
 import PlatformUsersPage from './pages/platform/PlatformUsersPage'
 
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="utilisateurs" element={<PlatformUsersPage />} />
               <Route path="organisations" element={<PlatformOrganizationsPage />} />
               <Route path="abonnements" element={<PlatformSubscriptionsPage />} />
+              <Route path="emails-pro" element={<PlatformProfessionalEmailsPage />} />
             </Route>
             <Route path="platform" element={<Navigate to="/elfadmin" replace />} />
             <Route path="platform/*" element={<Navigate to="/elfadmin" replace />} />

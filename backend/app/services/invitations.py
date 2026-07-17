@@ -3,9 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
-import smtplib
 from datetime import datetime, timedelta
-from email.message import EmailMessage
 
 from sqlalchemy.orm import Session
 
@@ -52,14 +50,12 @@ def _notify(
 
 
 def _send_invite_email(*, to_email: str, org_name: str, role: str, accept_url: str) -> str | None:
-    """Envoie l'e-mail si SMTP configuré. Retourne None ou message d'erreur."""
-    if not (settings.smtp_host and settings.smtp_from):
-        return "SMTP non configuré — invitation créée, lien à transmettre manuellement."
-    msg = EmailMessage()
-    msg["Subject"] = f"Invitation à rejoindre {org_name} sur ComptaPilot"
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.set_content(
+    """Envoie l'e-mail si le transport est configuré. Retourne None ou message d'erreur."""
+    from app.services.mailer import email_configured, send_email
+
+    if not email_configured():
+        return "E-mail non configuré — invitation créée, lien à transmettre manuellement."
+    body = (
         f"Bonjour,\n\nVous êtes invité(e) à rejoindre l’organisation « {org_name} » "
         f"sur ComptaPilot IA avec le rôle « {role} ».\n\n"
         f"Accepter l’invitation :\n{accept_url}\n\n"
@@ -69,12 +65,11 @@ def _send_invite_email(*, to_email: str, org_name: str, role: str, accept_url: s
         "Cordialement,\nComptaPilot IA\n"
     )
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
-            if settings.smtp_use_tls:
-                smtp.starttls()
-            if settings.smtp_user:
-                smtp.login(settings.smtp_user, settings.smtp_password)
-            smtp.send_message(msg)
+        send_email(
+            to_email=to_email,
+            subject=f"Invitation à rejoindre {org_name} sur ComptaPilot",
+            body=body,
+        )
         return None
     except Exception as exc:  # noqa: BLE001
         return str(exc)[:300]

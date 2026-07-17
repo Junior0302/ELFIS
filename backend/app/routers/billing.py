@@ -127,6 +127,17 @@ class EmailSendIn(BaseModel):
     recipient: str = ""
     message: str = ""
     subject: str | None = None
+    cc: str | None = None
+    bcc: str | None = None
+    is_test: bool = False
+    idempotency_key: str | None = None
+    connection_id: int | None = None
+    # mailto = ouverture messagerie utilisateur (sans SMTP) ; server = Brevo/OAuth
+    send_mode: str = "mailto"
+    sender_acknowledged: bool = False
+    # Expéditeur choisi (ELFIS pro / perso) — utilisé pour Reply-To et journal
+    preferred_from_email: str | None = None
+    preferred_from_label: str | None = None
 
 
 def _org_id(auth: AuthContext) -> int:
@@ -166,15 +177,45 @@ def _serialize(doc: SalesDocument) -> dict:
     }
 
 
-def _serialize_email_log(log) -> dict:
+def _serialize_email_log(log, db: Session | None = None) -> dict:
+    sent_by_email = ""
+    sent_by_name = ""
+    uid = getattr(log, "sent_by_user_id", None)
+    if db is not None and uid:
+        from app.models_saas import User
+
+        user = db.get(User, uid)
+        if user:
+            sent_by_email = user.email or ""
+            sent_by_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or (
+                user.email or ""
+            )
     return {
         "id": log.id,
         "sales_document_id": log.sales_document_id,
-        "recipient": log.recipient,
+        "organization_id": getattr(log, "organization_id", None),
+        "document_type": getattr(log, "document_type", "") or "",
+        "sent_by_user_id": uid,
+        "sent_by_email": sent_by_email,
+        "sent_by_name": sent_by_name,
+        "recipient": log.recipient or getattr(log, "recipient_email", "") or "",
+        "recipient_email": getattr(log, "recipient_email", None) or log.recipient or "",
+        "cc_email": getattr(log, "cc_email", "") or "",
+        "bcc_email": getattr(log, "bcc_email", "") or "",
+        "sender_name": getattr(log, "sender_name", "") or "",
+        "sender_email": getattr(log, "sender_email", "") or "",
+        "reply_to_email": getattr(log, "reply_to_email", "") or "",
         "subject": log.subject,
+        "provider": getattr(log, "provider", "") or "",
+        "provider_message_id": getattr(log, "provider_message_id", "") or "",
         "status": log.status,
-        "error_message": log.error_message,
+        "error_code": getattr(log, "error_code", "") or "",
+        "error_message": log.error_message or "",
         "sent_at": log.sent_at,
+        "delivered_at": getattr(log, "delivered_at", None),
+        "opened_at": getattr(log, "opened_at", None),
+        "bounced_at": getattr(log, "bounced_at", None),
+        "updated_at": getattr(log, "updated_at", None),
     }
 
 
@@ -613,7 +654,10 @@ def get_document(doc_id: int, auth: AuthContext = Depends(get_auth_context), db:
     doc = _get_doc(db, auth, doc_id)
     return {
         "document": _serialize(doc),
-        "email_logs": [_serialize_email_log(log) for log in list_email_logs(db, doc.id)],
+        "email_logs": [
+            _serialize_email_log(log, db)
+            for log in list_email_logs(db, doc.id, organization_id=doc.organization_id)
+        ],
     }
 
 
@@ -678,32 +722,66 @@ def email_document(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    auth.require("invoice.create")
+    auth.require("documents.send_email")
     doc = _get_doc(db, auth, doc_id)
     recipient = (payload.recipient or doc.customer_email or "").strip()
-    if recipient and recipient != (doc.customer_email or ""):
+    if recipient and recipient != (doc.customer_email or "") and not payload.is_test:
         doc.customer_email = recipient
         db.add(doc)
         db.commit()
         db.refresh(doc)
-    log = send_sales_document_email(
-        db,
-        doc,
-        recipient=recipient,
-        message=payload.message,
-        subject=payload.subject,
-    )
+
+    mode = (payload.send_mode or "mailto").strip().lower()
+    if mode == "mailto":
+        from app.services.sales_email import log_mailto_document_send
+
+        if not payload.sender_acknowledged:
+            raise HTTPException(
+                400,
+                detail="Confirmez que l’e-mail partira depuis votre adresse avant d’ouvrir la messagerie.",
+            )
+        log = log_mailto_document_send(
+            db,
+            doc,
+            recipient=recipient,
+            message=payload.message,
+            subject=payload.subject,
+            sent_by_user=auth.user,
+            idempotency_key=payload.idempotency_key,
+            preferred_from_email=payload.preferred_from_email,
+            preferred_from_label=payload.preferred_from_label,
+        )
+    else:
+        log = send_sales_document_email(
+            db,
+            doc,
+            recipient=recipient,
+            message=payload.message,
+            subject=payload.subject,
+            cc=payload.cc,
+            bcc=payload.bcc,
+            sent_by_user_id=auth.user.id if auth.user else None,
+            is_test=payload.is_test,
+            idempotency_key=payload.idempotency_key,
+            connection_id=payload.connection_id,
+            preferred_from_email=payload.preferred_from_email,
+            preferred_from_label=payload.preferred_from_label,
+        )
     write_audit(
         db,
         user_id=auth.user.id if auth.user else None,
         organization_id=_org_id(auth),
-        action=f"email_{doc.doc_type}:{doc.number}:{log.status}",
+        action=f"email_{doc.doc_type}:{doc.number}:{log.status}:{mode}",
         module="facturation",
     )
     return {
         "document": _serialize(doc),
-        "email_log": _serialize_email_log(log),
+        "email_log": _serialize_email_log(log, db),
         "smtp_configured": smtp_configured(),
+        "email_configured": smtp_configured() if mode == "server" else True,
+        "send_mode": mode,
+        "sender_email": log.sender_email,
+        "can_send_direct": smtp_configured(),
     }
 
 
@@ -713,9 +791,73 @@ def document_emails(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
-    auth.require("invoice.read")
+    # invoice.read OU historique e-mails
+    if not (
+        "*" in auth.permissions
+        or "invoice.read" in auth.permissions
+        or "documents.view_email_history" in auth.permissions
+        or "documents.send_email" in auth.permissions
+    ):
+        auth.require("invoice.read")
     doc = _get_doc(db, auth, doc_id)
-    return {"email_logs": [_serialize_email_log(log) for log in list_email_logs(db, doc.id)]}
+    from app.services.org_email_settings import (
+        get_or_create_email_settings,
+        resolve_sender,
+        build_subject_and_body,
+        pdf_filename,
+    )
+    from app.services.email_connections import (
+        ensure_platform_connection,
+        get_default_connection,
+        list_sendable_connections,
+        serialize_connection,
+    )
+    from app.models_saas import Organization
+
+    org = db.get(Organization, doc.organization_id)
+    preview = None
+    connections: list = []
+    default_connection_id = None
+    if org:
+        ensure_platform_connection(db, org.id)
+        row = get_or_create_email_settings(db, org)
+        sender = resolve_sender(org, row)
+        subject, message = build_subject_and_body(doc, org, row)
+        sendable = list_sendable_connections(db, org.id)
+        connections = [serialize_connection(c) for c in sendable]
+        default = get_default_connection(db, org.id)
+        default_connection_id = default.id if default and default.status == "connected" else (
+            sendable[0].id if sendable else None
+        )
+        default_conn = next((c for c in sendable if c.id == default_connection_id), None)
+        preview = {
+            "recipient": doc.customer_email or "",
+            "cc": row.cc_email or "",
+            "bcc": row.bcc_email or "",
+            "subject": subject,
+            "message": message,
+            "pdf_filename": pdf_filename(doc, org),
+            "sender_name": (default_conn.display_name if default_conn else sender.sender_name),
+            "sender_email": (default_conn.email_address if default_conn else sender.sender_email),
+            "reply_to_email": sender.reply_to_email,
+            "sender_mode": (default_conn.provider if default_conn else sender.mode),
+            "connection_id": default_connection_id,
+            "user_email": (auth.user.email if auth.user else "") or "",
+            "org_email": (org.email or "").strip(),
+            "preferred_send_mode": "server" if smtp_configured() else "mailto",
+        }
+    return {
+        "email_logs": [
+            _serialize_email_log(log, db)
+            for log in list_email_logs(db, doc.id, organization_id=doc.organization_id)
+        ],
+        "smtp_configured": smtp_configured(),
+        "email_configured": smtp_configured(),
+        "preview": preview,
+        "connections": connections,
+        "default_connection_id": default_connection_id,
+        "can_send_direct": smtp_configured(),
+    }
 
 
 @router.post("/documents/{doc_id}/send")
