@@ -151,6 +151,10 @@ export default function DevisPage() {
             Liste, recherche, aperçu PDF, modification, suppression et envoi par e-mail. Création
             aussi disponible dans <Link to="/facturation">Facturation</Link>.
           </p>
+          <p className="muted" style={{ marginTop: '0.5rem' }}>
+            À l’envoi, choisissez l’expéditeur (adresse ELFIS Core ou personnelle). Demandez votre
+            adresse pro dans <Link to="/compte">Mon compte</Link>.
+          </p>
         </div>
       </div>
 
