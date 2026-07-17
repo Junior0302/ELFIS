@@ -41,12 +41,12 @@ export const navSections: NavSection[] = [
       {
         to: '/copilote',
         label: 'Copilote IA',
-        hint: 'Questions & conseils',
+        hint: 'Voix & conseils',
         permission: 'ai.analysis',
         guide: [
-          'Posez une question en français sur votre situation (trésorerie, facture, priorité du jour).',
+          'Posez une question en français — à l’écrit ou à la voix (mode Jarvis).',
           'Le copilote aide à décider rapidement sans remplacer votre expert-comptable.',
-          'Exemple : « Que faire de cette facture à 2 400 € ? » ou « Quelles relances préparer cette semaine ? ».',
+          'Exemple : appuyez sur l’orbe et dites « Quels clients sont en retard ? ».',
           'Réservé à l’offre ComptaPilot IA : démarrez l’essai depuis Abonnement pour l’utiliser.',
         ],
       },

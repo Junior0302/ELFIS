@@ -377,13 +377,13 @@ export default function DashboardPage() {
             <strong>Parler au copilote</strong>
             <span>Questions sur vos chiffres</span>
           </Link>
-          <button type="button" className="dash-cta dash-cta-voice" disabled>
+          <Link className="dash-cta dash-cta-voice" to="/copilote?voice=1">
             <span className="dash-cta-icon">
               <NavIconAccount />
             </span>
             <strong>Assistant vocal</strong>
-            <span>Bientôt disponible</span>
-          </button>
+            <span>Mode Jarvis — micro & réponse</span>
+          </Link>
         </div>
       </section>
 
