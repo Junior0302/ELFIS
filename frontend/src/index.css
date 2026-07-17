@@ -4537,3 +4537,184 @@ textarea {
     flex-wrap: wrap;
   }
 }
+
+/* Jarvis welcome + FAB guides */
+.jarvis-welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(123, 196, 160, 0.22), transparent 45%),
+    rgba(7, 40, 30, 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.jarvis-welcome-card {
+  width: min(440px, 100%);
+  padding: 1.75rem 1.5rem 1.35rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(123, 196, 160, 0.2), transparent 40%),
+    rgba(255, 253, 248, 0.97);
+  border: 1px solid rgba(11, 61, 46, 0.12);
+  box-shadow: 0 28px 70px rgba(7, 40, 30, 0.28);
+  text-align: center;
+}
+
+.jarvis-welcome-orb {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #1a6b4f, #07281e);
+  box-shadow: 0 0 0 8px rgba(123, 196, 160, 0.18), 0 14px 30px rgba(7, 40, 30, 0.3);
+}
+
+.jarvis-welcome-orb span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #7bc4a0;
+  animation: jarvis-breathe 2s ease-in-out infinite;
+}
+
+.jarvis-welcome-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(16, 36, 28, 0.5);
+}
+
+.jarvis-welcome-card h2 {
+  margin: 0.35rem 0 0.65rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  color: var(--forest);
+}
+
+.jarvis-welcome-card > p {
+  margin: 0 auto 1.15rem;
+  max-width: 34rem;
+  color: rgba(16, 36, 28, 0.72);
+  line-height: 1.5;
+}
+
+.jarvis-welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: center;
+}
+
+.jarvis-welcome-hint {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+}
+
+.jarvis-fab {
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: flex-end;
+}
+
+.jarvis-fab-btn {
+  border: 1px solid rgba(11, 61, 46, 0.14);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: rgba(255, 253, 248, 0.94);
+  color: var(--forest);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(7, 40, 30, 0.12);
+  text-decoration: none;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.jarvis-fab-btn:hover {
+  transform: translateY(-1px);
+}
+
+.jarvis-fab-btn.is-on {
+  background: rgba(123, 196, 160, 0.22);
+  border-color: rgba(123, 196, 160, 0.45);
+}
+
+.jarvis-fab-btn.accent {
+  background: linear-gradient(160deg, #1a6b4f, #0b3d2e);
+  color: #e7f2ec;
+  border-color: transparent;
+}
+
+.jarvis-fab-btn.secondary {
+  background: rgba(255, 253, 248, 0.88);
+}
+
+.jarvis-fab.is-speaking .jarvis-fab-btn.is-on {
+  box-shadow: 0 0 0 4px rgba(123, 196, 160, 0.25);
+}
+
+.page-guide-spoken {
+  margin: 0.25rem 0 0;
+  color: rgba(16, 36, 28, 0.78);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  max-width: 42rem;
+}
+
+.page-guide-actions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.page-guide-listen {
+  border: 1px solid rgba(11, 61, 46, 0.16);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  background: rgba(123, 196, 160, 0.16);
+  color: var(--forest);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.page-guide-listen.is-hot {
+  background: rgba(180, 35, 24, 0.1);
+  border-color: rgba(180, 35, 24, 0.3);
+  color: var(--danger);
+}
+
+.page-guide.is-speaking {
+  border-color: rgba(123, 196, 160, 0.45);
+  box-shadow: 0 10px 28px rgba(7, 40, 30, 0.08);
+}
+
+.page-guide-head {
+  align-items: flex-start;
+}
+
+@media (max-width: 720px) {
+  .jarvis-fab {
+    right: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .page-guide-head {
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+}

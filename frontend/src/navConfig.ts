@@ -3,6 +3,8 @@ export type NavItem = {
   label: string
   /** Sous-titre court dans la barre latérale */
   hint: string
+  /** Salutation vocale courte (style Jarvis/Siri) pour l'onglet */
+  spokenIntro: string
   /** Guide détaillé (4 phrases) affiché en tête de page */
   guide: [string, string, string, string]
   permission?: string
@@ -18,6 +20,8 @@ export const navSections: NavSection[] = [
         to: '/dashboard',
         label: 'Tableau de bord',
         hint: 'Vue d’ensemble',
+        spokenIntro:
+          'Bienvenue sur votre tableau de bord. Ici, vous voyez l’état de l’activité en un coup d’œil.',
         permission: 'invoice.read',
         guide: [
           'C’est votre écran d’accueil une fois connecté : vous voyez en un coup d’œil l’état de l’activité.',
@@ -30,6 +34,8 @@ export const navSections: NavSection[] = [
         to: '/intelligence',
         label: 'Intelligence',
         hint: 'Alertes & ELFIS',
+        spokenIntro:
+          'Voici la page Intelligence. J’y centralise les alertes et signaux qui méritent votre attention.',
         permission: 'ai.analysis',
         guide: [
           'Ici, ComptaPilot regroupe les alertes et signaux utiles pour le dirigeant (écarts, anomalies, priorités).',
@@ -42,6 +48,8 @@ export const navSections: NavSection[] = [
         to: '/copilote',
         label: 'Copilote IA',
         hint: 'Voix & conseils',
+        spokenIntro:
+          'Vous êtes sur le Copilote IA. Parlez-moi ou écrivez pour piloter vos chiffres.',
         permission: 'ai.analysis',
         guide: [
           'Posez une question en français — à l’écrit ou à la voix (mode Jarvis).',
@@ -59,6 +67,8 @@ export const navSections: NavSection[] = [
         to: '/deposit',
         label: 'Déposer',
         hint: 'Scan de factures',
+        spokenIntro:
+          'Vous êtes sur Déposer. Envoyez une photo ou un PDF, je m’occupe du reste.',
         permission: 'invoice.create',
         guide: [
           'Déposez une photo ou un PDF de facture / justificatif pour lancer le traitement automatique.',
@@ -71,6 +81,8 @@ export const navSections: NavSection[] = [
         to: '/history',
         label: 'Comptabilité',
         hint: 'Documents & exports',
+        spokenIntro:
+          'Bienvenue en Comptabilité. Retrouvez ici tous vos documents et exports.',
         permission: 'documents.read',
         guide: [
           'Retrouvez tous les documents déjà traités, leur statut et l’historique de travail.',
@@ -83,6 +95,8 @@ export const navSections: NavSection[] = [
         to: '/facturation',
         label: 'Facturation',
         hint: 'Devis & clients',
+        spokenIntro:
+          'Vous consultez la Facturation. Devis, encaissements et suivi client sont à portée de main.',
         permission: 'invoice.read',
         guide: [
           'Point d’entrée commercial : factures émises, suivi des encaissements et liens vers devis / clients.',
@@ -95,6 +109,8 @@ export const navSections: NavSection[] = [
         to: '/devis',
         label: 'Devis',
         hint: 'Liste & envoi',
+        spokenIntro:
+          'Vous êtes dans les Devis. Créez, listez et envoyez vos propositions en quelques clics.',
         permission: 'invoice.read',
         guide: [
           'Créez, listez et envoyez vos devis professionnels depuis un seul endroit.',
@@ -107,6 +123,8 @@ export const navSections: NavSection[] = [
         to: '/clients',
         label: 'Clients',
         hint: 'Fiches & contacts',
+        spokenIntro:
+          'Voici vos Clients. Centralisez contacts et fiches pour gagner du temps au quotidien.',
         permission: 'invoice.read',
         guide: [
           'Centralisez les fiches clients : nom, email, téléphone, adresse, n° TVA.',
@@ -119,6 +137,8 @@ export const navSections: NavSection[] = [
         to: '/catalogue',
         label: 'Catalogue',
         hint: 'Produits & services',
+        spokenIntro:
+          'Bienvenue dans le Catalogue. Vos produits et services sont prêts à insérer dans chaque document.',
         permission: 'invoice.read',
         guide: [
           'Listez vos produits et services avec prix HT, unité et taux de TVA.',
@@ -131,6 +151,8 @@ export const navSections: NavSection[] = [
         to: '/activites',
         label: 'Activités',
         hint: 'Agenda commercial',
+        spokenIntro:
+          'Vous êtes sur Activités. Planifiez rendez-vous et suivis commerciaux sans rien oublier.',
         permission: 'invoice.read',
         guide: [
           'Planifiez rendez-vous, suivis, ventes et interventions liés à vos clients.',
@@ -148,6 +170,8 @@ export const navSections: NavSection[] = [
         to: '/abonnement',
         label: 'Abonnement',
         hint: 'Essai, carte & factures',
+        spokenIntro:
+          'Voici Abonnement. Gérez votre essai, votre carte et le renouvellement en toute simplicité.',
         permission: 'subscription.manage',
         guide: [
           'Gérez l’essai gratuit, le renouvellement, la carte et les factures de l’organisation.',
@@ -160,6 +184,8 @@ export const navSections: NavSection[] = [
         to: '/organisation',
         label: 'Organisation',
         hint: 'Entreprise & coordonnées',
+        spokenIntro:
+          'Vous êtes sur Organisation. Renseignez l’identité de votre entreprise une seule fois.',
         guide: [
           'Renseignez l’identité de l’entreprise (nom, adresse, informations légales utiles).',
           'Ces infos alimentent vos documents et la cohérence de votre espace multi-utilisateurs.',
@@ -171,6 +197,8 @@ export const navSections: NavSection[] = [
         to: '/admin/equipe',
         label: 'Admin équipe',
         hint: 'Comptes & droits',
+        spokenIntro:
+          'Bienvenue dans Admin équipe. Invitez vos collaborateurs et ajustez leurs droits.',
         permission: 'users.manage',
         guide: [
           'Invitez des collaborateurs et définissez qui peut voir ou modifier quoi.',
@@ -183,6 +211,8 @@ export const navSections: NavSection[] = [
         to: '/settings',
         label: 'Paramètres',
         hint: 'Entreprise & TVA',
+        spokenIntro:
+          'Vous consultez les Paramètres. Réglez TVA et préférences pour des documents conformes.',
         permission: 'settings.manage',
         guide: [
           'Réglez les paramètres métier (TVA, préférences d’entreprise liées à la facturation).',
@@ -195,6 +225,8 @@ export const navSections: NavSection[] = [
         to: '/compte',
         label: 'Mon compte',
         hint: 'Profil & sécurité',
+        spokenIntro:
+          'Voici Mon compte. Mettez à jour votre profil et sécurisez votre accès personnel.',
         guide: [
           'Modifiez votre profil personnel : nom, téléphone, photo et mot de passe.',
           'C’est votre sécurité individuelle, indépendante de l’abonnement de l’entreprise.',
@@ -215,4 +247,8 @@ export function findNavItem(pathname: string): NavItem | undefined {
     }
   }
   return undefined
+}
+
+export function spokenPageScript(item: NavItem): string {
+  return `${item.spokenIntro} ${item.guide[0]} ${item.guide[1]}`
 }

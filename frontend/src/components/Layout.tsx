@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { navSections } from '../navConfig'
 import { SubscriptionProvider } from '../subscriptionContext'
 import { navIcons } from './NavIcons'
+import JarvisHost from './JarvisHost'
 import PageGuide from './PageGuide'
 import SubscriptionBanner from './SubscriptionBanner'
 
@@ -222,6 +223,7 @@ function LayoutInner() {
           <PageGuide />
           <Outlet />
         </main>
+        <JarvisHost />
       </div>
     </div>
   )
