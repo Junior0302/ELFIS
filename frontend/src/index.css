@@ -4957,3 +4957,55 @@ textarea {
   margin-top: 0.2rem;
   flex: 0 0 auto;
 }
+
+.email-channel-fieldset {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(11, 61, 46, 0.18);
+  border-radius: 12px;
+  background: rgba(231, 242, 236, 0.45);
+}
+
+.email-channel-fieldset legend {
+  padding: 0 0.35rem;
+  font-weight: 650;
+  color: var(--forest);
+}
+
+.email-channel-option {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  margin: 0.55rem 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.email-channel-option.is-selected {
+  border-color: rgba(11, 61, 46, 0.35);
+  background: #fff;
+}
+
+.email-channel-option.is-disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.email-channel-option input {
+  margin-top: 0.2rem;
+}
+
+.email-channel-option strong {
+  display: block;
+  color: var(--ink);
+}
+
+.email-channel-option small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted, #5c6b64);
+  line-height: 1.35;
+}
+

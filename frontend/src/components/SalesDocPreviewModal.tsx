@@ -18,6 +18,8 @@ type Props = {
   onSent: (doc: SalesDoc, log: DocumentEmailLog) => void
 }
 
+type SendChannel = 'personal' | 'elfis'
+
 function statusLabel(status: string) {
   const map: Record<string, string> = {
     preparing: 'Préparation',
@@ -61,7 +63,7 @@ export default function SalesDocPreviewModal({
   const [loadingPdf, setLoadingPdf] = useState(true)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
-  const [canSendDirect, setCanSendDirect] = useState(false)
+  const [platformReady, setPlatformReady] = useState(false)
   const [connectionId, setConnectionId] = useState<number | null>(null)
   const [recipient, setRecipient] = useState(doc.customer_email || '')
   const [cc, setCc] = useState('')
@@ -70,35 +72,31 @@ export default function SalesDocPreviewModal({
   const [message, setMessage] = useState('')
   const [preview, setPreview] = useState<EmailSendPreview | null>(null)
   const [logs, setLogs] = useState<DocumentEmailLog[]>([])
-  const [ackSender, setAckSender] = useState(false)
   const [hint, setHint] = useState('')
   const [senderOptions, setSenderOptions] = useState<EmailSenderOption[]>([])
-  const [senderOptionId, setSenderOptionId] = useState<string>('')
+  const [channel, setChannel] = useState<SendChannel>('personal')
+  const [personalEmail, setPersonalEmail] = useState('')
+  const [elfisOptionId, setElfisOptionId] = useState('')
+  const [hasPendingPro, setHasPendingPro] = useState(false)
   const sendingLock = useRef(false)
   const idempotencyRef = useRef(`send-${doc.id}-${Date.now()}`)
 
-  const selectedSender = senderOptions.find((o) => o.id === senderOptionId) || null
-  const replyToEmail = (
-    selectedSender?.email ||
-    preview?.reply_to_email ||
-    preview?.org_email ||
-    preview?.user_email ||
-    user?.email ||
-    ''
-  ).trim()
-  const displayFrom = selectedSender
-    ? selectedSender.label
-    : preview?.sender_name && preview?.sender_email
-      ? `${preview.sender_name} <${preview.sender_email}>`
-      : preview?.sender_email || 'ComptaPilot'
-  const mailboxFrom = (selectedSender?.email || preview?.user_email || user?.email || replyToEmail).trim()
+  const elfisOptions = senderOptions.filter((o) => o.kind === 'professional')
+  const hasElfis = elfisOptions.length > 0
+  const selectedElfis =
+    elfisOptions.find((o) => o.id === elfisOptionId) || elfisOptions.find((o) => o.is_default) || elfisOptions[0] || null
+
+  const accountEmail = (preview?.user_email || user?.email || '').trim()
+  const orgEmail = (preview?.org_email || '').trim()
+  const effectivePersonal = (personalEmail || accountEmail || orgEmail).trim()
+  const effectiveElfis = (selectedElfis?.email || '').trim()
+  const senderEmail = channel === 'elfis' ? effectiveElfis : effectivePersonal
 
   useEffect(() => {
     let objectUrl: string | null = null
     let cancelled = false
     setLoadingPdf(true)
     setError('')
-    setAckSender(false)
     setHint('')
     idempotencyRef.current = `send-${doc.id}-${Date.now()}`
     api
@@ -122,7 +120,7 @@ export default function SalesDocPreviewModal({
       .then((data) => {
         if (cancelled) return
         setLogs(data.email_logs)
-        setCanSendDirect(Boolean(data.can_send_direct ?? data.email_configured ?? data.smtp_configured))
+        setPlatformReady(Boolean(data.can_send_direct ?? data.email_configured ?? data.smtp_configured))
         if (data.default_connection_id) setConnectionId(data.default_connection_id)
         if (data.preview) {
           setPreview(data.preview)
@@ -132,6 +130,7 @@ export default function SalesDocPreviewModal({
           setSubject(data.preview.subject || '')
           setMessage(data.preview.message || '')
           if (data.preview.connection_id) setConnectionId(data.preview.connection_id)
+          setPersonalEmail(data.preview.user_email || data.preview.org_email || '')
         }
       })
       .catch(() => undefined)
@@ -140,7 +139,25 @@ export default function SalesDocPreviewModal({
       .then((data) => {
         if (cancelled) return
         setSenderOptions(data.options)
-        setSenderOptionId(data.default_option_id || data.options[0]?.id || '')
+        const pros = data.options.filter((o) => o.kind === 'professional')
+        const personal = data.options.find((o) => o.kind === 'personal')
+        if (personal?.email) setPersonalEmail(personal.email)
+        if (pros.length) {
+          const def =
+            pros.find((o) => o.id === data.default_option_id) ||
+            pros.find((o) => o.is_default) ||
+            pros[0]
+          setElfisOptionId(def.id)
+          setChannel('elfis')
+        } else {
+          setChannel('personal')
+        }
+      })
+      .catch(() => undefined)
+    api
+      .myProfessionalEmails(token, orgId)
+      .then((data) => {
+        if (!cancelled) setHasPendingPro(Boolean(data.has_pending))
       })
       .catch(() => undefined)
     return () => {
@@ -157,20 +174,20 @@ export default function SalesDocPreviewModal({
     }
   }
 
-  const sendDirect = async () => {
+  const sendViaElfis = async () => {
     if (sendingLock.current) return
-    if (!canSendDirect) {
+    if (!hasElfis || !effectiveElfis) {
+      setError('Aucune adresse ELFIS Core active. Demandez-la depuis Mon compte.')
+      return
+    }
+    if (!platformReady) {
       setError(
-        'Envoi direct non activé. Ajoutez BREVO_API_KEY + PLATFORM_EMAIL_FROM sur le serveur, ou utilisez « Ouvrir ma messagerie ».',
+        'Envoi depuis ELFIS Core temporairement indisponible. Réessayez plus tard ou utilisez votre messagerie personnelle.',
       )
       return
     }
-    if (!ackSender) {
-      setError('Cochez la case pour confirmer l’adresse de réponse (votre e-mail).')
-      return
-    }
     if (!recipient.trim()) {
-      setError('Indiquez l’adresse du client.')
+      setError('Indiquez le destinataire.')
       return
     }
     sendingLock.current = true
@@ -189,19 +206,19 @@ export default function SalesDocPreviewModal({
           send_mode: 'server',
           sender_acknowledged: true,
           connection_id: connectionId,
-          preferred_from_email: selectedSender?.email || replyToEmail || undefined,
-          preferred_from_label: selectedSender?.label || undefined,
-          idempotency_key: `${idempotencyRef.current}-direct`,
+          preferred_from_email: effectiveElfis,
+          preferred_from_label: selectedElfis?.label || effectiveElfis,
+          idempotency_key: `${idempotencyRef.current}-elfis`,
         },
         token,
         orgId,
       )
       setLogs((current) => [result.email_log, ...current])
-      setCanSendDirect(Boolean(result.can_send_direct ?? result.email_configured ?? result.smtp_configured))
+      setPlatformReady(Boolean(result.can_send_direct ?? result.email_configured ?? result.smtp_configured))
       onSent(result.document, result.email_log)
       if (result.email_log.status === 'sent' || result.email_log.status === 'delivered') {
         idempotencyRef.current = `send-${doc.id}-${Date.now()}`
-        setHint(`E-mail envoyé au client. Les réponses iront sur ${replyToEmail || 'votre adresse'}.`)
+        setHint(`E-mail envoyé depuis ${effectiveElfis} vers ${recipient.trim()}.`)
       } else {
         setError(result.email_log.error_message || 'Envoi échoué')
       }
@@ -213,18 +230,14 @@ export default function SalesDocPreviewModal({
     }
   }
 
-  const openInMailbox = async () => {
+  const sendViaPersonalMailbox = async () => {
     if (sendingLock.current) return
-    if (!ackSender) {
-      setError('Cochez la case pour confirmer que l’expéditeur sera votre adresse e-mail.')
+    if (!effectivePersonal) {
+      setError('Indiquez votre adresse e-mail personnelle (expéditeur).')
       return
     }
     if (!recipient.trim()) {
-      setError('Indiquez l’adresse du client.')
-      return
-    }
-    if (!mailboxFrom) {
-      setError('Renseignez votre e-mail de compte ou celui de l’entreprise dans Paramètres.')
+      setError('Indiquez le destinataire.')
       return
     }
     sendingLock.current = true
@@ -243,8 +256,8 @@ export default function SalesDocPreviewModal({
           bcc,
           send_mode: 'mailto',
           sender_acknowledged: true,
-          preferred_from_email: selectedSender?.email || mailboxFrom || undefined,
-          preferred_from_label: selectedSender?.label || undefined,
+          preferred_from_email: effectivePersonal,
+          preferred_from_label: effectivePersonal,
           idempotency_key: `${idempotencyRef.current}-mailto`,
         },
         token,
@@ -263,7 +276,9 @@ export default function SalesDocPreviewModal({
         cc: cc.trim() || undefined,
         bcc: bcc.trim() || undefined,
       })
-      setHint(`Messagerie ouverte. Expéditeur : ${mailboxFrom}. Joignez le PDF puis envoyez.`)
+      setHint(
+        `Messagerie ouverte. Envoyez depuis ${effectivePersonal}, joignez le PDF, puis validez l’envoi.`,
+      )
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Impossible d’ouvrir la messagerie')
     } finally {
@@ -274,8 +289,8 @@ export default function SalesDocPreviewModal({
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (canSendDirect) void sendDirect()
-    else void openInMailbox()
+    if (channel === 'elfis') void sendViaElfis()
+    else void sendViaPersonalMailbox()
   }
 
   const label = doc.doc_type === 'devis' ? 'Devis' : doc.doc_type === 'avoir' ? 'Avoir' : 'Facture'
@@ -318,91 +333,100 @@ export default function SalesDocPreviewModal({
 
             <form onSubmit={onSubmit}>
               <h4>Envoyer au client</h4>
+              <p className="muted" style={{ marginBottom: '0.85rem' }}>
+                Deux possibilités : votre messagerie personnelle, ou votre adresse ELFIS Core une fois
+                activée.
+              </p>
 
-              {canSendDirect ? (
+              <fieldset className="email-channel-fieldset">
+                <legend>Comment envoyer ?</legend>
+
+                <label className={`email-channel-option ${channel === 'personal' ? 'is-selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="send-channel"
+                    checked={channel === 'personal'}
+                    onChange={() => {
+                      setChannel('personal')
+                      setError('')
+                    }}
+                  />
+                  <span>
+                    <strong>1 · Mon e-mail personnel</strong>
+                    <small>
+                      Ouvre votre boîte mail (Gmail, Outlook…). Vous envoyez depuis l’adresse de votre
+                      choix.
+                    </small>
+                  </span>
+                </label>
+
+                <label
+                  className={`email-channel-option ${channel === 'elfis' ? 'is-selected' : ''} ${
+                    !hasElfis ? 'is-disabled' : ''
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="send-channel"
+                    checked={channel === 'elfis'}
+                    disabled={!hasElfis}
+                    onChange={() => {
+                      setChannel('elfis')
+                      setError('')
+                    }}
+                  />
+                  <span>
+                    <strong>2 · Adresse ELFIS Core (recommandé)</strong>
+                    <small>
+                      {hasElfis
+                        ? `Envoi direct depuis l’outil avec ${effectiveElfis || 'votre adresse @elfis-core.com'}.`
+                        : hasPendingPro
+                          ? 'Demande en cours — accès sous 24 h après validation admin / Brevo.'
+                          : 'Pas encore d’adresse. Demandez-la gratuitement dans Mon compte.'}
+                    </small>
+                  </span>
+                </label>
+              </fieldset>
+
+              {!hasElfis && (
                 <div className="email-sender-notice" role="status">
-                  <strong>Envoi direct activé</strong>
+                  <strong>Obtenir jean.dupont@elfis-core.com</strong>
                   <p>
-                    ComptaPilot enverra l’e-mail <em>automatiquement</em> au client, avec le PDF joint.
-                  </p>
-                  <p>
-                    Les réponses du client arriveront sur <strong>{replyToEmail || 'votre e-mail entreprise'}</strong>.
-                  </p>
-                </div>
-              ) : (
-                <div className="email-sender-notice" role="status">
-                  <strong>Envoi via votre messagerie</strong>
-                  <p>
-                    L’expéditeur sera <strong>{mailboxFrom || 'votre adresse'}</strong>. Pour un envoi
-                    100 % automatique depuis ComptaPilot, configurez{' '}
-                    <code>BREVO_API_KEY</code> + <code>PLATFORM_EMAIL_FROM</code> sur le serveur.
+                    Sur <Link to="/compte">Mon compte</Link>, cliquez « Demander mon adresse ». Notre
+                    équipe configure Brevo puis active l’envoi. Vous pourrez alors envoyer devis et
+                    factures directement depuis ComptaPilot.
                   </p>
                 </div>
               )}
 
               <div className="field">
                 <label>Expéditeur</label>
-                <select
-                  value={senderOptionId}
-                  onChange={(e) => setSenderOptionId(e.target.value)}
-                  required={senderOptions.length > 0}
-                >
-                  {senderOptions.length === 0 ? (
-                    <option value="">{mailboxFrom || 'Mon adresse'}</option>
+                {channel === 'elfis' ? (
+                  hasElfis ? (
+                    <select
+                      value={selectedElfis?.id || ''}
+                      onChange={(e) => setElfisOptionId(e.target.value)}
+                      required
+                    >
+                      {elfisOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.email}
+                          {opt.is_default ? ' (par défaut)' : ''}
+                        </option>
+                      ))}
+                    </select>
                   ) : (
-                    senderOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.kind === 'professional' ? '● ' : '○ '}
-                        {opt.label}
-                        {opt.kind === 'professional' ? ' (ELFIS Core)' : ''}
-                        {opt.kind === 'personal' ? ' (personnel)' : ''}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <label className="email-ack-row">
-                <input
-                  type="checkbox"
-                  checked={ackSender}
-                  onChange={(e) => {
-                    setAckSender(e.target.checked)
-                    setError('')
-                  }}
-                />
-                <span>
-                  {canSendDirect ? (
-                    <>
-                      J’ai compris : les réponses iront sur{' '}
-                      <strong>{replyToEmail || 'mon e-mail'}</strong>
-                    </>
-                  ) : (
-                    <>
-                      J’ai compris : l’expéditeur sera{' '}
-                      <strong>{mailboxFrom || 'mon adresse e-mail'}</strong>
-                    </>
-                  )}
-                </span>
-              </label>
-
-              <div className="email-identity-box" aria-label="Récapitulatif">
-                <p>
-                  <strong>De</strong>
-                  <span>{canSendDirect ? displayFrom : mailboxFrom || '—'}</span>
-                </p>
-                <p>
-                  <strong>Réponse</strong>
-                  <span>{replyToEmail || '—'}</span>
-                </p>
-                <p>
-                  <strong>À</strong>
-                  <span>{recipient || '—'}</span>
-                </p>
-                <p>
-                  <strong>Pièce jointe</strong>
-                  <span>{pdfName}</span>
-                </p>
+                    <input value="" disabled placeholder="Adresse ELFIS non encore activée" />
+                  )
+                ) : (
+                  <input
+                    type="email"
+                    required
+                    value={personalEmail}
+                    onChange={(e) => setPersonalEmail(e.target.value)}
+                    placeholder="contact@entreprise.fr"
+                  />
+                )}
               </div>
 
               <div className="field">
@@ -415,6 +439,28 @@ export default function SalesDocPreviewModal({
                   placeholder="client@exemple.fr"
                 />
               </div>
+
+              <div className="email-identity-box" aria-label="Récapitulatif">
+                <p>
+                  <strong>De</strong>
+                  <span>{senderEmail || '—'}</span>
+                </p>
+                <p>
+                  <strong>À</strong>
+                  <span>{recipient || '—'}</span>
+                </p>
+                <p>
+                  <strong>Mode</strong>
+                  <span>
+                    {channel === 'elfis' ? 'Envoi direct ELFIS Core' : 'Messagerie personnelle (mailto)'}
+                  </span>
+                </p>
+                <p>
+                  <strong>Pièce jointe</strong>
+                  <span>{pdfName}</span>
+                </p>
+              </div>
+
               <div className="field">
                 <label>Copie (CC)</label>
                 <input
@@ -437,37 +483,22 @@ export default function SalesDocPreviewModal({
                 <button className="btn secondary" type="button" onClick={onClose} disabled={sending}>
                   Annuler
                 </button>
-                {canSendDirect ? (
-                  <>
-                    <button
-                      className="btn"
-                      type="submit"
-                      disabled={sending || !ackSender}
-                    >
-                      {sending ? 'Envoi…' : 'Envoyer directement'}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      type="button"
-                      disabled={sending || !ackSender}
-                      onClick={() => void openInMailbox()}
-                    >
-                      Ouvrir ma messagerie
-                    </button>
-                  </>
-                ) : (
-                  <button className="btn" type="submit" disabled={sending || !ackSender}>
-                    {sending ? 'Préparation…' : 'Ouvrir ma messagerie'}
-                  </button>
-                )}
+                <button
+                  className="btn"
+                  type="submit"
+                  disabled={
+                    sending ||
+                    (channel === 'elfis' && (!hasElfis || !platformReady)) ||
+                    (channel === 'personal' && !effectivePersonal)
+                  }
+                >
+                  {sending
+                    ? 'Envoi…'
+                    : channel === 'elfis'
+                      ? 'Envoyer depuis ELFIS Core'
+                      : 'Ouvrir ma messagerie'}
+                </button>
               </div>
-              {!canSendDirect && (
-                <p className="muted" style={{ fontSize: '0.85rem' }}>
-                  Envoi auto : Render → Environment → <code>BREVO_API_KEY</code> et{' '}
-                  <code>PLATFORM_EMAIL_FROM</code>.{' '}
-                  <Link to="/settings">Paramètres entreprise</Link>
-                </p>
-              )}
             </form>
 
             {error && <p className="form-error">{error}</p>}

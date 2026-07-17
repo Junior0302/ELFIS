@@ -364,9 +364,17 @@ export default function ComptePage() {
 
         <section className="panel account-card" aria-label="Adresse e-mail professionnelle">
           <h3>Adresse e-mail professionnelle</h3>
+          <p className="muted">
+            Pour envoyer devis et factures, vous avez 2 choix : votre e-mail personnel (messagerie),
+            ou une adresse fournie par ELFIS Core (ex. jean.dupont@elfis-core.com) pour envoyer
+            directement depuis l’outil.
+          </p>
           {proHasActive ? (
             <>
-              <p className="muted">Votre adresse ELFIS Core est active et utilisable pour les devis / factures.</p>
+              <p>
+                Votre adresse ELFIS Core est <strong>active</strong>. Elle apparaît comme expéditeur
+                dans Devis / Facturation → Envoyer.
+              </p>
               <div className="list">
                 {proEmails
                   .filter((row) => row.status === 'active')
@@ -382,8 +390,8 @@ export default function ComptePage() {
             <div className="email-sender-notice" role="status">
               <strong>Votre demande a bien été envoyée.</strong>
               <p>
-                Notre équipe prépare actuellement votre adresse professionnelle. Vous recevrez vos
-                accès sous 24 heures maximum.
+                Notre équipe prépare actuellement votre adresse professionnelle (Brevo). Vous
+                recevrez vos accès sous 24 heures maximum. Surveillez votre boîte mail.
               </p>
             </div>
           ) : (
@@ -392,9 +400,9 @@ export default function ComptePage() {
                 Vous ne possédez pas encore d’adresse ELFIS Core.
               </p>
               <p className="muted">
-                Obtenez gratuitement une adresse professionnelle pour envoyer vos devis et factures
-                (ex. prenom.nom@elfis-core.com). Aucun formulaire à remplir : vos informations de
-                compte sont utilisées automatiquement.
+                Cliquez ci-dessous : aucune saisie. Nous récupérons nom, prénom, e-mail, téléphone,
+                société, abonnement et statut depuis votre compte, puis notifions{' '}
+                <strong>contact@elfis-core.com</strong>. Vous recevez aussi un accusé de réception.
               </p>
               <div className="actions">
                 <button

@@ -101,14 +101,15 @@ export default function PlatformProfessionalEmailsPage() {
         <div>
           <h2>Demandes Email Professionnel</h2>
           <p className="muted">
-            Créez la boîte dans Brevo (ex. jean.dupont@elfis-core.com), puis validez ici pour l’activer
-            dans ComptaPilot.
+            1) Le client demande son adresse depuis Mon compte → mail à contact@elfis-core.com.
+            2) Vous créez la boîte dans Brevo (SMTP/IMAP, envoi + réception).
+            3) Vous validez ici → l’adresse apparaît comme expéditeur dans Devis / Factures (envoi
+            direct).
           </p>
           <p className="muted" style={{ marginTop: '0.35rem' }}>
             <a href="https://app.brevo.com/" target="_blank" rel="noreferrer">
               Ouvrir Brevo
             </a>
-            {' · '}SMTP / IMAP · autorisation d’envoi et de réception
           </p>
         </div>
       </div>

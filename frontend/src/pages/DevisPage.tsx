@@ -152,8 +152,9 @@ export default function DevisPage() {
             aussi disponible dans <Link to="/facturation">Facturation</Link>.
           </p>
           <p className="muted" style={{ marginTop: '0.5rem' }}>
-            À l’envoi, choisissez l’expéditeur (adresse ELFIS Core ou personnelle). Demandez votre
-            adresse pro dans <Link to="/compte">Mon compte</Link>.
+            À l’envoi : <strong>1)</strong> votre messagerie personnelle, ou <strong>2)</strong>{' '}
+            votre adresse ELFIS Core (après demande dans <Link to="/compte">Mon compte</Link> et
+            validation admin).
           </p>
         </div>
       </div>
