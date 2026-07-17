@@ -1943,6 +1943,52 @@ a.platform-action {
   color: #ffb6b6;
 }
 
+.platform-pill-neutral {
+  background: rgba(238, 244, 248, 0.1);
+  color: rgba(238, 244, 248, 0.72);
+}
+
+.platform-alert-pre {
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* Table admin : forcer lisibilité (évite badges produit clairs sur fond sombre) */
+.platform-shell .subscription-badge {
+  background: rgba(117, 214, 191, 0.14);
+  color: #9ce8d7;
+  border: none;
+}
+
+.platform-shell .subscription-badge.warn {
+  background: rgba(240, 180, 80, 0.16);
+  color: #ffd28a;
+}
+
+.platform-shell .subscription-badge.danger {
+  background: rgba(240, 112, 112, 0.14);
+  color: #ffb6b6;
+}
+
+.platform-shell .subscription-badge.neutral,
+.platform-shell .subscription-badge.ok {
+  background: rgba(117, 214, 191, 0.14);
+  color: #9ce8d7;
+}
+
+.platform-shell .btn,
+.platform-shell .btn.secondary {
+  background: rgba(117, 214, 191, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #eef4f8;
+}
+
+.platform-shell .btn:hover:not(:disabled),
+.platform-shell .btn.secondary:hover:not(:disabled) {
+  background: rgba(117, 214, 191, 0.22);
+  color: #fff;
+}
+
 .platform-request-list {
   display: grid;
   gap: 1rem;
