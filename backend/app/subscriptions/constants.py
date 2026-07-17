@@ -53,7 +53,7 @@ PRO_PLAN_STATUSES = {"trialing", "active", "past_due", "unpaid", "paused"}
 
 UX_STATUS_LABELS = {
     "none": "Aucun abonnement",
-    "checkout_pending": "Souscription non finalisée",
+    "checkout_pending": "Paiement à finaliser",
     "trialing": "Essai gratuit",
     "active": "Abonnement actif",
     "past_due": "Paiement à régulariser",
@@ -63,7 +63,7 @@ UX_STATUS_LABELS = {
     "canceled": "Abonnement terminé",
     "expired": "Abonnement expiré",
     "admin_revoked": "Accès suspendu",
-    "incomplete": "Paiement incomplet",
+    "incomplete": "Paiement à finaliser",
     "incomplete_expired": "Paiement expiré",
 }
 

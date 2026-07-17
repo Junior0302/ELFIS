@@ -119,7 +119,7 @@ function friendlyError(status: number, message: string, path?: string): string {
     if (path?.includes('/billing/documents/') && path.includes('/pdf')) {
       return isLocalApi
         ? 'PDF indisponible. Vérifiez que le backend local est démarré (start-backend.bat).'
-        : 'PDF indisponible : l’API cloud n’est pas encore à jour. Déployez le backend (git push → Render).'
+        : 'PDF indisponible pour le moment. Réessayez dans quelques minutes.'
     }
     if (isLocalApi) {
       return 'Service API introuvable. Lancez le backend : start-backend.bat (port 8001)'

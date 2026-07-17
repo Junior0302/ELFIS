@@ -196,7 +196,7 @@ export default function ComptePage() {
       setUser(res.user)
       setAvatarFile(null)
       setForm((f) => ({ ...f, password: '', password_confirm: '' }))
-      setMessage('Profil et photo synchronisés avec Firebase.')
+      setMessage('Profil et photo mis à jour.')
     } catch (err) {
       setError(mapFirebaseError(err))
     } finally {
@@ -285,8 +285,8 @@ export default function ComptePage() {
 
             <h4 className="account-section-title">Sécurité</h4>
             <p className="muted">
-              Le nouveau mot de passe est enregistré directement dans Firebase Authentication.
-              Une reconnexion récente peut être demandée par sécurité.
+              Le nouveau mot de passe est enregistré de façon sécurisée. Une reconnexion récente
+              peut être demandée.
             </p>
             <div className="form-grid">
               <div className="field">

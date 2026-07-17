@@ -46,7 +46,7 @@ export default function PlatformSubscriptionsPage() {
       if (kind === 'sync') {
         const result = await api.platformSyncSubscription(organizationId, token)
         patchLocal(organizationId, result.subscription)
-        setMessage(`Organisation #${organizationId} resynchronisée avec Stripe.`)
+        setMessage(`Organisation #${organizationId} resynchronisée.`)
       } else if (kind === 'revoke') {
         const reason = window.prompt('Motif public de suspension (visible client) ?')
         if (!reason?.trim()) return
@@ -87,7 +87,7 @@ export default function PlatformSubscriptionsPage() {
       <div className="platform-title">
         <span>ELF Admin</span>
         <h1>Abonnements</h1>
-        <p>Suivi, resync Stripe, révocation, essai exceptionnel et résumé IA (lecture seule).</p>
+        <p>Suivi, resynchronisation, révocation, essai exceptionnel et résumé IA (lecture seule).</p>
       </div>
       {error && <div className="platform-alert">{error}</div>}
       {message && <div className="platform-alert platform-alert-ok">{message}</div>}

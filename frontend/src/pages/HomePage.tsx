@@ -437,7 +437,7 @@ export default function HomePage() {
             <div className="home-trust">
               <span>
                 <IconShield className="home-trust-icon" />
-                Firebase sécurisé
+                Connexion sécurisée
               </span>
               <span>
                 <IconDatabase className="home-trust-icon" />

@@ -191,7 +191,7 @@ def platform_sync_subscription(
 
     row = _latest_subscription(db, organization_id)
     if not row or not row.stripe_subscription_id:
-        raise HTTPException(404, detail="Aucun abonnement Stripe à synchroniser")
+        raise HTTPException(404, detail="Aucun abonnement à synchroniser")
     sync_subscription_from_stripe(db, row.stripe_subscription_id)
     db.commit()
     write_audit(
@@ -326,7 +326,7 @@ def platform_ai_subscription_summary(
     if access.subscription_status == "past_due":
         suggestions.append("Contacter le client pour mettre à jour le moyen de paiement")
     if access.subscription_status == "checkout_pending":
-        suggestions.append("Proposer de reprendre la session Stripe Checkout")
+        suggestions.append("Proposer de reprendre la souscription sécurisée")
     if not access.stripe_subscription_id and access.subscription_status == "none":
         suggestions.append("Inviter le client à démarrer l’essai gratuit")
     summary = (

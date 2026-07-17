@@ -31,9 +31,7 @@ let firestore: Firestore | null = null
 
 export function getFirebaseAuth(): Auth {
   if (!isFirebaseConfigured()) {
-    throw new Error(
-      'Firebase non configuré. Renseignez VITE_FIREBASE_* dans frontend/.env puis redémarrez Vite.',
-    )
+    throw new Error('Service de connexion indisponible.')
   }
   if (!app) {
     app = initializeApp({
@@ -61,7 +59,7 @@ export function getFirebaseFirestore(): Firestore {
 
 function requireFirebaseUser(): FirebaseUser {
   const user = getFirebaseAuth().currentUser
-  if (!user) throw new Error('Session Firebase expirée. Reconnectez-vous.')
+  if (!user) throw new Error('Session expirée. Reconnectez-vous.')
   return user
 }
 
@@ -197,9 +195,15 @@ export function mapFirebaseError(err: unknown): string {
       'Pour changer le mot de passe, déconnectez-vous puis reconnectez-vous avant de réessayer.',
     'auth/missing-email': 'Saisissez votre adresse email.',
     'auth/network-request-failed': 'Réseau indisponible. Vérifiez votre connexion.',
-    'auth/operation-not-allowed': 'Email/mot de passe non activé dans Firebase Console.',
+    'auth/operation-not-allowed': 'Connexion email / mot de passe non disponible.',
   }
   if (code && map[code]) return map[code]
-  if (err instanceof Error && err.message) return err.message
+  if (err instanceof Error && err.message) {
+    const msg = err.message
+    if (/firebase|vite_|firestore|identity toolkit/i.test(msg)) {
+      return 'Authentification impossible. Réessayez ou contactez le support.'
+    }
+    return msg
+  }
   return 'Authentification impossible'
 }

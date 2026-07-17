@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
     <div className="auth-card">
       <div className="auth-card-head">
         <h2>Mot de passe oublié</h2>
-        <p>Recevez un lien Firebase sécurisé pour choisir un nouveau mot de passe.</p>
+        <p>Recevez un lien sécurisé pour choisir un nouveau mot de passe.</p>
       </div>
 
       {sent ? (

@@ -67,8 +67,7 @@ export default function RegisterPage() {
 
       {!firebaseReady && (
         <div className="auth-alert auth-alert-error">
-          Firebase n&apos;est pas configuré. Renseignez les variables{' '}
-          <code>VITE_FIREBASE_*</code> dans <code>frontend/.env</code>.
+          Inscription indisponible pour le moment. Réessayez plus tard ou contactez le support.
         </div>
       )}
 

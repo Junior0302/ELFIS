@@ -152,7 +152,7 @@ def subscription_sync(
             status_code=502,
             detail={
                 "code": "stripe_sync_failed",
-                "message": f"Synchronisation Stripe impossible : {str(exc)[:200]}",
+                "message": f"Synchronisation impossible. Réessayez dans un instant.",
             },
         ) from exc
     db.commit()

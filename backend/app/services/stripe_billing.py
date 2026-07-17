@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -10,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models_saas import Organization, Subscription
+
+logger = logging.getLogger(__name__)
 
 STRIPE_SUBSCRIPTION_STATUSES = {
     "incomplete",
@@ -38,8 +41,7 @@ def _require_stripe(*, webhook: bool = False) -> None:
             503,
             detail={
                 "code": "stripe_not_configured",
-                "message": "Configuration Stripe incomplète",
-                "missing": missing,
+                "message": "Paiement sécurisé indisponible pour le moment",
             },
         )
     stripe.api_key = settings.stripe_secret_key
@@ -50,7 +52,7 @@ def construct_webhook_event(payload: bytes, signature: str | None) -> dict[str, 
     if not signature:
         raise HTTPException(
             400,
-            detail={"code": "stripe_signature_missing", "message": "Signature Stripe absente"},
+            detail={"code": "stripe_signature_missing", "message": "Signature de requête absente"},
         )
     try:
         return stripe.Webhook.construct_event(
@@ -61,7 +63,7 @@ def construct_webhook_event(payload: bytes, signature: str | None) -> dict[str, 
     except (ValueError, stripe.SignatureVerificationError) as exc:
         raise HTTPException(
             400,
-            detail={"code": "stripe_signature_invalid", "message": "Signature Stripe invalide"},
+            detail={"code": "stripe_signature_invalid", "message": "Signature de requête invalide"},
         ) from exc
 
 
@@ -172,15 +174,12 @@ def create_checkout_session(
 
     price_id = settings.stripe_price_pro
     if not price_id.startswith("price_"):
+        logger.error("Invalid billing price id configured (prefix=%s)", price_id[:5])
         raise HTTPException(
-            400,
+            503,
             detail={
                 "code": "stripe_price_invalid",
-                "message": (
-                    "STRIPE_PRICE_PRO doit être un ID de prix Stripe (price_...), "
-                    "pas un ID de produit (prod_...)"
-                ),
-                "value_prefix": price_id[:5],
+                "message": "Paiement sécurisé indisponible pour le moment",
             },
         )
     current = assert_trial_eligible(db, organization_id)
@@ -223,7 +222,7 @@ def create_checkout_session(
             502,
             detail={
                 "code": "stripe_checkout_url_missing",
-                "message": "Stripe n’a pas renvoyé d’URL de paiement",
+                "message": "Impossible d’ouvrir le paiement sécurisé",
             },
         )
     session_id = getattr(session, "id", None) or ""
@@ -254,7 +253,7 @@ def create_portal_session(db: Session, *, organization_id: int) -> str:
             409,
             detail={
                 "code": "stripe_customer_missing",
-                "message": "Aucun compte de facturation Stripe pour cette organisation",
+                "message": "Aucun moyen de paiement enregistré pour cette organisation",
             },
         )
     try:
@@ -275,15 +274,20 @@ def create_portal_session(db: Session, *, organization_id: int) -> str:
             502,
             detail={
                 "code": "stripe_portal_url_missing",
-                "message": "Stripe n’a pas renvoyé d’URL de portail",
+                "message": "Impossible d’ouvrir l’espace facturation",
             },
         )
     return session.url
 
 
 def _stripe_error_message(exc: stripe.StripeError) -> str:
-    user_message = getattr(exc, "user_message", None) or str(exc) or "Erreur Stripe"
-    return user_message[:300]
+    raw = getattr(exc, "user_message", None) or str(exc) or ""
+    if raw and not any(
+        token in raw.lower()
+        for token in ("stripe", "api_key", "webhook", "price_", "sk_", "pk_")
+    ):
+        return raw[:300]
+    return "Le service de paiement est temporairement indisponible"
 
 
 def _as_dict(obj: Any) -> dict[str, Any]:
@@ -725,7 +729,7 @@ def sync_checkout_session(
                 403,
                 detail={
                     "code": "stripe_session_org_mismatch",
-                    "message": "Cette session Stripe ne correspond pas à l’organisation active",
+                    "message": "Cette session de paiement ne correspond pas à l’organisation active",
                 },
             )
         try:
@@ -742,10 +746,7 @@ def sync_checkout_session(
                     502,
                     detail={
                         "code": "stripe_checkout_sync_failed",
-                        "message": (
-                            "Impossible d’enregistrer la session Stripe "
-                            f"(conflit résolu partiellement) : {str(exc)[:160]}"
-                        ),
+                        "message": "Impossible d’enregistrer la session de paiement. Réessayez.",
                     },
                 ) from exc
         except Exception as exc:
@@ -754,7 +755,7 @@ def sync_checkout_session(
                 502,
                 detail={
                     "code": "stripe_checkout_sync_failed",
-                    "message": f"Impossible d’enregistrer la session Stripe : {str(exc)[:180]}",
+                    "message": "Impossible d’enregistrer la session de paiement. Réessayez.",
                 },
             ) from exc
         row = _subscription_for_org(db, organization_id)

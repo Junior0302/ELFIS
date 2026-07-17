@@ -38,13 +38,12 @@ export default function LoginPage() {
     <div className="auth-card">
       <div className="auth-card-head">
         <h2>Connexion</h2>
-        <p>Accédez à votre espace ComptaPilot avec votre compte Firebase.</p>
+        <p>Accédez à votre espace ComptaPilot avec votre email et mot de passe.</p>
       </div>
 
       {!firebaseReady && (
         <div className="auth-alert auth-alert-error">
-          Firebase n&apos;est pas configuré. Renseignez <code>VITE_FIREBASE_*</code> dans{' '}
-          <code>frontend/.env</code>.
+          Connexion indisponible pour le moment. Réessayez plus tard ou contactez le support.
         </div>
       )}
 

@@ -7,11 +7,11 @@ export const subscriptionLabels: Record<SubscriptionStatus, string> = {
   unpaid: 'Impayé',
   canceled: 'Abonnement terminé',
   expired: 'Abonnement expiré',
-  incomplete: 'Paiement incomplet',
+  incomplete: 'Paiement à finaliser',
   incomplete_expired: 'Paiement expiré',
   paused: 'Suspendu',
   none: 'Aucun abonnement',
-  checkout_pending: 'Souscription non finalisée',
+  checkout_pending: 'Paiement à finaliser',
   cancel_scheduled: 'Résiliation programmée',
   admin_revoked: 'Accès suspendu',
 }
@@ -63,7 +63,9 @@ export function subscriptionCheckoutLabel(status: SubscriptionStatus, trialUsed?
   if (status === 'canceled' || status === 'expired') {
     return trialUsed ? 'Souscrire à nouveau (19 €/mois)' : 'Souscrire à nouveau'
   }
-  if (status === 'incomplete' || status === 'checkout_pending') return 'Reprendre le paiement'
+  if (status === 'incomplete' || status === 'checkout_pending') {
+    return 'Finaliser la souscription sécurisée'
+  }
   if (status === 'incomplete_expired') return 'Relancer la souscription'
   if (trialUsed) return 'Souscrire à ComptaPilot IA — 19 €/mois'
   return 'Commencer mon essai gratuit de 14 jours'

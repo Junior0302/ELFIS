@@ -91,10 +91,10 @@ export default function OrganisationPage() {
     try {
       const { url } = await api.createSubscriptionPortal(token, orgId)
       const target = new URL(url, window.location.origin)
-      if (!['http:', 'https:'].includes(target.protocol)) throw new Error('URL Stripe invalide')
+      if (!['http:', 'https:'].includes(target.protocol)) throw new Error('Lien de facturation invalide')
       window.location.assign(target.toString())
     } catch (reason) {
-      setSubscriptionError(reason instanceof Error ? reason.message : 'Portail Stripe indisponible')
+      setSubscriptionError(reason instanceof Error ? reason.message : 'Espace facturation indisponible')
       setOpeningPortal(false)
     }
   }
@@ -210,7 +210,7 @@ export default function OrganisationPage() {
               disabled={openingPortal}
               onClick={() => void openPortal()}
             >
-              {openingPortal ? 'Ouverture…' : 'Ouvrir le portail Stripe'}
+              {openingPortal ? 'Ouverture…' : 'Gérer la carte et les factures'}
             </button>
           )}
           {canManageSubscription && !canOpenPortal && (

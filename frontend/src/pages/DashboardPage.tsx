@@ -9,6 +9,17 @@ import {
   type SubscriptionInfo,
 } from '../api'
 import { useAuth } from '../auth'
+import {
+  NavIconAccount,
+  NavIconActivities,
+  NavIconBilling,
+  NavIconCatalog,
+  NavIconClients,
+  NavIconCopilote,
+  NavIconDeposit,
+  NavIconOrg,
+  NavIconTeam,
+} from '../components/NavIcons'
 import StatusBadge from '../components/StatusBadge'
 import {
   canStartSubscriptionCheckout,
@@ -151,8 +162,7 @@ export default function DashboardPage() {
   }, [stats, blocked])
 
   if (blocked && !isElfAdmin) {
-    const needsCheckout =
-      !subscription || canStartSubscriptionCheckout(subscription.status)
+    const needsCheckout = !subscription || canStartSubscriptionCheckout(subscription.status)
     return (
       <>
         <div className="page-head">
@@ -169,8 +179,8 @@ export default function DashboardPage() {
               : 'Essai de 14 jours à démarrer'}
           </h3>
           <p className="muted">
-            Le tableau de bord, l’OCR, la facturation et le copilote s’ouvrent après activation de
-            l’abonnement. Carte demandée au départ, 19 €/mois après l’essai.
+            Le tableau de bord, le dépôt de documents, la facturation et le copilote s’ouvrent après
+            activation. Carte demandée au départ, 19 €/mois après l’essai.
           </p>
           {canManageSubscription ? (
             <div className="dashboard-gate-actions">
@@ -203,7 +213,10 @@ export default function DashboardPage() {
                         e instanceof Error ? e.message : 'Impossible de charger le dashboard'
                       setError(message)
                       setBlocked(isSubscriptionBlock(message))
-                      void api.currentSubscription(token, orgId).then(setSubscription).catch(() => null)
+                      void api
+                        .currentSubscription(token, orgId)
+                        .then(setSubscription)
+                        .catch(() => null)
                     }
                   })()
                 }}
@@ -224,23 +237,27 @@ export default function DashboardPage() {
 
   const empty = (pilot?.health === 'setup' || !pilot) && stats.invoice_count === 0
   const trialRemaining =
-    subscription?.status === 'trialing'
-      ? remainingTime(subscription.trial_end, now)
-      : null
+    subscription?.status === 'trialing' ? remainingTime(subscription.trial_end, now) : null
 
   const recentSales = (billing?.documents ?? []).slice(0, 4)
   const recentDocs = stats.recent.slice(0, 4)
+  const health = pilot?.health || 'setup'
 
   return (
     <div className="dashboard-page" ref={welcomeRef}>
       <section className="dash-welcome panel">
-        <span className="dash-welcome-eyebrow home-eyebrow">Copilote ComptaPilot</span>
-        <h2 className="dash-welcome-title">
-          {greetingHour()} {firstName}
-        </h2>
+        <div className="dash-welcome-head">
+          <div>
+            <span className="dash-welcome-eyebrow home-eyebrow">Copilote ComptaPilot</span>
+            <h2 className="dash-welcome-title">
+              {greetingHour()} {firstName}
+            </h2>
+          </div>
+          <span className={`dash-health-pill ${health}`}>{healthLabel[health]}</span>
+        </div>
         <p className="dash-welcome-lead muted">
-          Je suis votre copilote financier. Voici l’état de votre activité et les prochaines
-          actions utiles.
+          Voici l’état de {activeMembership?.organization_name || 'votre entreprise'} : chiffre
+          d’affaires, impayés, documents et prochaines actions utiles.
         </p>
 
         <div className="stats dash-recap">
@@ -257,8 +274,8 @@ export default function DashboardPage() {
             <strong>{stats.invoice_count}</strong>
           </div>
           <div className="stat">
-            <span>Santé</span>
-            <strong>{pilot ? healthLabel[pilot.health] : '—'}</strong>
+            <span>À relire</span>
+            <strong>{stats.to_review}</strong>
           </div>
         </div>
       </section>
@@ -283,8 +300,8 @@ export default function DashboardPage() {
         <section className="panel onboarding-panel dash-reveal">
           <h3>Votre parcours de démarrage</h3>
           <p className="muted">
-            Activez l’accès, renseignez l’entreprise, puis nourrissez le copilote avec vos
-            documents et clients.
+            Activez l’accès, renseignez l’entreprise, puis nourrissez le copilote avec vos documents
+            et clients.
           </p>
           <ol className="onboarding-steps">
             <li>
@@ -326,26 +343,44 @@ export default function DashboardPage() {
         </div>
         <div className="dash-cta-grid">
           <Link className="dash-cta" to="/deposit">
+            <span className="dash-cta-icon">
+              <NavIconDeposit />
+            </span>
             <strong>Déposer un document</strong>
-            <span>OCR facture fournisseur</span>
+            <span>Scan automatique d’une facture</span>
           </Link>
           <Link className="dash-cta" to="/facturation">
+            <span className="dash-cta-icon">
+              <NavIconBilling />
+            </span>
             <strong>Créer une facture</strong>
             <span>Devis ou facture client</span>
           </Link>
           <Link className="dash-cta" to="/clients">
+            <span className="dash-cta-icon">
+              <NavIconClients />
+            </span>
             <strong>Ajouter un client</strong>
             <span>Fiche contact & TVA</span>
           </Link>
           <Link className="dash-cta" to="/catalogue">
+            <span className="dash-cta-icon">
+              <NavIconCatalog />
+            </span>
             <strong>Ajouter un produit</strong>
             <span>Catalogue prix HT</span>
           </Link>
           <Link className="dash-cta" to="/copilote">
+            <span className="dash-cta-icon">
+              <NavIconCopilote />
+            </span>
             <strong>Parler au copilote</strong>
             <span>Questions sur vos chiffres</span>
           </Link>
           <button type="button" className="dash-cta dash-cta-voice" disabled>
+            <span className="dash-cta-icon">
+              <NavIconAccount />
+            </span>
             <strong>Assistant vocal</strong>
             <span>Bientôt disponible</span>
           </button>
@@ -366,9 +401,7 @@ export default function DashboardPage() {
                 <Link key={`doc-${inv.id}`} to={`/result/${inv.id}`} className="list-item">
                   <div>
                     <strong>{inv.supplier || inv.filename}</strong>
-                    <span>
-                      Document · {inv.invoice_date || '—'}
-                    </span>
+                    <span>Document · {inv.invoice_date || '—'}</span>
                   </div>
                   <div>{formatEuro(inv.amount_ht)}</div>
                   <div>
@@ -400,14 +433,23 @@ export default function DashboardPage() {
           <h3>Raccourcis</h3>
           <div className="dashboard-shortcut-list">
             <Link to="/activites">
+              <span className="dash-cta-icon">
+                <NavIconActivities />
+              </span>
               <strong>Activités</strong>
               <span>Agenda commercial</span>
             </Link>
             <Link to="/organisation">
+              <span className="dash-cta-icon">
+                <NavIconOrg />
+              </span>
               <strong>Organisation</strong>
               <span>Siège & coordonnées</span>
             </Link>
             <Link to="/admin/equipe">
+              <span className="dash-cta-icon">
+                <NavIconTeam />
+              </span>
               <strong>Équipe</strong>
               <span>Comptes et droits</span>
             </Link>

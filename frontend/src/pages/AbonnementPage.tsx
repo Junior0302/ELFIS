@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, formatEuro, type SubscriptionInfo } from '../api'
 import { useAuth } from '../auth'
+import { useSubscription } from '../subscriptionContext'
 import {
   canOpenSubscriptionPortal,
   canStartSubscriptionCheckout,
@@ -23,10 +24,10 @@ const FEATURES = [
   'Tableaux de bord, historique et exports',
 ]
 
-function openStripe(url: string) {
+function openBillingUrl(url: string) {
   const target = new URL(url, window.location.origin)
   if (!['http:', 'https:'].includes(target.protocol)) {
-    throw new Error('URL Stripe invalide')
+    throw new Error('Lien de paiement invalide')
   }
   window.location.assign(target.toString())
 }
@@ -81,21 +82,21 @@ function CountdownBoard({
 function statusDescription(sub: SubscriptionInfo): string {
   switch (sub.status) {
     case 'none':
-      return 'Votre compte est actif, mais aucun abonnement ComptaPilot IA n’est associé à ce compte.'
+      return 'Votre compte est actif, mais aucun abonnement ComptaPilot IA n’est associé à cette organisation.'
     case 'checkout_pending':
     case 'incomplete':
-      return 'Votre souscription n’est pas encore finalisée. Aucun prélèvement actif n’a été confirmé.'
+      return 'La souscription n’est pas encore confirmée. Finalisez le paiement sécurisé pour ouvrir l’accès.'
     case 'trialing':
-      return `Votre essai gratuit est actif jusqu’au ${formatDateTime(sub.trial_end)}. À la fin, renouvellement automatique à 19 €/mois sauf annulation.`
+      return `Essai actif jusqu’au ${formatDateTime(sub.trial_end)}. Ensuite : 19 €/mois en renouvellement automatique, sauf annulation avant cette date.`
     case 'cancel_scheduled':
-      return `Votre abonnement a été résilié. Vous conservez l’accès jusqu’au ${formatDateTime(sub.access_ends_at || sub.current_period_end)}.`
+      return `Résiliation enregistrée. Accès conservé jusqu’au ${formatDateTime(sub.access_ends_at || sub.current_period_end)}.`
     case 'past_due':
-      return `Nous n’avons pas pu renouveler votre abonnement. Mettez à jour votre moyen de paiement avant le ${formatDate(sub.grace_until)}.`
+      return `Le renouvellement a échoué. Mettez à jour votre moyen de paiement avant le ${formatDate(sub.grace_until)}.`
     case 'admin_revoked':
       return `Accès suspendu par l’administration. Motif : ${sub.admin_revoked_reason_public || 'non précisé'}.`
     case 'canceled':
     case 'expired':
-      return `Votre abonnement n’est plus actif. Vos données sont conservées ; les fonctionnalités premium sont désactivées.`
+      return 'Votre abonnement n’est plus actif. Vos données sont conservées ; les fonctions premium sont désactivées.'
     default:
       return sub.label || subscriptionLabels[sub.status]
   }
@@ -103,62 +104,20 @@ function statusDescription(sub: SubscriptionInfo): string {
 
 export default function AbonnementPage() {
   const { token, orgId, memberships, user } = useAuth()
-  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
-  const [loading, setLoading] = useState(true)
+  const {
+    subscription,
+    loading,
+    refresh,
+    setSubscription,
+    setCheckoutReturnPending,
+    checkoutReturnPending,
+  } = useSubscription()
   const [action, setAction] = useState<'checkout' | 'portal' | 'sync' | null>(null)
   const [error, setError] = useState('')
   const [returnNotice, setReturnNotice] = useState('')
   const [now, setNow] = useState(Date.now())
   const [renewalOk, setRenewalOk] = useState(false)
   const [termsOk, setTermsOk] = useState(false)
-
-  const loadSubscription = useCallback(
-    async (checkoutReturn?: 'success' | 'cancel', sessionId?: string | null) => {
-      if (!token || !orgId) return
-      setLoading(true)
-      setError('')
-      try {
-        let current = await api.currentSubscription(token, orgId)
-        if (checkoutReturn === 'success') {
-          let syncError = ''
-          try {
-            current = await api.syncSubscription(token, orgId, sessionId)
-          } catch (reason) {
-            syncError = reason instanceof Error ? reason.message : 'Synchronisation Stripe impossible'
-          }
-          if (!hasProductAccess(current)) {
-            await new Promise((resolve) => window.setTimeout(resolve, 1800))
-            try {
-              current = await api.syncSubscription(token, orgId, sessionId)
-              syncError = ''
-            } catch (reason) {
-              syncError =
-                reason instanceof Error ? reason.message : 'Synchronisation Stripe impossible'
-              current = await api.currentSubscription(token, orgId)
-            }
-          }
-          if (hasProductAccess(current)) {
-            setReturnNotice('Essai activé. Votre accès ComptaPilot IA est ouvert.')
-          } else {
-            setReturnNotice(
-              syncError
-                ? `Retour Stripe reçu, mais la sync a échoué : ${syncError}`
-                : 'Retour de Stripe confirmé. Cliquez sur « Actualiser » pour forcer la synchro.',
-            )
-            if (syncError) setError(syncError)
-          }
-        } else if (checkoutReturn === 'cancel') {
-          setReturnNotice('Paiement interrompu.')
-        }
-        setSubscription(current)
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Abonnement indisponible')
-      } finally {
-        setLoading(false)
-      }
-    },
-    [token, orgId],
-  )
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -169,10 +128,38 @@ export default function AbonnementPage() {
     } else if (params.has('canceled') || params.get('checkout') === 'cancel') {
       checkoutReturn = 'cancel'
     }
-    if (checkoutReturn) setReturnNotice('Vérification du statut…')
     if (params.size > 0) window.history.replaceState({}, '', window.location.pathname)
-    void loadSubscription(checkoutReturn, sessionId)
-  }, [loadSubscription])
+
+    void (async () => {
+      if (checkoutReturn === 'success') {
+        setCheckoutReturnPending(true)
+        setReturnNotice('Vérification du paiement…')
+        setError('')
+        let current = await refresh({ syncSessionId: sessionId })
+        if (!hasProductAccess(current)) {
+          await new Promise((resolve) => window.setTimeout(resolve, 1800))
+          current = await refresh({ syncSessionId: sessionId })
+        }
+        if (hasProductAccess(current)) {
+          setReturnNotice('Essai activé. Votre accès ComptaPilot IA est ouvert.')
+          setCheckoutReturnPending(false)
+        } else {
+          setReturnNotice(
+            'Le paiement a bien été reçu. L’activation peut prendre quelques instants — cliquez sur Actualiser.',
+          )
+          setCheckoutReturnPending(false)
+        }
+        return
+      }
+      if (checkoutReturn === 'cancel') {
+        setReturnNotice('Paiement interrompu. Vous pouvez reprendre quand vous voulez.')
+        setCheckoutReturnPending(false)
+        await refresh()
+        return
+      }
+      await refresh()
+    })()
+  }, [refresh, setCheckoutReturnPending])
 
   useEffect(() => {
     const tickMs =
@@ -199,21 +186,20 @@ export default function AbonnementPage() {
               terms_accepted: termsOk,
             })
           : await api.createSubscriptionPortal(token, orgId)
-      openStripe(result.url)
+      openBillingUrl(result.url)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Redirection Stripe impossible')
+      setError(reason instanceof Error ? reason.message : 'Redirection paiement impossible')
       setAction(null)
     }
   }
 
   const statusForActions = (subscription?.status || 'none') as SubscriptionInfo['status']
   const canUsePortal =
-    subscription &&
-    !subscription.platform_bypass &&
-    canOpenSubscriptionPortal(statusForActions)
+    subscription && !subscription.platform_bypass && canOpenSubscriptionPortal(statusForActions)
   const canCheckout =
     subscription &&
     !hasProductAccess(subscription) &&
+    !checkoutReturnPending &&
     canStartSubscriptionCheckout(statusForActions)
   const activeMembership = memberships.find((membership) => membership.organization_id === orgId)
   const canManage = Boolean(
@@ -237,12 +223,12 @@ export default function AbonnementPage() {
       {returnNotice && <div className="subscription-return">{returnNotice}</div>}
       {isElfAdmin && (
         <div className="subscription-return">
-          Compte ELF Admin : accès complet, sans abonnement Stripe requis.
+          Compte ELF Admin : accès complet, sans abonnement requis.
         </div>
       )}
       {error && <div className="auth-alert auth-alert-error">{error}</div>}
 
-      {loading ? (
+      {loading && !subscription ? (
         <div className="loading">Vérification du statut…</div>
       ) : isActiveAccess && subscription ? (
         <section className="panel subscription-active-panel">
@@ -258,18 +244,7 @@ export default function AbonnementPage() {
           <p className="muted">{statusDescription(subscription)}</p>
 
           {isTrialing ? (
-            <>
-              <CountdownBoard deadline={deadline} now={now} label="Essai gratuit — temps restant" />
-              <div className="dashboard-sub-strip warn" style={{ marginTop: '1rem' }}>
-                <div>
-                  <strong>Essai gratuit — {remainingTime(deadline, now) || '…'}</strong>
-                  <span>
-                    Premier prélèvement prévu le {formatDate(subscription.trial_end)} : 19 € ·
-                    Renouvellement mensuel automatique
-                  </span>
-                </div>
-              </div>
-            </>
+            <CountdownBoard deadline={deadline} now={now} label="Temps restant sur l’essai" />
           ) : (
             <div className="subscription-active-meta">
               <p>
@@ -306,11 +281,13 @@ export default function AbonnementPage() {
                   setAction('sync')
                   void (async () => {
                     try {
-                      setSubscription(await api.syncSubscription(token!, orgId))
+                      const current = await refresh()
+                      if (current) setSubscription(current)
                       setReturnNotice('Statut à jour.')
+                      setCheckoutReturnPending(false)
                     } catch (reason) {
                       setError(
-                        reason instanceof Error ? reason.message : 'Synchronisation impossible',
+                        reason instanceof Error ? reason.message : 'Actualisation impossible',
                       )
                     } finally {
                       setAction(null)
@@ -366,23 +343,25 @@ export default function AbonnementPage() {
                 <button
                   className="btn subscription-main-action"
                   type="button"
-                  disabled={Boolean(action) || subscription?.configured === false || !renewalOk || !termsOk}
+                  disabled={
+                    Boolean(action) || subscription?.configured === false || !renewalOk || !termsOk
+                  }
                   onClick={() => void startAction('checkout')}
                 >
                   {action === 'checkout'
-                    ? 'Ouverture de Stripe…'
+                    ? 'Ouverture du paiement sécurisé…'
                     : subscription?.configured === false
                       ? 'Paiement bientôt disponible'
-                      : subscriptionCheckoutLabel(
-                          subscription!.status,
-                          subscription?.trial_used,
-                        )}
+                      : subscriptionCheckoutLabel(subscription!.status, subscription?.trial_used)}
                 </button>
                 <p className="muted" style={{ marginTop: '0.75rem', fontSize: '0.88rem' }}>
                   Aucun prélèvement aujourd’hui. Premier prélèvement prévu dans 14 jours : 19 €,
                   puis 19 € par mois jusqu’à résiliation.
                 </p>
               </div>
+            )}
+            {checkoutReturnPending && (
+              <p className="muted">Activation en cours — merci de patienter quelques secondes.</p>
             )}
             {!canManage && (
               <p className="muted">
@@ -397,11 +376,15 @@ export default function AbonnementPage() {
               <>
                 <div className="subscription-status-line">
                   <span className={`subscription-badge ${subscriptionTone(subscription.status)}`}>
-                    {subscription.label || subscriptionLabels[subscription.status]}
+                    {checkoutReturnPending
+                      ? 'Activation en cours'
+                      : subscription.label || subscriptionLabels[subscription.status]}
                   </span>
                 </div>
                 <p className="muted" style={{ marginTop: '1rem' }}>
-                  {statusDescription(subscription)}
+                  {checkoutReturnPending
+                    ? 'Nous confirmons votre paiement. Le statut passera à « Essai gratuit » dès validation.'
+                    : statusDescription(subscription)}
                 </p>
                 {canManage && (
                   <button
@@ -413,10 +396,11 @@ export default function AbonnementPage() {
                       setAction('sync')
                       void (async () => {
                         try {
-                          setSubscription(await api.syncSubscription(token!, orgId))
+                          await refresh()
+                          setCheckoutReturnPending(false)
                         } catch (reason) {
                           setError(
-                            reason instanceof Error ? reason.message : 'Synchronisation impossible',
+                            reason instanceof Error ? reason.message : 'Actualisation impossible',
                           )
                         } finally {
                           setAction(null)
@@ -424,7 +408,7 @@ export default function AbonnementPage() {
                       })()
                     }}
                   >
-                    {action === 'sync' ? 'Actualisation…' : 'Actualiser depuis Stripe'}
+                    {action === 'sync' ? 'Actualisation…' : 'Actualiser le statut'}
                   </button>
                 )}
               </>

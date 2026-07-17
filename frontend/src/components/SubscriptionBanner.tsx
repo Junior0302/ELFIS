@@ -1,25 +1,35 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, type SubscriptionInfo } from '../api'
+import type { SubscriptionInfo } from '../api'
 import { useAuth } from '../auth'
+import { useSubscription } from '../subscriptionContext'
 import { formatDate, hasProductAccess, remainingTime, subscriptionDeadline } from '../subscription'
 
-function bannerMessage(subscription: SubscriptionInfo, now: number) {
-  const deadline = subscriptionDeadline(subscription)
+function bannerMessage(
+  subscription: SubscriptionInfo,
+  now: number,
+  checkoutReturnPending: boolean,
+): string | null {
+  if (checkoutReturnPending && !hasProductAccess(subscription)) {
+    return 'Activation en cours… Votre accès sera confirmé dans un instant.'
+  }
+
   switch (subscription.status) {
-    case 'trialing':
+    case 'trialing': {
+      const deadline = subscriptionDeadline(subscription)
       return `Essai gratuit — ${remainingTime(deadline, now) || '…'} · Premier prélèvement le ${formatDate(subscription.trial_end)} : 19 €`
+    }
     case 'cancel_scheduled':
       return `Résiliation programmée — accès jusqu’au ${formatDate(subscription.access_ends_at || subscription.current_period_end)}`
     case 'past_due':
       return `Paiement en échec — régularisez avant le ${formatDate(subscription.grace_until)}`
     case 'checkout_pending':
     case 'incomplete':
-      return 'Souscription non finalisée. Reprenez le paiement sécurisé.'
+      return 'Paiement non finalisé. Reprenez la souscription sécurisée pour activer l’accès.'
     case 'unpaid':
       return 'Votre abonnement présente un impayé. Une action est requise.'
     case 'paused':
-      return 'Votre abonnement est suspendu. Consultez le portail Stripe pour le reprendre.'
+      return 'Votre abonnement est suspendu. Ouvrez l’espace facturation pour le reprendre.'
     case 'admin_revoked':
       return `Accès suspendu : ${subscription.admin_revoked_reason_public || 'contactez le support'}`
     case 'canceled':
@@ -28,31 +38,18 @@ function bannerMessage(subscription: SubscriptionInfo, now: number) {
       return 'Votre abonnement a expiré. Une nouvelle souscription est nécessaire.'
     case 'none':
       return 'Aucun abonnement associé à ce compte. Démarrez l’essai gratuit.'
+    case 'active':
+      return null
     default:
+      if (hasProductAccess(subscription)) return null
       return 'Votre abonnement n’est pas actif. Une action est requise.'
   }
 }
 
 export default function SubscriptionBanner() {
-  const { token, orgId, memberships } = useAuth()
-  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
+  const { orgId, memberships } = useAuth()
+  const { subscription, checkoutReturnPending } = useSubscription()
   const [now, setNow] = useState(Date.now())
-
-  useEffect(() => {
-    if (!token || !orgId) return
-    let cancelled = false
-    void api
-      .currentSubscription(token, orgId)
-      .then((sub) => {
-        if (!cancelled) setSubscription(sub)
-      })
-      .catch(() => {
-        if (!cancelled) setSubscription(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [token, orgId])
 
   useEffect(() => {
     const tickMs =
@@ -64,26 +61,12 @@ export default function SubscriptionBanner() {
   }, [subscription?.status])
 
   if (!subscription || subscription.platform_bypass) return null
-  if (subscription.status === 'active' && !subscription.cancel_at_period_end) return null
-  if (subscription.status === 'trialing' || subscription.status === 'cancel_scheduled') {
-    const canManage = Boolean(
-      memberships.find((m) => m.organization_id === orgId)?.permissions.includes('*') ||
-        memberships
-          .find((m) => m.organization_id === orgId)
-          ?.permissions.includes('subscription.manage'),
-    )
-    return (
-      <div
-        className={`global-subscription-banner ${subscription.status === 'trialing' ? 'trialing' : 'warn'}`}
-        role="status"
-      >
-        <span>{bannerMessage(subscription, now)}</span>
-        {canManage ? <Link to="/abonnement">Détails</Link> : null}
-      </div>
-    )
-  }
-  if (hasProductAccess(subscription)) return null
 
+  const message = bannerMessage(subscription, now, checkoutReturnPending)
+  if (!message) return null
+
+  const isTrialingUi =
+    subscription.status === 'trialing' || subscription.status === 'cancel_scheduled'
   const canManage = Boolean(
     memberships.find((m) => m.organization_id === orgId)?.permissions.includes('*') ||
       memberships
@@ -91,10 +74,19 @@ export default function SubscriptionBanner() {
         ?.permissions.includes('subscription.manage'),
   )
 
+  const toneClass =
+    subscription.status === 'trialing'
+      ? 'trialing'
+      : checkoutReturnPending
+        ? 'none'
+        : subscription.status
+
   return (
-    <div className={`global-subscription-banner ${subscription.status}`} role="status">
-      <span>{bannerMessage(subscription, now)}</span>
-      {canManage ? <Link to="/abonnement">Voir l’abonnement</Link> : null}
+    <div className={`global-subscription-banner ${toneClass}`} role="status">
+      <span>{message}</span>
+      {canManage ? (
+        <Link to="/abonnement">{isTrialingUi ? 'Détails' : 'Voir l’abonnement'}</Link>
+      ) : null}
     </div>
   )
 }

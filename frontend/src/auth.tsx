@@ -116,9 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       firebaseReady,
       login: async (email, password) => {
         if (!firebaseReady) {
-          throw new Error(
-            'Firebase non configuré. Ajoutez les clés VITE_FIREBASE_* dans frontend/.env',
-          )
+          throw new Error('Connexion indisponible pour le moment. Réessayez plus tard.')
         }
         try {
           const fbUser = await firebaseLogin(email, password)
@@ -134,9 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       register: async (payload) => {
         if (!firebaseReady) {
-          throw new Error(
-            'Firebase non configuré. Ajoutez les clés VITE_FIREBASE_* dans frontend/.env',
-          )
+          throw new Error('Inscription indisponible pour le moment. Réessayez plus tard.')
         }
         try {
           const display = `${payload.first_name} ${payload.last_name}`.trim()

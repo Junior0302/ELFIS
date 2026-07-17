@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
 from app.database import SessionLocal, init_db
+from app.middleware.security import SecurityHeadersMiddleware
 from app.routers import (
     ai,
     auth,
@@ -79,14 +80,15 @@ else:
     cors_kwargs["allow_credentials"] = True
 
 app.add_middleware(CORSMiddleware, **cors_kwargs)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 def _cors_headers_for(request: Request) -> dict[str, str]:
     origin = request.headers.get("origin") or ""
-    allowed = cors_kwargs.get("allow_origins") or []
+    allowed = list(cors_kwargs.get("allow_origins") or [])
     headers: dict[str, str] = {
-        "Access-Control-Allow-Methods": "*",
-        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Organization-Id, X-Requested-With",
     }
     if allowed == ["*"]:
         headers["Access-Control-Allow-Origin"] = "*"
@@ -96,11 +98,7 @@ def _cors_headers_for(request: Request) -> dict[str, str]:
         headers["Access-Control-Allow-Credentials"] = "true"
         headers["Vary"] = "Origin"
         return headers
-    # Fallback prod front
-    if origin:
-        headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
-        headers["Vary"] = "Origin"
+    # Ne jamais refléter une origine inconnue (anti CSRF / data exfil).
     return headers
 
 
@@ -115,9 +113,14 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    detail: object
+    if settings.app_env.lower() == "production":
+        detail = {"code": "validation_error", "message": "Requête invalide"}
+    else:
+        detail = exc.errors()
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()},
+        content={"detail": detail},
         headers=_cors_headers_for(request),
     )
 
@@ -153,35 +156,17 @@ app.include_router(modules.router, prefix="/api")
 
 @app.get("/api/health")
 def health():
-    ai_mode = "openai" if settings.openai_api_key else "guided"
     firebase_ok = bool(settings.firebase_web_api_key and settings.firebase_project_id)
     stripe_ok = bool(settings.stripe_secret_key and settings.stripe_price_pro)
     return {
         "status": "ok",
         "app": settings.app_name,
         "product": settings.product_name,
-        "ai_mode": ai_mode,
         "details": {
             "slogan": "Déposez une facture. L'IA prépare votre comptabilité.",
             "version": "0.8.0",
-            "modules_live": [
-                "comptabilite",
-                "banque",
-                "tresorerie",
-                "facturation",
-                "auth",
-                "assistant",
-                "pilotage",
-                "subscriptions",
-                "elfis_ai",
-            ],
-            "auth": "firebase",
-            "firebase_configured": firebase_ok,
-            "firebase_project_id": settings.firebase_project_id or None,
             "auth_required": settings.auth_required,
-            "stripe_configured": stripe_ok,
-            "stripe_webhook_configured": bool(settings.stripe_webhook_secret),
-            "frontend_url": settings.frontend_url,
-            "stack_note": "ELFIS Core FastAPI + Firebase Auth + Firestore (multi-tenant)",
+            "billing_ready": stripe_ok,
+            "auth_ready": firebase_ok,
         },
     }

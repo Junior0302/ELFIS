@@ -145,7 +145,7 @@ async def firebase_session(
 def login(_: LoginIn):
     raise HTTPException(
         400,
-        detail="Connexion via Firebase uniquement. Utilisez l’application web.",
+        detail="Utilisez l’application web pour vous connecter.",
     )
 
 
@@ -153,7 +153,7 @@ def login(_: LoginIn):
 def register_legacy(_: RegisterIn):
     raise HTTPException(
         400,
-        detail="Inscription via Firebase uniquement. Utilisez /register dans l'application web.",
+        detail="Utilisez l’application web pour créer un compte.",
     )
 
 
@@ -347,7 +347,7 @@ def update_profile(
         if user.firebase_uid:
             raise HTTPException(
                 400,
-                detail="Le mot de passe Firebase doit être modifié depuis la session sécurisée.",
+                detail="Le mot de passe doit être modifié depuis la session sécurisée.",
             )
         if len(payload.password) < 8:
             raise HTTPException(400, detail="Le mot de passe doit contenir au moins 8 caractères")
@@ -431,4 +431,12 @@ def get_avatar(filename: str):
         ".png": "image/png",
         ".webp": "image/webp",
     }.get(path.suffix.lower(), "application/octet-stream")
-    return FileResponse(path, media_type=media_type)
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, max-age=3600",
+            "Content-Disposition": f'inline; filename="{safe_name}"',
+        },
+    )

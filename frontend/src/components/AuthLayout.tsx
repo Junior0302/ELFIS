@@ -5,8 +5,8 @@ import './auth.css'
 
 const bullets = [
   {
-    title: 'Sécurité Firebase',
-    text: 'Connexion email / mot de passe chiffrée.',
+    title: 'Connexion sécurisée',
+    text: 'Email et mot de passe protégés de bout en bout.',
   },
   {
     title: 'Données réelles',
