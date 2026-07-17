@@ -19,11 +19,18 @@ function statusLabel(status: string) {
   const map: Record<string, string> = {
     pending: 'En attente',
     creating: 'Configuration',
-    active: 'Adresse créée',
+    active: 'Active',
     suspended: 'Suspendue',
     rejected: 'Refusée',
   }
   return map[status] || status
+}
+
+function statusPillClass(status: string) {
+  if (status === 'active') return 'platform-pill'
+  if (status === 'pending' || status === 'creating') return 'platform-pill platform-pill-warn'
+  if (status === 'suspended' || status === 'rejected') return 'platform-pill platform-pill-danger'
+  return 'platform-pill'
 }
 
 type Counts = {
@@ -33,6 +40,16 @@ type Counts = {
   active: number
   suspended: number
   rejected: number
+}
+
+type MailStatus = {
+  configured: boolean
+  transport: string
+  has_brevo_api_key: boolean
+  has_platform_from: boolean
+  platform_from: string
+  notify_to: string
+  hint: string
 }
 
 export default function PlatformProfessionalEmailsPage() {
@@ -45,7 +62,7 @@ export default function PlatformProfessionalEmailsPage() {
   const [message, setMessage] = useState('')
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [emailDrafts, setEmailDrafts] = useState<Record<number, string>>({})
-  const [mailDiag, setMailDiag] = useState<string>('')
+  const [mailStatus, setMailStatus] = useState<MailStatus | null>(null)
 
   const load = (statusFilter = filter) => {
     if (!token) return
@@ -65,14 +82,8 @@ export default function PlatformProfessionalEmailsPage() {
       .finally(() => setLoading(false))
     api
       .platformEmailStatus(token)
-      .then((s) => {
-        setMailDiag(
-          s.configured
-            ? `E-mail OK · From ${s.platform_from} → ${s.notify_to} (${s.transport})`
-            : `E-mail KO · ${s.hint} (clé Brevo: ${s.has_brevo_api_key ? 'oui' : 'NON'}, From: ${s.platform_from || 'vide'})`,
-        )
-      })
-      .catch(() => setMailDiag(''))
+      .then(setMailStatus)
+      .catch(() => setMailStatus(null))
   }
 
   useEffect(() => {
@@ -87,10 +98,12 @@ export default function PlatformProfessionalEmailsPage() {
       setError('Indiquez l’adresse créée dans Brevo.')
       return
     }
-    const ok = window.confirm(
-      `Valider ${email} ?\n\nAssurez-vous d’avoir créé la boîte dans Brevo (SMTP/IMAP) avant de valider.`,
+    if (
+      !window.confirm(
+        `Valider ${email} ?\n\nCréez d’abord la boîte dans Brevo (envoi + réception).`,
+      )
     )
-    if (!ok) return
+      return
     setPendingId(row.id)
     setError('')
     setMessage('')
@@ -122,8 +135,7 @@ export default function PlatformProfessionalEmailsPage() {
 
   const suspend = async (row: ProfessionalEmailRecord) => {
     if (!token) return
-    if (!window.confirm(`Suspendre l’adresse ${row.email} ? Elle ne pourra plus servir d’expéditeur.`))
-      return
+    if (!window.confirm(`Suspendre ${row.email} ?`)) return
     setPendingId(row.id)
     try {
       await api.platformSuspendProfessionalEmail(row.id, { notes: 'Suspendue' }, token)
@@ -160,7 +172,7 @@ export default function PlatformProfessionalEmailsPage() {
     if (!token) return
     if (
       !window.confirm(
-        `Réinitialiser la demande de ${row.user?.email || row.id} ?\nLe client pourra refaire une demande.`,
+        `Réinitialiser la demande de ${row.user?.email || row.id} ?\nLe client pourra redemander.`,
       )
     )
       return
@@ -178,18 +190,13 @@ export default function PlatformProfessionalEmailsPage() {
 
   const resetAll = async () => {
     if (!token) return
-    if (
-      !window.confirm(
-        'Réinitialiser TOUTES les demandes e-mail pro ?\nCette action est définitive (tests / reprise à zéro).',
-      )
-    )
-      return
+    if (!window.confirm('Réinitialiser TOUTES les demandes e-mail pro ?')) return
     setPendingId(-1)
     setError('')
     setMessage('')
     try {
       const res = await api.platformResetAllProfessionalEmails(token)
-      setMessage(`${res.deleted_count} demande(s) supprimée(s). Les users peuvent redemander.`)
+      setMessage(`${res.deleted_count} demande(s) supprimée(s).`)
       load()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Réinitialisation globale impossible')
@@ -199,147 +206,197 @@ export default function PlatformProfessionalEmailsPage() {
   }
 
   return (
-    <div>
-      <div className="page-head">
+    <>
+      <div className="platform-title platform-title-row">
         <div>
-          <h2>Demandes Email Professionnel</h2>
-          <p className="muted">
-            Suivi des états : en attente → Brevo → validation → active. Réinitialisez une demande ou
-            toutes pour les tests. Comptes users :{' '}
-            <Link to="/elfadmin/utilisateurs">Utilisateurs</Link> (suspendre / bannir).
-          </p>
-          <p className="muted" style={{ marginTop: '0.35rem' }}>
-            Lien admin :{' '}
-            <a href="https://elfis-core.com/elfadmin/emails-pro">
-              https://elfis-core.com/elfadmin/emails-pro
-            </a>
-            {' · '}
-            <a href="https://app.brevo.com/" target="_blank" rel="noreferrer">
-              Ouvrir Brevo
-            </a>
+          <span>ELF Admin</span>
+          <h1>Emails professionnels</h1>
+          <p>
+            Demandes d’adresses @elfis-core.com · validation Brevo · activation pour devis / factures.
           </p>
         </div>
-        <div className="actions" style={{ margin: 0 }}>
+        <div className="platform-title-actions">
+          <a
+            className="platform-action platform-action-primary"
+            href="https://app.brevo.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ouvrir Brevo
+          </a>
+          <Link className="platform-action" to="/elfadmin/utilisateurs">
+            Utilisateurs
+          </Link>
           <button
             type="button"
-            className="btn secondary"
+            className="platform-action platform-action-danger"
             disabled={pendingId === -1}
             onClick={() => void resetAll()}
           >
-            {pendingId === -1 ? '…' : 'Réinitialiser toutes les demandes'}
+            {pendingId === -1 ? '…' : 'Tout réinitialiser'}
           </button>
         </div>
       </div>
 
-      {counts && (
-        <div className="stats" style={{ marginBottom: '1rem' }}>
-          <div className="stat">
-            <span>Total</span>
-            <strong>{counts.all}</strong>
-          </div>
-          <div className="stat">
-            <span>En attente</span>
-            <strong>{counts.pending}</strong>
-          </div>
-          <div className="stat">
-            <span>Actives</span>
-            <strong>{counts.active}</strong>
-          </div>
-          <div className="stat">
-            <span>Suspendues</span>
-            <strong>{counts.suspended}</strong>
-          </div>
-          <div className="stat">
-            <span>Refusées</span>
-            <strong>{counts.rejected}</strong>
-          </div>
+      {mailStatus && (
+        <div
+          className={`platform-alert ${mailStatus.configured ? 'platform-alert-ok' : ''}`}
+          role="status"
+        >
+          {mailStatus.configured ? (
+            <>
+              <strong>Envoi automatique OK</strong>
+              <span>
+                De <code>{mailStatus.platform_from || '—'}</code> →{' '}
+                <code>{mailStatus.notify_to}</code> ({mailStatus.transport})
+              </span>
+            </>
+          ) : (
+            <>
+              <strong>Envoi automatique KO</strong>
+              <span>{mailStatus.hint}</span>
+              <span>
+                Clé Brevo : {mailStatus.has_brevo_api_key ? 'présente' : 'manquante'} · From :{' '}
+                {mailStatus.platform_from || 'vide'}
+              </span>
+            </>
+          )}
         </div>
       )}
 
-      <div className="sales-filters" style={{ marginBottom: '1rem' }}>
-        <select
-          value={filter}
-          onChange={(e) => {
-            const next = e.target.value
-            setFilter(next)
-            load(next)
-          }}
-        >
-          <option value="">Tous les états</option>
-          <option value="pending">En attente</option>
-          <option value="creating">Configuration</option>
-          <option value="active">Actives</option>
-          <option value="suspended">Suspendues</option>
-          <option value="rejected">Refusées</option>
-        </select>
-        <button className="btn secondary" type="button" onClick={() => load()}>
+      {error && <div className="platform-alert">{error}</div>}
+      {message && <div className="platform-alert platform-alert-ok">{message}</div>}
+
+      {counts && (
+        <div className="platform-stats platform-stats-5">
+          <article>
+            <span>Total</span>
+            <strong>{counts.all}</strong>
+          </article>
+          <article>
+            <span>En attente</span>
+            <strong>{counts.pending}</strong>
+          </article>
+          <article>
+            <span>Actives</span>
+            <strong>{counts.active}</strong>
+          </article>
+          <article>
+            <span>Suspendues</span>
+            <strong>{counts.suspended}</strong>
+          </article>
+          <article>
+            <span>Refusées</span>
+            <strong>{counts.rejected}</strong>
+          </article>
+        </div>
+      )}
+
+      <div className="platform-toolbar">
+        <label className="platform-field">
+          <span>Filtrer</span>
+          <select
+            value={filter}
+            onChange={(e) => {
+              const next = e.target.value
+              setFilter(next)
+              load(next)
+            }}
+          >
+            <option value="">Tous les états</option>
+            <option value="pending">En attente</option>
+            <option value="creating">Configuration</option>
+            <option value="active">Actives</option>
+            <option value="suspended">Suspendues</option>
+            <option value="rejected">Refusées</option>
+          </select>
+        </label>
+        <button type="button" className="platform-action" onClick={() => load()}>
           Actualiser
         </button>
       </div>
 
-      {mailDiag && (
-        <p className={mailDiag.startsWith('E-mail OK') ? 'muted' : 'form-error'} role="status">
-          {mailDiag}
-        </p>
-      )}
-      {error && <p className="form-error">{error}</p>}
-      {message && <p className="muted">{message}</p>}
       {loading ? (
-        <p className="muted">Chargement…</p>
+        <div className="platform-loading">Chargement des demandes…</div>
       ) : items.length === 0 ? (
-        <p className="muted">Aucune demande pour le moment.</p>
+        <div className="platform-loading platform-empty">Aucune demande pour le moment.</div>
       ) : (
-        <div className="list">
+        <div className="platform-request-list">
           {items.map((row) => {
             const snap = row.request_snapshot || {}
             const name =
               `${row.user?.first_name || snap.first_name || ''} ${row.user?.last_name || snap.last_name || ''}`.trim() ||
               row.user?.email ||
               '—'
-            const userStatus = row.user?.status || ''
+            const busy = pendingId === row.id
+            const proposed = row.suggested_email || emailDrafts[row.id] || ''
             return (
-              <div
-                key={row.id}
-                className="list-item"
-                style={{ gridTemplateColumns: '1fr auto', alignItems: 'start' }}
-              >
-                <div>
-                  <strong>{name}</strong>
-                  <span>
-                    Compte user : {userStatus || '—'} · Demande : {statusLabel(row.status)} ·{' '}
-                    {(snap.subscription as string) || '—'} · {formatWhen(row.created_at)}
-                    {row.suggested_email ? ` · Proposé : ${row.suggested_email}` : ''}
-                    {row.email ? ` · Adresse : ${row.email}` : ''}
-                    {row.user?.email ? ` · ${row.user.email}` : ''}
-                  </span>
-                  {(row.status === 'pending' || row.status === 'creating') && (
-                    <div className="field" style={{ marginTop: '0.65rem', maxWidth: 360 }}>
-                      <label>Adresse créée dans Brevo</label>
-                      <input
-                        value={emailDrafts[row.id] || ''}
-                        onChange={(e) =>
-                          setEmailDrafts((current) => ({ ...current, [row.id]: e.target.value }))
-                        }
-                        placeholder="prenom.nom@elfis-core.com"
-                      />
+              <article key={row.id} className="platform-request-card">
+                <header className="platform-request-head">
+                  <div>
+                    <h2>{name}</h2>
+                    <p>{row.user?.email || (snap.current_email as string) || '—'}</p>
+                  </div>
+                  <span className={statusPillClass(row.status)}>{statusLabel(row.status)}</span>
+                </header>
+
+                <dl className="platform-request-meta">
+                  <div>
+                    <dt>Compte</dt>
+                    <dd>{row.user?.status || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Abonnement</dt>
+                    <dd>{(snap.subscription as string) || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Demandé le</dt>
+                    <dd>{formatWhen(row.created_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>Adresse proposée</dt>
+                    <dd>
+                      <code>{proposed || '—'}</code>
+                    </dd>
+                  </div>
+                  {row.email ? (
+                    <div>
+                      <dt>Adresse active</dt>
+                      <dd>
+                        <code>{row.email}</code>
+                      </dd>
                     </div>
-                  )}
-                </div>
-                <div className="actions" style={{ margin: 0, flexWrap: 'wrap' }}>
+                  ) : null}
+                </dl>
+
+                {(row.status === 'pending' || row.status === 'creating') && (
+                  <label className="platform-field platform-field-grow">
+                    <span>Adresse créée dans Brevo</span>
+                    <input
+                      value={emailDrafts[row.id] || ''}
+                      onChange={(e) =>
+                        setEmailDrafts((current) => ({ ...current, [row.id]: e.target.value }))
+                      }
+                      placeholder="prenom.nom@elfis-core.com"
+                    />
+                  </label>
+                )}
+
+                <footer className="platform-request-actions">
                   {(row.status === 'pending' || row.status === 'creating') && (
                     <>
                       <button
                         type="button"
-                        className="btn"
-                        disabled={pendingId === row.id}
+                        className="platform-action platform-action-primary"
+                        disabled={busy}
                         onClick={() => void activate(row)}
                       >
-                        {pendingId === row.id ? '…' : 'Valider'}
+                        {busy ? '…' : 'Valider'}
                       </button>
                       <button
                         type="button"
-                        className="btn secondary"
-                        disabled={pendingId === row.id}
+                        className="platform-action"
+                        disabled={busy}
                         onClick={() => void reject(row)}
                       >
                         Refuser
@@ -347,41 +404,37 @@ export default function PlatformProfessionalEmailsPage() {
                     </>
                   )}
                   {row.status === 'active' && (
-                    <>
-                      <span className="badge">✓ Active</span>
-                      <button
-                        type="button"
-                        className="btn secondary"
-                        disabled={pendingId === row.id}
-                        onClick={() => void suspend(row)}
-                      >
-                        Suspendre adresse
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      className="platform-action"
+                      disabled={busy}
+                      onClick={() => void suspend(row)}
+                    >
+                      Suspendre
+                    </button>
                   )}
-                  {row.status === 'suspended' && <span className="badge warn">Suspendue</span>}
                   <button
                     type="button"
-                    className="btn secondary"
-                    disabled={pendingId === row.id}
+                    className="platform-action"
+                    disabled={busy}
                     onClick={() => void resend(row)}
                   >
                     Renvoyer mails
                   </button>
                   <button
                     type="button"
-                    className="btn secondary"
-                    disabled={pendingId === row.id}
+                    className="platform-action platform-action-danger"
+                    disabled={busy}
                     onClick={() => void resetOne(row)}
                   >
                     Réinit. demande
                   </button>
-                </div>
-              </div>
+                </footer>
+              </article>
             )
           })}
         </div>
       )}
-    </div>
+    </>
   )
 }
