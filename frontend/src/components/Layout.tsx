@@ -6,7 +6,6 @@ import { SubscriptionProvider } from '../subscriptionContext'
 import { navIcons } from './NavIcons'
 import PageGuide from './PageGuide'
 import SubscriptionBanner from './SubscriptionBanner'
-import { resolveTheme, toggleTheme, type ThemeMode } from '../theme'
 
 const SIDEBAR_KEY = 'cp_sidebar_collapsed'
 
@@ -26,7 +25,6 @@ function safeAvatarUrl(url?: string | null) {
 function LayoutInner() {
   const { user, memberships, orgId, setOrgId, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [theme, setTheme] = useState<ThemeMode>(() => resolveTheme())
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === '1'
@@ -66,14 +64,6 @@ function LayoutInner() {
           <span>ComptaPilot IA</span>
         </Link>
         <div className="mobile-topbar-actions">
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={() => setTheme(toggleTheme())}
-            aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
-          >
-            {theme === 'dark' ? 'Clair' : 'Sombre'}
-          </button>
           {user && (
             <Link to="/compte" className="shell-avatar" title="Mon compte" aria-label="Mon compte">
               {avatar ? <img src={avatar} alt="" /> : <span>{initials}</span>}
@@ -198,15 +188,6 @@ function LayoutInner() {
             <strong>{activeMembership?.organization_name || 'ComptaPilot IA'}</strong>
           </div>
           <div className="desktop-topbar-right">
-            <button
-              type="button"
-              className="theme-toggle"
-              onClick={() => setTheme(toggleTheme())}
-              aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
-              title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-            >
-              {theme === 'dark' ? 'Clair' : 'Sombre'}
-            </button>
             {memberships.length > 1 && (
               <select
                 className="org-select topbar-org"
