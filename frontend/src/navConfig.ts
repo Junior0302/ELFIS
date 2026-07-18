@@ -24,9 +24,9 @@ export const navSections: NavSection[] = [
           'Bienvenue sur votre tableau de bord. Ici, vous voyez l’état de l’activité en un coup d’œil.',
         permission: 'invoice.read',
         guide: [
-          'C’est votre écran d’accueil une fois connecté : vous voyez en un coup d’œil l’état de l’activité.',
-          'Utile pour savoir où vous en êtes sans ouvrir chaque module (documents récents, rappels, accès rapides).',
-          'Exemple : vous arrivez le matin et voyez qu’une facture attend validation, ou qu’un devis a été envoyé hier.',
+          'C’est votre écran d’accueil : chiffre d’affaires, impayés, documents et priorités.',
+          'Le bouton « Écouter le récap » lit un résumé vocal court (~10 s) — seul endroit où la voix est activée.',
+          'Exemple : vous arrivez le matin, écoutez le récap, puis ouvrez le copilote en chat si besoin.',
           'Sans abonnement actif, cette vue vous oriente déjà vers l’essai pour débloquer l’analyse et la facturation.',
         ],
       },
@@ -47,14 +47,14 @@ export const navSections: NavSection[] = [
       {
         to: '/copilote',
         label: 'Copilote IA',
-        hint: 'Voix & conseils',
+        hint: 'Chat & conseils',
         spokenIntro:
-          'Vous êtes sur le Copilote IA. Parlez-moi ou écrivez pour piloter vos chiffres.',
+          'Vous êtes sur le Copilote IA. Posez vos questions en chat pour piloter vos chiffres.',
         permission: 'ai.analysis',
         guide: [
-          'Posez une question en français — à l’écrit ou à la voix (mode Jarvis).',
+          'Posez une question en français dans le chat — réponses basées sur vos données.',
           'Le copilote aide à décider rapidement sans remplacer votre expert-comptable.',
-          'Exemple : appuyez sur l’orbe et dites « Quels clients sont en retard ? ».',
+          'Exemple : « Quels clients sont en retard ? » ou « Résume mon activité ».',
           'Réservé à l’offre ComptaPilot IA : démarrez l’essai depuis Abonnement pour l’utiliser.',
         ],
       },

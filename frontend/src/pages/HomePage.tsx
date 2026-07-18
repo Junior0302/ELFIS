@@ -431,7 +431,7 @@ export default function HomePage() {
                 {user ? 'Accéder au tableau de bord' : 'Commencer gratuitement'}
               </Link>
               <Link className="btn secondary" to={user ? '/copilote' : '/login'}>
-                {user ? 'Parler au copilote' : 'J’ai déjà un compte'}
+                {user ? 'Ouvrir le copilote' : 'J’ai déjà un compte'}
               </Link>
             </div>
             <div className="home-trust">

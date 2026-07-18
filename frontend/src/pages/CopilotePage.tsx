@@ -1,86 +1,47 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import JarvisOrb from '../components/JarvisOrb'
-import { useVoiceAssistant } from '../hooks/useVoiceAssistant'
 
-type Msg = { role: 'user' | 'assistant'; text: string; viaVoice?: boolean }
+type Msg = { role: 'user' | 'assistant'; text: string }
 
 export default function CopilotePage() {
   const { token, orgId, user } = useAuth()
-  const [searchParams, setSearchParams] = useSearchParams()
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [question, setQuestion] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
   const [messages, setMessages] = useState<Msg[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const voiceBootRef = useRef(false)
-
-  const {
-    supported,
-    phase,
-    interim,
-    error: voiceError,
-    setError: setVoiceError,
-    autoSpeak,
-    setAutoSpeak,
-    startListening,
-    toggleListening,
-    speak,
-    stopSpeaking,
-    markProcessing,
-    markIdle,
-  } = useVoiceAssistant({
-    onFinalTranscript: (text) => {
-      void askVoiceRef.current(text)
-    },
-  })
-
-  const autoSpeakRef = useRef(autoSpeak)
-  autoSpeakRef.current = autoSpeak
 
   const ask = useCallback(
-    async (q: string, opts?: { fromVoice?: boolean }) => {
+    async (q: string) => {
       const clean = q.trim()
       if (clean.length < 1) return
       setError('')
-      setVoiceError('')
       setLoading(true)
-      markProcessing()
-      stopSpeaking()
-      setMessages((m) => [...m, { role: 'user', text: clean, viaVoice: opts?.fromVoice }])
+      setMessages((m) => [...m, { role: 'user', text: clean }])
       setQuestion('')
       try {
         const res = await api.aiChat(clean, token, orgId)
         setMessages((m) => [...m, { role: 'assistant', text: res.answer }])
-        if (autoSpeakRef.current || opts?.fromVoice) {
-          speak(res.answer)
-        } else {
-          markIdle()
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Réponse IA indisponible')
-        markIdle()
       } finally {
         setLoading(false)
       }
     },
-    [markIdle, markProcessing, orgId, setVoiceError, speak, stopSpeaking, token],
+    [orgId, token],
   )
-
-  const askVoiceRef = useRef<(q: string) => Promise<void>>(async () => {})
-  askVoiceRef.current = (q: string) => ask(q, { fromVoice: true })
 
   useEffect(() => {
     const first = user?.first_name || 'vous'
     const welcome: Msg = {
       role: 'assistant',
       text:
-        `Bonjour ${first}. Je suis votre Finance Agent vocal. ` +
-        `Parlez-moi naturellement ou écrivez : trésorerie, impayés, marge, priorités du jour. ` +
-        `Appuyez sur l’orbe pour activer le mode Jarvis.`,
+        `Bonjour ${first}. Je suis votre Finance Agent. ` +
+        `Posez vos questions en texte : trésorerie, impayés, marge, priorités du jour. ` +
+        `Les réponses s’appuient sur les données de votre entreprise.`,
     }
     setMessages([welcome])
     if (!token) return
@@ -122,48 +83,21 @@ export default function CopilotePage() {
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, loading, interim])
-
-  useEffect(() => {
-    if (searchParams.get('voice') !== '1') return
-    if (voiceBootRef.current) return
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      if (cancelled) return
-      voiceBootRef.current = true
-      setSearchParams({}, { replace: true })
-      if (supported) startListening()
-    }, 500)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [searchParams, setSearchParams, startListening, supported])
+  }, [messages, loading])
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     void ask(question)
   }
 
-  const statusLine =
-    phase === 'listening'
-      ? 'Mode Jarvis · écoute active'
-      : phase === 'speaking'
-        ? 'Mode Jarvis · réponse vocale'
-        : phase === 'processing'
-          ? 'Mode Jarvis · analyse'
-          : supported
-            ? 'En ligne · texte & voix'
-            : 'En ligne · texte (voix non supportée)'
-
   return (
-    <div className={`copilot-page jarvis-mode ${phase}`}>
+    <div className="copilot-page">
       <div className="page-head">
         <div>
           <h2>Copilote IA</h2>
           <p>
-            Votre directeur financier virtuel — parlez ou écrivez. Réponses claires, basées sur vos
-            données d’entreprise.
+            Chat avec votre directeur financier virtuel — réponses claires, basées sur vos données
+            d’entreprise.
           </p>
         </div>
         {!user && (
@@ -174,58 +108,22 @@ export default function CopilotePage() {
       </div>
 
       <div className="copilot-layout copilot-layout-wide">
-        <section className="panel copilot-chat jarvis-panel">
+        <section className="panel copilot-chat">
           <div className="copilot-chat-head">
-            <div className={`copilot-avatar jarvis-avatar ${phase}`} aria-hidden>
+            <div className="copilot-avatar" aria-hidden>
               FA
             </div>
             <div>
               <strong>Finance Agent</strong>
-              <span className="muted">{statusLine}</span>
+              <span className="muted">Mode chat · en ligne</span>
             </div>
-            <label className="jarvis-autospeak">
-              <input
-                type="checkbox"
-                checked={autoSpeak}
-                onChange={(e) => setAutoSpeak(e.target.checked)}
-              />
-              Lecture auto
-            </label>
           </div>
-
-          <JarvisOrb
-            phase={phase}
-            interim={interim}
-            onToggle={() => {
-              if (phase === 'speaking') {
-                stopSpeaking()
-                return
-              }
-              toggleListening()
-            }}
-            disabled={loading}
-          />
 
           <div className="copilot-thread" ref={threadRef}>
             {messages.map((m, i) => (
               <div key={i} className={`copilot-bubble ${m.role}`}>
-                <span className="copilot-role">
-                  {m.role === 'user' ? (m.viaVoice ? 'Vous · voix' : 'Vous') : 'Finance Agent'}
-                </span>
+                <span className="copilot-role">{m.role === 'user' ? 'Vous' : 'Finance Agent'}</span>
                 <p>{m.text}</p>
-                {m.role === 'assistant' && (
-                  <button
-                    type="button"
-                    className="jarvis-speak-btn"
-                    onClick={() => {
-                      stopSpeaking()
-                      speak(m.text)
-                    }}
-                    disabled={!supported}
-                  >
-                    Écouter
-                  </button>
-                )}
               </div>
             ))}
             {loading && (
@@ -236,11 +134,9 @@ export default function CopilotePage() {
             )}
           </div>
 
-          {(error || voiceError) && (
-            <div className="auth-alert auth-alert-error">{error || voiceError}</div>
-          )}
+          {error && <div className="auth-alert auth-alert-error">{error}</div>}
 
-          <form className="copilot-compose jarvis-compose" onSubmit={onSubmit}>
+          <form className="copilot-compose" onSubmit={onSubmit}>
             <textarea
               rows={2}
               value={question}
@@ -251,23 +147,10 @@ export default function CopilotePage() {
                   void ask(question)
                 }
               }}
-              placeholder={
-                phase === 'listening'
-                  ? 'Écoute en cours… ou tapez ici'
-                  : 'Écrivez ou parlez… Ex. Où en est ma trésorerie ?'
-              }
+              placeholder="Écrivez votre question… Ex. Où en est ma trésorerie ?"
               disabled={loading}
             />
-            <div className="jarvis-compose-actions">
-              <button
-                type="button"
-                className={`btn secondary jarvis-mic-btn ${phase === 'listening' ? 'is-hot' : ''}`}
-                onClick={() => toggleListening()}
-                disabled={loading || !supported}
-                aria-pressed={phase === 'listening'}
-              >
-                {phase === 'listening' ? 'Stop micro' : 'Parler'}
-              </button>
+            <div className="copilot-compose-actions">
               <button className="btn" type="submit" disabled={loading || !question.trim()}>
                 Envoyer
               </button>
@@ -276,10 +159,9 @@ export default function CopilotePage() {
         </section>
 
         <aside className="panel copilot-side">
-          <h3>Mode Jarvis</h3>
+          <h3>Suggestions</h3>
           <p className="muted copilot-side-lead">
-            Appuyez sur l’orbe, posez votre question à voix haute, puis écoutez la réponse. Chrome
-            ou Edge recommandés (micro HTTPS requis).
+            Cliquez une question pour démarrer, ou tapez librement dans le chat.
           </p>
           <div className="suggestion-list">
             {suggestions.map((s) => (
@@ -295,12 +177,12 @@ export default function CopilotePage() {
             ))}
           </div>
           <div className="copilot-side-tips">
-            <h4>Astuces vocales</h4>
+            <h4>Exemples utiles</h4>
             <ul>
               <li>« Résume mon activité »</li>
               <li>« Quels clients sont en retard ? »</li>
               <li>« Où en est ma TVA ? »</li>
-              <li>Coupez la lecture auto si besoin</li>
+              <li>« Quelles sont mes priorités ? »</li>
             </ul>
           </div>
         </aside>

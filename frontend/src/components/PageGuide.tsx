@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { findNavItem, spokenPageScript } from '../navConfig'
-import {
-  cancelSpeech,
-  isJarvisUnlocked,
-  setJarvisUnlocked,
-  speakFrench,
-  speechSupported,
-} from '../voice/speech'
+import { findNavItem } from '../navConfig'
 
 const GUIDE_KEY = 'cp_page_guide_open'
 
@@ -21,7 +14,6 @@ export default function PageGuide() {
       return true
     }
   })
-  const [speaking, setSpeaking] = useState(false)
 
   useEffect(() => {
     try {
@@ -31,46 +23,16 @@ export default function PageGuide() {
     }
   }, [open])
 
-  useEffect(() => {
-    setSpeaking(false)
-    cancelSpeech()
-  }, [pathname])
-
   if (!item) return null
 
-  const listen = () => {
-    if (!speechSupported()) return
-    if (speaking) {
-      cancelSpeech()
-      setSpeaking(false)
-      return
-    }
-    if (!isJarvisUnlocked()) setJarvisUnlocked()
-    speakFrench(spokenPageScript(item), {
-      onStart: () => setSpeaking(true),
-      onEnd: () => setSpeaking(false),
-    })
-  }
-
   return (
-    <aside
-      className={`page-guide ${open ? '' : 'is-collapsed'} ${speaking ? 'is-speaking' : ''}`}
-      aria-label={`À propos de ${item.label}`}
-    >
+    <aside className={`page-guide ${open ? '' : 'is-collapsed'}`} aria-label={`À propos de ${item.label}`}>
       <div className="page-guide-head">
         <div>
           <p className="page-guide-kicker">Guide · {item.label}</p>
           <p className="page-guide-spoken">{item.spokenIntro}</p>
         </div>
         <div className="page-guide-actions">
-          <button
-            type="button"
-            className={`page-guide-listen ${speaking ? 'is-hot' : ''}`}
-            onClick={listen}
-            disabled={!speechSupported()}
-          >
-            {speaking ? 'Stop' : 'Écouter'}
-          </button>
           <button
             type="button"
             className="page-guide-toggle"

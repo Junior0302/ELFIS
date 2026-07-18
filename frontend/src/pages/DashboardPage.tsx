@@ -10,7 +10,6 @@ import {
 } from '../api'
 import { useAuth } from '../auth'
 import {
-  NavIconAccount,
   NavIconActivities,
   NavIconBilling,
   NavIconCatalog,
@@ -28,6 +27,7 @@ import {
   subscriptionLabels,
   subscriptionTone,
 } from '../subscription'
+import { cancelSpeech, speakFrench, speechSupported } from '../voice/speech'
 
 const healthLabel: Record<PilotOverview['health'], string> = {
   ok: 'Activité saine',
@@ -53,6 +53,43 @@ function greetingHour() {
   return 'Bonsoir'
 }
 
+function spokenEuro(value: number) {
+  const rounded = Math.round(value)
+  return `${rounded.toLocaleString('fr-FR')} euros`
+}
+
+function buildDashboardRecap(opts: {
+  firstName: string
+  orgName: string
+  health: PilotOverview['health']
+  ca: number
+  unpaid: number
+  docs: number
+  toReview: number
+  alerts: string[]
+  recommendations: string[]
+  trialLabel?: string | null
+}) {
+  const parts = [
+    `${greetingHour()} ${opts.firstName}.`,
+    `Récap rapide de ${opts.orgName}.`,
+    `${healthLabel[opts.health]}.`,
+    `Chiffre d’affaires : ${spokenEuro(opts.ca)}.`,
+    `Impayés : ${spokenEuro(opts.unpaid)}.`,
+    `${opts.docs} document${opts.docs > 1 ? 's' : ''}`,
+  ]
+  if (opts.toReview > 0) {
+    parts.push(`dont ${opts.toReview} à relire.`)
+  } else {
+    parts.push('à jour.')
+  }
+  if (opts.trialLabel) parts.push(opts.trialLabel)
+  const priority = opts.alerts[0] || opts.recommendations[0]
+  if (priority) parts.push(`Priorité : ${priority}.`)
+  parts.push('Fin du récap.')
+  return parts.join(' ')
+}
+
 export default function DashboardPage() {
   const { token, orgId, user, memberships } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -62,6 +99,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [blocked, setBlocked] = useState(false)
   const [now, setNow] = useState(Date.now())
+  const [recapSpeaking, setRecapSpeaking] = useState(false)
   const welcomeRef = useRef<HTMLDivElement>(null)
 
   const activeMembership = memberships.find((item) => item.organization_id === orgId)
@@ -123,6 +161,10 @@ export default function DashboardPage() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    return () => cancelSpeech()
   }, [])
 
   useEffect(() => {
@@ -242,6 +284,33 @@ export default function DashboardPage() {
   const recentSales = (billing?.documents ?? []).slice(0, 4)
   const recentDocs = stats.recent.slice(0, 4)
   const health = pilot?.health || 'setup'
+  const unpaidAmount = pilot?.unpaid ?? billing?.stats.unpaid_amount ?? 0
+
+  const playRecap = () => {
+    if (!speechSupported()) return
+    if (recapSpeaking) {
+      cancelSpeech()
+      setRecapSpeaking(false)
+      return
+    }
+    const script = buildDashboardRecap({
+      firstName,
+      orgName: activeMembership?.organization_name || 'votre entreprise',
+      health,
+      ca: pilot?.ca ?? 0,
+      unpaid: unpaidAmount,
+      docs: stats.invoice_count,
+      toReview: stats.to_review,
+      alerts: pilot?.alerts ?? [],
+      recommendations: pilot?.recommendations ?? [],
+      trialLabel: trialRemaining ? `Essai : ${trialRemaining} restant.` : null,
+    })
+    speakFrench(script, {
+      rate: 1.08,
+      onStart: () => setRecapSpeaking(true),
+      onEnd: () => setRecapSpeaking(false),
+    })
+  }
 
   return (
     <div className="dashboard-page" ref={welcomeRef}>
@@ -253,7 +322,22 @@ export default function DashboardPage() {
               {greetingHour()} {firstName}
             </h2>
           </div>
-          <span className={`dash-health-pill ${health}`}>{healthLabel[health]}</span>
+          <div className="dash-welcome-actions">
+            <button
+              type="button"
+              className={`btn secondary dash-recap-btn ${recapSpeaking ? 'is-hot' : ''}`}
+              onClick={playRecap}
+              disabled={!speechSupported()}
+              title={
+                speechSupported()
+                  ? 'Écouter un récapitulatif vocal d’environ 10 secondes'
+                  : 'Synthèse vocale non disponible sur ce navigateur'
+              }
+            >
+              {recapSpeaking ? 'Stop récap' : 'Écouter le récap'}
+            </button>
+            <span className={`dash-health-pill ${health}`}>{healthLabel[health]}</span>
+          </div>
         </div>
         <p className="dash-welcome-lead muted">
           Voici l’état de {activeMembership?.organization_name || 'votre entreprise'} : chiffre
@@ -267,7 +351,7 @@ export default function DashboardPage() {
           </div>
           <div className="stat">
             <span>Impayés clients</span>
-            <strong>{formatEuro(pilot?.unpaid ?? billing?.stats.unpaid_amount ?? 0)}</strong>
+            <strong>{formatEuro(unpaidAmount)}</strong>
           </div>
           <div className="stat">
             <span>Documents</span>
@@ -374,15 +458,8 @@ export default function DashboardPage() {
             <span className="dash-cta-icon">
               <NavIconCopilote />
             </span>
-            <strong>Parler au copilote</strong>
-            <span>Questions sur vos chiffres</span>
-          </Link>
-          <Link className="dash-cta dash-cta-voice" to="/copilote?voice=1">
-            <span className="dash-cta-icon">
-              <NavIconAccount />
-            </span>
-            <strong>Assistant vocal</strong>
-            <span>Mode Jarvis — micro & réponse</span>
+            <strong>Poser une question</strong>
+            <span>Chat avec le copilote IA</span>
           </Link>
         </div>
       </section>
