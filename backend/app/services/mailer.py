@@ -26,18 +26,27 @@ class SendEmailResult:
     sender_name: str = ""
 
 
+def _smtp_ready() -> bool:
+    return bool(
+        settings.smtp_host.strip()
+        and settings.effective_platform_from
+        and (settings.smtp_user.strip() or settings.smtp_password.strip())
+    )
+
+
 def email_configured() -> bool:
-    """True si Brevo API ou SMTP classique est prêt (clés plateforme uniquement)."""
-    if settings.brevo_api_key.strip() and settings.effective_platform_from:
+    """True si SMTP Brevo ou API Brevo est prêt (clés plateforme uniquement)."""
+    if _smtp_ready():
         return True
-    return bool(settings.smtp_host.strip() and settings.effective_platform_from)
+    return bool(settings.brevo_api_key.strip() and settings.effective_platform_from)
 
 
 def email_transport() -> str:
+    # SMTP en priorité si configuré (plus fiable quand la clé API est refusée).
+    if _smtp_ready():
+        return "smtp"
     if settings.brevo_api_key.strip() and settings.effective_platform_from:
         return "brevo"
-    if settings.smtp_host.strip() and settings.effective_platform_from:
-        return "smtp"
     return "none"
 
 
@@ -53,6 +62,10 @@ def email_status_public() -> dict:
     return {
         "configured": email_configured(),
         "transport": email_transport(),
+        "smtp_ready": _smtp_ready(),
+        "has_smtp_host": bool(settings.smtp_host.strip()),
+        "has_smtp_user": bool(settings.smtp_user.strip()),
+        "has_smtp_password": bool(settings.smtp_password.strip()),
         "has_brevo_api_key": bool(key),
         "brevo_key_looks_valid": key.startswith("xkeysib-") and len(key) > 40,
         "brevo_key_prefix": key_prefix,
@@ -65,14 +78,27 @@ def email_status_public() -> dict:
 
 
 def probe_brevo_account() -> dict:
-    """Appelle GET /v3/account pour valider la clé sans envoyer de mail."""
+    """Valide SMTP (prioritaire) ou ping API Brevo."""
     status = email_status_public()
+    if status["transport"] == "smtp" and status["smtp_ready"]:
+        return {
+            **status,
+            "brevo_ok": True,
+            "brevo_error": "",
+            "hint": (
+                "Envoi via SMTP Brevo prêt "
+                f"({settings.smtp_host.strip()} → {status['platform_from']})."
+            ),
+        }
     key = settings.brevo_api_key.strip()
     if not key:
         return {
             **status,
             "brevo_ok": False,
-            "brevo_error": "BREVO_API_KEY vide côté serveur.",
+            "brevo_error": (
+                "Ni SMTP ni clé API. Sur Render ajoutez SMTP_HOST / SMTP_USER / "
+                "SMTP_PASSWORD (clé SMTP Brevo) ou BREVO_API_KEY."
+            ),
         }
     try:
         response = httpx.get(

@@ -252,34 +252,34 @@ export default function PlatformProfessionalEmailsPage() {
         >
           {mailStatus.brevo_ok ? (
             <>
-              <strong>Brevo OK — clé acceptée</strong>
-              <span>
-                Compte Brevo : <code>{mailStatus.brevo_account_email || '—'}</code>
-              </span>
+              <strong>
+                {mailStatus.transport === 'smtp' ? 'Brevo OK — SMTP prêt' : 'Brevo OK — API prête'}
+              </strong>
+              {mailStatus.brevo_account_email ? (
+                <span>
+                  Compte Brevo : <code>{mailStatus.brevo_account_email}</code>
+                </span>
+              ) : null}
               <span>
                 De <code>{mailStatus.platform_from || '—'}</code> →{' '}
-                <code>{mailStatus.notify_to}</code>
+                <code>{mailStatus.notify_to}</code> ({mailStatus.transport})
               </span>
+              {mailStatus.hint ? <span>{mailStatus.hint}</span> : null}
             </>
           ) : (
             <>
-              <strong>Brevo KO — la clé est refusée</strong>
+              <strong>Envoi KO</strong>
               <span>{mailStatus.brevo_error || mailStatus.hint}</span>
               <span>
-                Clé vue par le serveur :{' '}
-                <code>
-                  {mailStatus.brevo_key_prefix || '…'}…{mailStatus.brevo_key_suffix || ''}
-                </code>{' '}
-                ({mailStatus.brevo_key_length || 0} car.)
-                {mailStatus.brevo_key_looks_valid === false
-                  ? ' — format suspect (doit commencer par xkeysib-)'
-                  : ''}
+                Solution simple : dans Brevo utilisez <strong>Générer une clé SMTP</strong>, puis sur
+                Render renseignez :
               </span>
               <span>
-                From : <code>{mailStatus.platform_from || 'vide'}</code> · Régénérez la clé API dans
-                Brevo, recollez-la dans Render <code>BREVO_API_KEY</code> sans guillemets, puis
-                Manual Deploy.
+                <code>SMTP_HOST=smtp-relay.brevo.com</code> · <code>SMTP_PORT=587</code> ·{' '}
+                <code>SMTP_USER</code> (login Brevo) · <code>SMTP_PASSWORD</code> (clé SMTP) ·{' '}
+                <code>PLATFORM_EMAIL_FROM=contact@elfis-core.com</code>
               </span>
+              <span>Puis Manual Deploy. L’API BREVO_API_KEY n’est plus obligatoire.</span>
             </>
           )}
         </div>
