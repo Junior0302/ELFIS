@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { api, type PlatformUser } from '../../api'
 import { useAuth } from '../../auth'
 
@@ -75,10 +74,7 @@ export default function PlatformUsersPage() {
       <div className="platform-title">
         <span>ELF Admin</span>
         <h1>Utilisateurs</h1>
-        <p>
-          Suivi des comptes : actif, suspendu ou banni. Demandes e-mail pro →{' '}
-          <Link to="/elfadmin/emails-pro">Emails pro</Link>.
-        </p>
+        <p>Suivi des comptes : actif, suspendu ou banni.</p>
         <p className="platform-muted">
           Lien :{' '}
           <a href="https://elfis-core.com/elfadmin/utilisateurs">

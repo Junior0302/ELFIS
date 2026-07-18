@@ -24,7 +24,6 @@ from app.routers import (
     org,
     org_email,
     platform,
-    professional_emails,
     settings as settings_router,
     subscriptions,
     webhooks_brevo,
@@ -49,7 +48,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="ELFIS Core API",
     description="Moteur IA commun — ComptaPilot IA (AI Finance Copilot)",
-    version="0.8.1",
+    version="0.8.2",
     lifespan=lifespan,
 )
 
@@ -147,7 +146,6 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(org.router, prefix="/api")
 app.include_router(org_email.router, prefix="/api")
 app.include_router(email_connections.router, prefix="/api")
-app.include_router(professional_emails.router, prefix="/api")
 app.include_router(subscriptions.router, prefix="/api")
 app.include_router(subscriptions.webhook_alias_router, prefix="/api")
 app.include_router(platform.router, prefix="/api")
@@ -174,7 +172,7 @@ def health():
         "product": settings.product_name,
         "details": {
             "slogan": "Déposez une facture. L'IA prépare votre comptabilité.",
-            "version": "0.8.1",
+            "version": "0.8.2",
             "auth_required": settings.auth_required,
             "billing_ready": stripe_ok,
             "auth_ready": firebase_ok,

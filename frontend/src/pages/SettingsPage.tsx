@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type CompanySettings, type OrgDetail, type OrgEmailSettings } from '../api'
 import { useAuth } from '../auth'
-import EmailConnectionsPanel from '../components/EmailConnectionsPanel'
 
 type BrandForm = {
   name: string
@@ -80,11 +79,10 @@ function fromOrg(org: OrgDetail['organization']): BrandForm {
 }
 
 export default function SettingsPage() {
-  const { token, orgId, user, memberships } = useAuth()
+  const { token, orgId } = useAuth()
   const [brand, setBrand] = useState<BrandForm>(emptyBrand)
   const [form, setForm] = useState(emptySettings)
   const [canEdit, setCanEdit] = useState(false)
-  const [canManageEmail, setCanManageEmail] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -92,7 +90,6 @@ export default function SettingsPage() {
   const [logoBusy, setLogoBusy] = useState(false)
   const [emailSettings, setEmailSettings] = useState<OrgEmailSettings | null>(null)
   const [emailSaving, setEmailSaving] = useState(false)
-  const [emailTesting, setEmailTesting] = useState(false)
   const [emailMessage, setEmailMessage] = useState('')
   const [emailError, setEmailError] = useState('')
 
@@ -107,9 +104,6 @@ export default function SettingsPage() {
     ])
       .then(([settings, detail, email]) => {
         setCanEdit(Boolean(detail.can_edit))
-        const membership = memberships.find((m) => m.organization_id === orgId)
-        const perms = membership?.permissions || []
-        setCanManageEmail(perms.includes('*') || perms.includes('email_accounts.manage') || Boolean(detail.can_edit))
         setBrand(fromOrg(detail.organization))
         setForm({
           company_name: settings.company_name || detail.organization.legal_name || detail.organization.name,
@@ -253,27 +247,6 @@ export default function SettingsPage() {
       setEmailError(err instanceof Error ? err.message : 'Enregistrement impossible')
     } finally {
       setEmailSaving(false)
-    }
-  }
-
-  const sendTestEmail = async () => {
-    if (!token || !orgId || !canEdit) return
-    setEmailTesting(true)
-    setEmailMessage('')
-    setEmailError('')
-    try {
-      const res = await api.testOrgEmailSettings(token, orgId)
-      if (res.ok) {
-        setEmailMessage(
-          `E-mail de test envoyé à ${res.recipient} (From : ${res.sender_name} <${res.sender_email}>, Reply-To : ${res.reply_to_email}).`,
-        )
-      } else {
-        setEmailError(res.error_message || 'Échec de l’e-mail de test')
-      }
-    } catch (err) {
-      setEmailError(err instanceof Error ? err.message : 'Échec de l’e-mail de test')
-    } finally {
-      setEmailTesting(false)
     }
   }
 
@@ -505,27 +478,17 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <h3 style={{ marginTop: '1.5rem' }}>Envoi des documents</h3>
+        <h3 style={{ marginTop: '1.5rem' }}>Modèles d’e-mail</h3>
         <p className="muted">
-          Connectez la boîte mail de votre entreprise, ou utilisez l’infrastructure ComptaPilot en
-          secours. Les réponses (Reply-To) et modèles restent configurables ci-dessous.
+          Les devis et factures s’envoient depuis <strong>votre messagerie</strong> (Gmail, Outlook…).
+          Préparez ici les objets et messages par défaut qui s’ouvrent automatiquement.
         </p>
-
-        {token && orgId ? (
-          <EmailConnectionsPanel
-            token={token}
-            orgId={orgId}
-            canManage={canManageEmail}
-            userEmail={user?.email}
-          />
-        ) : null}
 
         {emailSettings ? (
           <>
-            <h4 style={{ marginTop: '1.25rem' }}>Identité & modèles</h4>
             <div className="form-grid">
               <div className="field">
-                <label>Nom d’expéditeur (mode ComptaPilot)</label>
+                <label>Nom affiché dans les modèles</label>
                 <input
                   value={emailSettings.sender_name}
                   disabled={!canEdit}
@@ -535,7 +498,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="field">
-                <label>Adresse e-mail de réponse</label>
+                <label>E-mail entreprise (rappel)</label>
                 <input
                   type="email"
                   value={emailSettings.reply_to_email}
@@ -547,7 +510,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="field">
-                <label>Copie (CC) facultative</label>
+                <label>Copie (CC) par défaut</label>
                 <input
                   type="email"
                   value={emailSettings.cc_email}
@@ -556,30 +519,13 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="field">
-                <label>Copie cachée (BCC) facultative</label>
+                <label>Copie cachée (BCC) par défaut</label>
                 <input
                   type="email"
                   value={emailSettings.bcc_email}
                   disabled={!canEdit}
                   onChange={(e) => setEmailSettings({ ...emailSettings, bcc_email: e.target.value })}
                 />
-              </div>
-              <div className="field">
-                <label>État plateforme ComptaPilot</label>
-                <input
-                  readOnly
-                  value={
-                    emailSettings.configuration_state === 'ready'
-                      ? 'Prêt'
-                      : emailSettings.configuration_state === 'needs_reply_to'
-                        ? 'Adresse de réponse manquante'
-                        : 'Service plateforme indisponible'
-                  }
-                />
-              </div>
-              <div className="field full">
-                <label>Aperçu From (mode ComptaPilot)</label>
-                <input readOnly value={emailSettings.effective_from_preview || '—'} />
               </div>
               <div className="field full">
                 <label>Objet par défaut — factures</label>
@@ -648,43 +594,17 @@ export default function SettingsPage() {
                   }
                 />
               </div>
-              <div className="field full">
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={emailSettings.send_copy_to_organization}
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                      setEmailSettings({
-                        ...emailSettings,
-                        send_copy_to_organization: e.target.checked,
-                      })
-                    }
-                  />
-                  Envoyer une copie à l’entreprise
-                </label>
-              </div>
             </div>
             <div className="actions" style={{ flexWrap: 'wrap' }}>
               {canEdit ? (
-                <>
-                  <button
-                    className="btn"
-                    type="button"
-                    disabled={emailSaving}
-                    onClick={() => void saveEmailSettings()}
-                  >
-                    {emailSaving ? 'Enregistrement…' : 'Enregistrer l’envoi'}
-                  </button>
-                  <button
-                    className="btn secondary"
-                    type="button"
-                    disabled={emailTesting || !emailSettings.platform_configured}
-                    onClick={() => void sendTestEmail()}
-                  >
-                    {emailTesting ? 'Envoi du test…' : 'Envoyer un e-mail de test'}
-                  </button>
-                </>
+                <button
+                  className="btn"
+                  type="button"
+                  disabled={emailSaving}
+                  onClick={() => void saveEmailSettings()}
+                >
+                  {emailSaving ? 'Enregistrement…' : 'Enregistrer les modèles'}
+                </button>
               ) : (
                 <p className="muted">Lecture seule — demandez un accès paramètres.</p>
               )}

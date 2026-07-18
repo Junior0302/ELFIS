@@ -5206,54 +5206,100 @@ a.platform-action {
   flex: 0 0 auto;
 }
 
-.email-channel-fieldset {
-  margin: 0 0 1rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid rgba(11, 61, 46, 0.18);
-  border-radius: 12px;
-  background: rgba(231, 242, 236, 0.45);
+.mailto-send-panel {
+  margin-top: 0.35rem;
+  padding: 1rem 1.05rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(11, 61, 46, 0.14);
+  background:
+    linear-gradient(165deg, rgba(231, 242, 236, 0.55), rgba(255, 255, 255, 0.92) 42%),
+    #fff;
 }
 
-.email-channel-fieldset legend {
-  padding: 0 0.35rem;
-  font-weight: 650;
-  color: var(--forest);
+.mailto-send-head h4 {
+  margin: 0 0 0.35rem;
 }
 
-.email-channel-option {
-  display: flex;
-  gap: 0.7rem;
-  align-items: flex-start;
-  margin: 0.55rem 0;
-  padding: 0.65rem 0.75rem;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  cursor: pointer;
-}
-
-.email-channel-option.is-selected {
-  border-color: rgba(11, 61, 46, 0.35);
-  background: #fff;
-}
-
-.email-channel-option.is-disabled {
-  opacity: 0.72;
-  cursor: not-allowed;
-}
-
-.email-channel-option input {
-  margin-top: 0.2rem;
-}
-
-.email-channel-option strong {
-  display: block;
-  color: var(--ink);
-}
-
-.email-channel-option small {
-  display: block;
-  margin-top: 0.2rem;
+.mailto-send-head p {
+  margin: 0 0 0.9rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
   color: var(--muted, #5c6b64);
+}
+
+.mailto-steps {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.mailto-steps li {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  font-size: 0.9rem;
   line-height: 1.35;
+  color: var(--ink, #14201b);
+}
+
+.mailto-step-num {
+  flex: 0 0 auto;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--forest, #0b3d2e);
+}
+
+.mailto-recap {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(11, 61, 46, 0.05);
+  border: 1px solid rgba(11, 61, 46, 0.1);
+}
+
+.mailto-recap div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+
+.mailto-recap span {
+  color: var(--muted, #5c6b64);
+}
+
+.mailto-recap strong {
+  font-weight: 650;
+  word-break: break-word;
+}
+
+.mailto-hint {
+  margin: 0.75rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(231, 242, 236, 0.85);
+  border: 1px solid rgba(11, 61, 46, 0.16);
+  color: var(--forest, #0b3d2e);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.mailto-history {
+  margin-top: 1.25rem;
+}
+
+.mailto-history h4 {
+  margin-bottom: 0.5rem;
 }
 

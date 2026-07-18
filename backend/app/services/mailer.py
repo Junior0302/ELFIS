@@ -83,16 +83,25 @@ def _probe_smtp_login() -> tuple[bool, str]:
             smtp.noop()
         return True, ""
     except smtplib.SMTPAuthenticationError as exc:
-        hint = (
-            "Auth SMTP refusée (535). "
-            "SMTP_USER doit être le login Brevo (…@smtp-brevo.com), "
-            "pas contact@ ni votre e-mail perso. "
-            "SMTP_PASSWORD = clé xsmtpsib-… (pas xkeysib-…)."
-        )
-        if not user.lower().endswith("@smtp-brevo.com"):
-            hint += (
-                f" Login actuel (masqué) : {_smtp_user_public()['smtp_user_masked']} — forme incorrecte."
+        public = _smtp_user_public()
+        if user.lower().endswith("@smtp-brevo.com") and public["smtp_password_looks_brevo"]:
+            hint = (
+                "Auth SMTP refusée (535) alors que login @smtp-brevo.com et forme xsmtpsib- sont OK. "
+                "La clé sur Render est probablement obsolète/incomplète, ou le filtrage IP SMTP "
+                "est activé dans Brevo. Régénérez une clé SMTP, collez-la dans SMTP_PASSWORD, "
+                "désactivez Authorized IPs, Manual Deploy."
             )
+        else:
+            hint = (
+                "Auth SMTP refusée (535). "
+                "SMTP_USER doit être le login Brevo (…@smtp-brevo.com), "
+                "pas contact@ ni votre e-mail perso. "
+                "SMTP_PASSWORD = clé xsmtpsib-… (pas xkeysib-…)."
+            )
+            if not user.lower().endswith("@smtp-brevo.com"):
+                hint += (
+                    f" Login actuel (masqué) : {public['smtp_user_masked']} — forme incorrecte."
+                )
         return False, f"{hint} Détail: {exc}"
     except Exception as exc:  # noqa: BLE001
         return False, f"Connexion SMTP impossible: {exc}"

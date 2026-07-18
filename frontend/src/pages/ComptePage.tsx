@@ -1,11 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import {
-  api,
-  type OrgInvitation,
-  type ProfessionalEmailRecord,
-  type TeamNotificationItem,
-} from '../api'
+import { api, type OrgInvitation, type TeamNotificationItem } from '../api'
 import { useAuth } from '../auth'
 import {
   mapFirebaseError,
@@ -42,13 +37,6 @@ export default function ComptePage() {
   const [invitations, setInvitations] = useState<OrgInvitation[]>([])
   const [notifications, setNotifications] = useState<TeamNotificationItem[]>([])
   const [inviteBusy, setInviteBusy] = useState<number | string | null>(null)
-  const [proEmails, setProEmails] = useState<ProfessionalEmailRecord[]>([])
-  const [proCanRequest, setProCanRequest] = useState(false)
-  const [proHasPending, setProHasPending] = useState(false)
-  const [proHasActive, setProHasActive] = useState(false)
-  const [proBusy, setProBusy] = useState(false)
-  const [proMessage, setProMessage] = useState('')
-  const [proError, setProError] = useState('')
 
   useEffect(() => {
     const checkout = new URLSearchParams(location.search).get('checkout')
@@ -61,15 +49,6 @@ export default function ComptePage() {
     if (!token) return
     void api.myInvitations(token, orgId).then((data) => setInvitations(data.invitations))
     void api.myNotifications(token, orgId).then((data) => setNotifications(data.notifications))
-    void api
-      .myProfessionalEmails(token, orgId)
-      .then((data) => {
-        setProEmails(data.emails)
-        setProCanRequest(data.can_request)
-        setProHasPending(data.has_pending)
-        setProHasActive(data.has_active)
-      })
-      .catch(() => undefined)
   }, [token, orgId, memberships.length])
 
   useEffect(() => {
@@ -139,32 +118,6 @@ export default function ComptePage() {
         </div>
       </div>
     )
-  }
-
-  const requestProEmail = async () => {
-    if (!token) return
-    setProBusy(true)
-    setProError('')
-    setProMessage('')
-    try {
-      const res = await api.requestProfessionalEmail(token, orgId)
-      setProCanRequest(false)
-      setProHasPending(true)
-      setProEmails((current) => [res.email, ...current])
-      if (res.notify?.admin_notified) {
-        setProMessage(res.message)
-      } else {
-        setProMessage(res.message)
-        setProError(
-          res.notify?.error ||
-            'La demande est enregistrée, mais les e-mails automatiques n’ont pas été envoyés. Vérifiez BREVO_API_KEY + PLATFORM_EMAIL_FROM sur Render.',
-        )
-      }
-    } catch (reason) {
-      setProError(reason instanceof Error ? reason.message : 'Demande impossible')
-    } finally {
-      setProBusy(false)
-    }
   }
 
   const acceptInvite = async (payload: { invitation_id?: number; token?: string }) => {
@@ -368,64 +321,6 @@ export default function ComptePage() {
               </button>
             </div>
           </form>
-        </section>
-
-        <section className="panel account-card" aria-label="Adresse e-mail professionnelle">
-          <h3>Adresse e-mail professionnelle</h3>
-          <p className="muted">
-            Pour envoyer devis et factures, vous avez 2 choix : votre e-mail personnel (messagerie),
-            ou une adresse fournie par ELFIS Core (ex. jean.dupont@elfis-core.com) pour envoyer
-            directement depuis l’outil.
-          </p>
-          {proHasActive ? (
-            <>
-              <p>
-                Votre adresse ELFIS Core est <strong>active</strong>. Elle apparaît comme expéditeur
-                dans Devis / Facturation → Envoyer.
-              </p>
-              <div className="list">
-                {proEmails
-                  .filter((row) => row.status === 'active')
-                  .map((row) => (
-                    <div key={row.id} className="membership-chip">
-                      <strong>{row.email}</strong>
-                      <span className="badge">Active{row.is_default ? ' · Par défaut' : ''}</span>
-                    </div>
-                  ))}
-              </div>
-            </>
-          ) : proHasPending ? (
-            <div className="email-sender-notice" role="status">
-              <strong>Votre demande a bien été envoyée.</strong>
-              <p>
-                Notre équipe prépare actuellement votre adresse professionnelle (Brevo). Vous
-                recevrez vos accès sous 24 heures maximum. Surveillez votre boîte mail.
-              </p>
-            </div>
-          ) : (
-            <>
-              <p>
-                Vous ne possédez pas encore d’adresse ELFIS Core.
-              </p>
-              <p className="muted">
-                Cliquez ci-dessous : aucune saisie. Nous récupérons nom, prénom, e-mail, téléphone,
-                société, abonnement et statut depuis votre compte, puis notifions{' '}
-                <strong>urequest@elfis-core.com</strong>. Vous recevez aussi un accusé de réception.
-              </p>
-              <div className="actions">
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={proBusy || !proCanRequest}
-                  onClick={() => void requestProEmail()}
-                >
-                  {proBusy ? 'Envoi…' : 'Demander mon adresse'}
-                </button>
-              </div>
-            </>
-          )}
-          {proError && <p className="form-error">{proError}</p>}
-          {proMessage && <p className="muted">{proMessage}</p>}
         </section>
 
         <aside className="panel account-side">
