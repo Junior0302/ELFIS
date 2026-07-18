@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { cancelSpeech, speakFrench, speechSupported, warmSpeechVoices } from '../voice/speech'
 
 export type VoicePhase = 'idle' | 'listening' | 'processing' | 'speaking' | 'unsupported'
 
@@ -35,18 +36,6 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null
 }
 
-function pickFrenchVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null
-  const voices = window.speechSynthesis.getVoices()
-  const fr = voices.filter((v) => v.lang.toLowerCase().startsWith('fr'))
-  return (
-    fr.find((v) => /google|natural|enhanced|premium/i.test(v.name)) ||
-    fr.find((v) => /france|fr-fr/i.test(v.lang)) ||
-    fr[0] ||
-    null
-  )
-}
-
 export function useVoiceAssistant(options?: {
   lang?: string
   onFinalTranscript?: (text: string) => void
@@ -55,58 +44,50 @@ export function useVoiceAssistant(options?: {
   const onFinalRef = useRef(options?.onFinalTranscript)
   onFinalRef.current = options?.onFinalTranscript
 
-  const [supported] = useState(() => Boolean(getSpeechRecognitionCtor() && window.speechSynthesis))
+  const [supported] = useState(() => Boolean(getSpeechRecognitionCtor() && speechSupported()))
   const [phase, setPhase] = useState<VoicePhase>(() =>
-    getSpeechRecognitionCtor() && typeof window !== 'undefined' && window.speechSynthesis
-      ? 'idle'
-      : 'unsupported',
+    getSpeechRecognitionCtor() && speechSupported() ? 'idle' : 'unsupported',
   )
   const [interim, setInterim] = useState('')
   const [error, setError] = useState('')
   const [autoSpeak, setAutoSpeak] = useState(true)
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  const sessionRef = useRef(0)
   const wantListenRef = useRef(false)
   const phaseRef = useRef<VoicePhase>(phase)
   phaseRef.current = phase
 
   const stopSpeaking = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel()
-    }
+    cancelSpeech()
     if (phaseRef.current === 'speaking') setPhase('idle')
   }, [])
 
   const speak = useCallback(
     (text: string) => {
-      if (!supported || !text.trim() || typeof window === 'undefined' || !window.speechSynthesis) {
-        return
-      }
-      window.speechSynthesis.cancel()
-      const utter = new SpeechSynthesisUtterance(text.trim())
-      utter.lang = lang
-      utter.rate = 1.02
-      utter.pitch = 0.98
-      const voice = pickFrenchVoice()
-      if (voice) utter.voice = voice
-      utter.onstart = () => setPhase('speaking')
-      utter.onend = () => {
-        if (phaseRef.current === 'speaking') setPhase('idle')
-      }
-      utter.onerror = () => {
-        if (phaseRef.current === 'speaking') setPhase('idle')
-      }
-      setPhase('speaking')
-      window.speechSynthesis.speak(utter)
+      if (!supported || !text.trim()) return
+      speakFrench(text, {
+        lang,
+        onStart: () => setPhase('speaking'),
+        onEnd: () => {
+          if (phaseRef.current === 'speaking') setPhase('idle')
+        },
+      })
     },
     [lang, supported],
   )
 
   const stopListening = useCallback(() => {
     wantListenRef.current = false
+    sessionRef.current += 1
     const rec = recognitionRef.current
+    recognitionRef.current = null
     if (rec) {
       try {
+        rec.onresult = null
+        rec.onerror = null
+        rec.onend = null
+        rec.onstart = null
         rec.stop()
       } catch {
         try {
@@ -129,18 +110,38 @@ export function useVoiceAssistant(options?: {
     const Ctor = getSpeechRecognitionCtor()
     if (!Ctor) return
 
+    // Contexte non sécurisé (sauf localhost)
+    if (
+      typeof window !== 'undefined' &&
+      !window.isSecureContext &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1'
+    ) {
+      setError('Le micro nécessite une connexion HTTPS.')
+      return
+    }
+
     stopSpeaking()
     setError('')
     setInterim('')
-    wantListenRef.current = true
 
-    if (recognitionRef.current) {
+    const prev = recognitionRef.current
+    recognitionRef.current = null
+    if (prev) {
       try {
-        recognitionRef.current.abort()
+        prev.onresult = null
+        prev.onerror = null
+        prev.onend = null
+        prev.onstart = null
+        prev.abort()
       } catch {
         /* ignore */
       }
     }
+
+    const session = sessionRef.current + 1
+    sessionRef.current = session
+    wantListenRef.current = true
 
     const rec = new Ctor()
     recognitionRef.current = rec
@@ -149,10 +150,13 @@ export function useVoiceAssistant(options?: {
     rec.interimResults = true
     rec.maxAlternatives = 1
 
+    const isCurrent = () => recognitionRef.current === rec && sessionRef.current === session
+
     rec.onstart = () => {
-      if (wantListenRef.current) setPhase('listening')
+      if (isCurrent() && wantListenRef.current) setPhase('listening')
     }
     rec.onresult = (event) => {
+      if (!isCurrent()) return
       let interimText = ''
       let finalText = ''
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
@@ -169,21 +173,26 @@ export function useVoiceAssistant(options?: {
       }
     }
     rec.onerror = (event) => {
+      if (!isCurrent()) return
+      const code = event.error || ''
+      // « aborted » = remplacement volontaire d’une session — ne pas casser wantListen
+      if (code === 'aborted') return
       wantListenRef.current = false
       setInterim('')
-      const code = event.error || ''
       if (code === 'not-allowed' || code === 'service-not-allowed') {
         setError('Micro refusé. Autorisez le microphone dans le navigateur.')
       } else if (code === 'no-speech') {
         setError('Aucune parole détectée. Réessayez.')
-      } else if (code !== 'aborted') {
+      } else if (code === 'network') {
+        setError('Réseau vocal indisponible. Réessayez.')
+      } else {
         setError('Écoute interrompue. Réessayez.')
       }
       setPhase('idle')
     }
     rec.onend = () => {
+      if (!isCurrent()) return
       if (wantListenRef.current) {
-        // Relance courte si le navigateur coupe trop tôt sans résultat final
         try {
           rec.start()
           return
@@ -201,6 +210,7 @@ export function useVoiceAssistant(options?: {
       setError('Impossible de démarrer le micro.')
       setPhase('idle')
       wantListenRef.current = false
+      recognitionRef.current = null
     }
   }, [lang, stopSpeaking, supported])
 
@@ -217,21 +227,18 @@ export function useVoiceAssistant(options?: {
   }, [supported])
 
   useEffect(() => {
-    if (!supported || typeof window === 'undefined') return
-    const warm = () => {
-      void pickFrenchVoice()
-    }
-    warm()
-    window.speechSynthesis.addEventListener('voiceschanged', warm)
+    if (!supported) return
+    warmSpeechVoices()
     return () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', warm)
       wantListenRef.current = false
+      sessionRef.current += 1
       try {
         recognitionRef.current?.abort()
       } catch {
         /* ignore */
       }
-      window.speechSynthesis.cancel()
+      recognitionRef.current = null
+      cancelSpeech()
     }
   }, [supported])
 

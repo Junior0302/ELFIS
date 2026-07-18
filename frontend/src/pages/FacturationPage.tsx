@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { api, formatEuro, type BillingOverview, type SalesDoc } from '../api'
 import { useAuth } from '../auth'
 import SalesDocPreviewModal from '../components/SalesDocPreviewModal'
@@ -181,6 +182,9 @@ export default function FacturationPage() {
           <h2>Facturation</h2>
           <p>Créez devis et factures, suivez les encaissements et relances.</p>
         </div>
+        <Link className="btn secondary" to="/devis">
+          Liste des devis
+        </Link>
       </div>
 
       <div className="stats billing-stats">

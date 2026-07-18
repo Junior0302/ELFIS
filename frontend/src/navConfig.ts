@@ -94,29 +94,15 @@ export const navSections: NavSection[] = [
       {
         to: '/facturation',
         label: 'Facturation',
-        hint: 'Devis & clients',
+        hint: 'Factures, devis, encaissements',
         spokenIntro:
-          'Vous consultez la Facturation. Devis, encaissements et suivi client sont à portée de main.',
+          'Vous consultez la Facturation. Devis, factures et encaissements sont à portée de main.',
         permission: 'invoice.read',
         guide: [
-          'Point d’entrée commercial : factures émises, suivi des encaissements et liens vers devis / clients.',
+          'Point d’entrée commercial : factures, devis, encaissements et suivi client.',
           'Ça sert à encaisser plus vite et à garder une vision claire de ce qui est dû.',
-          'Exemple : vous créez une facture pour un client, l’envoyez, puis suivez le paiement.',
+          'Exemple : créez un devis, transformez-le en facture, puis suivez le paiement.',
           'Avec l’essai ComptaPilot IA, toute la chaîne devis → facture devient disponible.',
-        ],
-      },
-      {
-        to: '/devis',
-        label: 'Devis',
-        hint: 'Liste & envoi',
-        spokenIntro:
-          'Vous êtes dans les Devis. Créez, listez et envoyez vos propositions en quelques clics.',
-        permission: 'invoice.read',
-        guide: [
-          'Créez, listez et envoyez vos devis professionnels depuis un seul endroit.',
-          'Utile pour professionnaliser vos propositions et convertir plus de prospects.',
-          'Exemple : devis de prestation à 1 200 € HT envoyé au client, puis transformé en facture une fois accepté.',
-          'Module lié à l’abonnement : sans offre active, la création / l’envoi peuvent être bloqués.',
         ],
       },
       {
@@ -164,41 +150,27 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    title: 'Administration',
+    title: 'Espace',
     items: [
       {
-        to: '/abonnement',
-        label: 'Abonnement',
-        hint: 'Essai, carte & factures',
-        spokenIntro:
-          'Voici Abonnement. Gérez votre essai, votre carte et le renouvellement en toute simplicité.',
-        permission: 'subscription.manage',
-        guide: [
-          'Gérez l’essai gratuit, le renouvellement, la carte et les factures de l’organisation.',
-          'C’est ici que vous démarrez les 14 jours d’essai puis le forfait à 19 € / mois.',
-          'Exemple : vous activez l’essai, recevez un rappel avant prélèvement, ou mettez à jour votre carte.',
-          'Sans abonnement finalisé, les modules premium restent verrouillés jusqu’à activation réussie.',
-        ],
-      },
-      {
         to: '/organisation',
-        label: 'Organisation',
-        hint: 'Entreprise & coordonnées',
+        label: 'Entreprise',
+        hint: 'Identité, TVA, e-mails',
         spokenIntro:
-          'Vous êtes sur Organisation. Renseignez l’identité de votre entreprise une seule fois.',
+          'Vous êtes sur Entreprise. Identité, TVA et préférences d’envoi au même endroit.',
         guide: [
-          'Renseignez l’identité de l’entreprise (nom, adresse, informations légales utiles).',
-          'Ces infos alimentent vos documents et la cohérence de votre espace multi-utilisateurs.',
-          'Exemple : changer la raison sociale affichée sur les devis et factures.',
-          'Accessible même avant abonnement : préparez votre fiche entreprise dès l’inscription.',
+          'Renseignez l’identité de l’entreprise, puis accédez à la TVA et aux e-mails de documents.',
+          'Ces infos alimentent vos devis, factures et l’espace multi-utilisateurs.',
+          'Exemple : raison sociale, logo, taux de TVA par défaut.',
+          'Accessible dès l’inscription ; affinez pendant l’essai.',
         ],
       },
       {
         to: '/admin/equipe',
-        label: 'Admin équipe',
-        hint: 'Comptes & droits',
+        label: 'Équipe',
+        hint: 'Invitations & droits',
         spokenIntro:
-          'Bienvenue dans Admin équipe. Invitez vos collaborateurs et ajustez leurs droits.',
+          'Bienvenue dans Équipe. Invitez vos collaborateurs et ajustez leurs droits.',
         permission: 'users.manage',
         guide: [
           'Invitez des collaborateurs et définissez qui peut voir ou modifier quoi.',
@@ -208,30 +180,17 @@ export const navSections: NavSection[] = [
         ],
       },
       {
-        to: '/settings',
-        label: 'Paramètres',
-        hint: 'Entreprise & TVA',
+        to: '/abonnement',
+        label: 'Abonnement',
+        hint: 'Essai & facturation',
         spokenIntro:
-          'Vous consultez les Paramètres. Réglez TVA et préférences pour des documents conformes.',
-        permission: 'settings.manage',
+          'Voici Abonnement. Gérez votre essai, votre carte et le renouvellement.',
+        permission: 'subscription.manage',
         guide: [
-          'Réglez les paramètres métier (TVA, préférences d’entreprise liées à la facturation).',
-          'Ça garantit des documents corrects et conformes à votre régime.',
-          'Exemple : taux de TVA par défaut à 20 %, ou coordonnées reprises sur les PDF.',
-          'À configurer tôt, même pendant l’essai, pour que vos premiers documents soient justes.',
-        ],
-      },
-      {
-        to: '/compte',
-        label: 'Mon compte',
-        hint: 'Profil & sécurité',
-        spokenIntro:
-          'Voici Mon compte. Mettez à jour votre profil et sécurisez votre accès personnel.',
-        guide: [
-          'Modifiez votre profil personnel : nom, téléphone, photo et mot de passe.',
-          'C’est votre sécurité individuelle, indépendante de l’abonnement de l’entreprise.',
-          'Exemple : changer le mot de passe après un partage accidentel d’écran.',
-          'Toujours accessible, avec ou sans abonnement ComptaPilot IA.',
+          'Gérez l’essai gratuit, le renouvellement, la carte et les factures de l’organisation.',
+          'C’est ici que vous démarrez les 14 jours d’essai puis le forfait à 19 € / mois.',
+          'Exemple : activez l’essai ou mettez à jour votre carte.',
+          'Sans abonnement finalisé, les modules premium restent verrouillés.',
         ],
       },
     ],

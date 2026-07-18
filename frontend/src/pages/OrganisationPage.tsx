@@ -155,17 +155,22 @@ export default function OrganisationPage() {
     <>
       <div className="page-head">
         <div>
-          <h2>Organisation</h2>
+          <h2>Entreprise</h2>
           <p>
-            Informations de l’entreprise, coordonnées et paramètres. La gestion des utilisateurs se
-            fait dans Admin → Équipe.
+            Identité et coordonnées de l’entreprise. TVA, e-mails de documents et préférences sont
+            dans Paramètres.
           </p>
         </div>
-        {canManageTeam && (
-          <Link className="btn secondary" to="/admin/equipe">
-            Gérer l’équipe
+        <div className="actions" style={{ margin: 0, flexWrap: 'wrap' }}>
+          <Link className="btn secondary" to="/settings">
+            TVA & e-mails
           </Link>
-        )}
+          {canManageTeam && (
+            <Link className="btn secondary" to="/admin/equipe">
+              Équipe
+            </Link>
+          )}
+        </div>
       </div>
 
       {error && <div className="auth-alert auth-alert-error">{error}</div>}

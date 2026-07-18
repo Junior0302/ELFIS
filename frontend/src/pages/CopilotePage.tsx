@@ -125,14 +125,19 @@ export default function CopilotePage() {
   }, [messages, loading, interim])
 
   useEffect(() => {
-    if (voiceBootRef.current) return
     if (searchParams.get('voice') !== '1') return
-    voiceBootRef.current = true
-    setSearchParams({}, { replace: true })
+    if (voiceBootRef.current) return
+    let cancelled = false
     const timer = window.setTimeout(() => {
+      if (cancelled) return
+      voiceBootRef.current = true
+      setSearchParams({}, { replace: true })
       if (supported) startListening()
-    }, 450)
-    return () => window.clearTimeout(timer)
+    }, 500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [searchParams, setSearchParams, startListening, supported])
 
   const onSubmit = (e: FormEvent) => {

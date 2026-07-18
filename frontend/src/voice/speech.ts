@@ -1,5 +1,8 @@
 /** Synthèse vocale FR partagée (accueil Jarvis + onglets + copilote). */
 
+let speakToken = 0
+let voicesReady: Promise<void> | null = null
+
 export function speechSupported(): boolean {
   return typeof window !== 'undefined' && Boolean(window.speechSynthesis)
 }
@@ -16,13 +19,31 @@ function pickFrenchVoice(): SpeechSynthesisVoice | null {
   )
 }
 
+function ensureVoices(): Promise<void> {
+  if (!speechSupported()) return Promise.resolve()
+  if (window.speechSynthesis.getVoices().length > 0) return Promise.resolve()
+  if (voicesReady) return voicesReady
+  voicesReady = new Promise((resolve) => {
+    const done = () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', done)
+      resolve()
+    }
+    window.speechSynthesis.addEventListener('voiceschanged', done)
+    window.setTimeout(done, 800)
+  })
+  return voicesReady
+}
+
 export function warmSpeechVoices(): void {
   if (!speechSupported()) return
-  void pickFrenchVoice()
+  void ensureVoices().then(() => {
+    void pickFrenchVoice()
+  })
   window.speechSynthesis.getVoices()
 }
 
 export function cancelSpeech(): void {
+  speakToken += 1
   if (!speechSupported()) return
   window.speechSynthesis.cancel()
 }
@@ -30,6 +51,7 @@ export function cancelSpeech(): void {
 export function speakFrench(
   text: string,
   opts?: {
+    lang?: string
     rate?: number
     pitch?: number
     onStart?: () => void
@@ -40,17 +62,35 @@ export function speakFrench(
     opts?.onEnd?.()
     return
   }
+  const token = ++speakToken
   window.speechSynthesis.cancel()
-  const utter = new SpeechSynthesisUtterance(text.trim())
-  utter.lang = 'fr-FR'
-  utter.rate = opts?.rate ?? 1.02
-  utter.pitch = opts?.pitch ?? 0.98
-  const voice = pickFrenchVoice()
-  if (voice) utter.voice = voice
-  utter.onstart = () => opts?.onStart?.()
-  utter.onend = () => opts?.onEnd?.()
-  utter.onerror = () => opts?.onEnd?.()
-  window.speechSynthesis.speak(utter)
+
+  void ensureVoices().then(() => {
+    if (token !== speakToken) {
+      opts?.onEnd?.()
+      return
+    }
+    const utter = new SpeechSynthesisUtterance(text.trim())
+    utter.lang = opts?.lang || 'fr-FR'
+    utter.rate = opts?.rate ?? 1.02
+    utter.pitch = opts?.pitch ?? 0.98
+    const voice = pickFrenchVoice()
+    if (voice) utter.voice = voice
+    utter.onstart = () => {
+      if (token === speakToken) opts?.onStart?.()
+    }
+    utter.onend = () => {
+      if (token === speakToken) opts?.onEnd?.()
+    }
+    utter.onerror = () => {
+      if (token === speakToken) opts?.onEnd?.()
+    }
+    try {
+      window.speechSynthesis.speak(utter)
+    } catch {
+      opts?.onEnd?.()
+    }
+  })
 }
 
 export const JARVIS_ANNOUNCE_KEY = 'cp_jarvis_announce'

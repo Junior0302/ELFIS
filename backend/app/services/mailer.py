@@ -177,10 +177,20 @@ def _send_via_brevo(
             )
         except Exception:  # noqa: BLE001
             detail = (response.text or "")[:280]
+        hint = (
+            "Sur Render → Environment : collez une vraie clé API Brevo dans BREVO_API_KEY "
+            "(SMTP & API → API Keys), puis PLATFORM_EMAIL_FROM=contact@elfis-core.com "
+            "(expéditeur validé dans Brevo)."
+        )
+        if "key not found" in detail.lower() or "unauthorized" in detail.lower():
+            raise RuntimeError(
+                "Clé Brevo invalide ou absente (Key not found). " + hint
+            )
         raise RuntimeError(
             "Brevo a refusé l’envoi"
             + (f" ({detail})" if detail else f" (HTTP {response.status_code})")
-            + ". Vérifiez BREVO_API_KEY et que PLATFORM_EMAIL_FROM est un expéditeur validé."
+            + ". "
+            + hint
         )
 
     message_id = ""

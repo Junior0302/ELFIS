@@ -40,6 +40,8 @@ export default function JarvisHost() {
     if (!welcomeDoneThisSession()) setShowWelcome(true)
     return () => {
       window.speechSynthesis?.removeEventListener('voiceschanged', warmSpeechVoices)
+      cancelSpeech()
+      setSpeaking(false)
     }
   }, [])
 
@@ -48,14 +50,21 @@ export default function JarvisHost() {
     if (!supported) return
     if (item.to === '/copilote') return
 
+    let cancelled = false
     const script = item.spokenIntro
     const timer = window.setTimeout(() => {
+      if (cancelled) return
       speakFrench(script, {
-        onStart: () => setSpeaking(true),
-        onEnd: () => setSpeaking(false),
+        onStart: () => {
+          if (!cancelled) setSpeaking(true)
+        },
+        onEnd: () => {
+          if (!cancelled) setSpeaking(false)
+        },
       })
-    }, 480)
+    }, 520)
     return () => {
+      cancelled = true
       window.clearTimeout(timer)
       cancelSpeech()
       setSpeaking(false)
