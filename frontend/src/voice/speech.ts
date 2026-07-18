@@ -1,4 +1,4 @@
-/** Synthèse vocale FR partagée (accueil Jarvis + onglets + copilote). */
+/** Synthèse vocale FR — récap dashboard (ton chaleureux, lent, humain). */
 
 let speakToken = 0
 let voicesReady: Promise<void> | null = null
@@ -7,16 +7,30 @@ export function speechSupported(): boolean {
   return typeof window !== 'undefined' && Boolean(window.speechSynthesis)
 }
 
+function scoreFrenchVoice(voice: SpeechSynthesisVoice): number {
+  const name = voice.name.toLowerCase()
+  const lang = voice.lang.toLowerCase()
+  let score = 0
+  if (lang.startsWith('fr')) score += 5
+  if (lang.includes('fr-fr') || lang.includes('fr_fr')) score += 2
+  // Voix masculines / neutres plus chaleureuses
+  if (/thomas|henri|paul|jacques|nicolas|claude|guy|george|daniel|pierre|male|homme|homme français/.test(name)) {
+    score += 12
+  }
+  if (/natural|neural|enhanced|premium|online \(natural\)/.test(name)) score += 4
+  if (/google/.test(name) && /fr/.test(lang)) score += 3
+  // Éviter les voix très robotiques / trop aiguës féminines par défaut
+  if (/amelie|hortense|julie|marie|audrey|denise|female|femme|zira|susan/.test(name)) score -= 14
+  if (/compact|eloquence|espeak|microsoft david/.test(name)) score -= 4
+  return score
+}
+
 function pickFrenchVoice(): SpeechSynthesisVoice | null {
   if (!speechSupported()) return null
   const voices = window.speechSynthesis.getVoices()
   const fr = voices.filter((v) => v.lang.toLowerCase().startsWith('fr'))
-  return (
-    fr.find((v) => /google|natural|enhanced|premium/i.test(v.name)) ||
-    fr.find((v) => /france|fr-fr/i.test(v.lang)) ||
-    fr[0] ||
-    null
-  )
+  if (!fr.length) return null
+  return [...fr].sort((a, b) => scoreFrenchVoice(b) - scoreFrenchVoice(a))[0] || null
 }
 
 function ensureVoices(): Promise<void> {
@@ -72,8 +86,10 @@ export function speakFrench(
     }
     const utter = new SpeechSynthesisUtterance(text.trim())
     utter.lang = opts?.lang || 'fr-FR'
-    utter.rate = opts?.rate ?? 1.02
-    utter.pitch = opts?.pitch ?? 0.98
+    // Plus lent, plus grave → moins robotique
+    utter.rate = opts?.rate ?? 0.88
+    utter.pitch = opts?.pitch ?? 0.86
+    utter.volume = 1
     const voice = pickFrenchVoice()
     if (voice) utter.voice = voice
     utter.onstart = () => {
@@ -91,56 +107,4 @@ export function speakFrench(
       opts?.onEnd?.()
     }
   })
-}
-
-export const JARVIS_ANNOUNCE_KEY = 'cp_jarvis_announce'
-export const JARVIS_UNLOCKED_KEY = 'cp_jarvis_unlocked'
-export const JARVIS_WELCOME_SESSION_KEY = 'cp_jarvis_welcome_done'
-
-export function getJarvisAnnounceEnabled(): boolean {
-  try {
-    return localStorage.getItem(JARVIS_ANNOUNCE_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
-
-export function setJarvisAnnounceEnabled(on: boolean): void {
-  try {
-    localStorage.setItem(JARVIS_ANNOUNCE_KEY, on ? '1' : '0')
-  } catch {
-    /* ignore */
-  }
-}
-
-export function isJarvisUnlocked(): boolean {
-  try {
-    return localStorage.getItem(JARVIS_UNLOCKED_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-export function setJarvisUnlocked(): void {
-  try {
-    localStorage.setItem(JARVIS_UNLOCKED_KEY, '1')
-  } catch {
-    /* ignore */
-  }
-}
-
-export function welcomeDoneThisSession(): boolean {
-  try {
-    return sessionStorage.getItem(JARVIS_WELCOME_SESSION_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-export function markWelcomeDoneThisSession(): void {
-  try {
-    sessionStorage.setItem(JARVIS_WELCOME_SESSION_KEY, '1')
-  } catch {
-    /* ignore */
-  }
 }

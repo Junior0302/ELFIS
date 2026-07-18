@@ -54,39 +54,57 @@ function greetingHour() {
 }
 
 function spokenEuro(value: number) {
-  const rounded = Math.round(value)
+  const rounded = Math.round(Math.abs(value))
   return `${rounded.toLocaleString('fr-FR')} euros`
 }
 
+function softenPriority(text: string) {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/[•·]/g, '')
+    .replace(/\bTVA\b/g, 'T V A')
+    .trim()
+}
+
+/** Texte court, naturel — uniquement les chiffres utiles. */
 function buildDashboardRecap(opts: {
   firstName: string
   orgName: string
-  health: PilotOverview['health']
   ca: number
   unpaid: number
-  docs: number
   toReview: number
   alerts: string[]
   recommendations: string[]
-  trialLabel?: string | null
 }) {
-  const parts = [
-    `${greetingHour()} ${opts.firstName}.`,
-    `Récap rapide de ${opts.orgName}.`,
-    `${healthLabel[opts.health]}.`,
-    `Chiffre d’affaires : ${spokenEuro(opts.ca)}.`,
-    `Impayés : ${spokenEuro(opts.unpaid)}.`,
-    `${opts.docs} document${opts.docs > 1 ? 's' : ''}`,
-  ]
-  if (opts.toReview > 0) {
-    parts.push(`dont ${opts.toReview} à relire.`)
+  const name = opts.firstName.trim()
+  const hello = name ? `${greetingHour()} ${name}.` : `${greetingHour()}.`
+  const parts = [hello, `Pour ${opts.orgName}, voilà l’essentiel.`]
+
+  if (opts.ca > 0) {
+    parts.push(`Le chiffre d’affaires est à ${spokenEuro(opts.ca)}.`)
   } else {
-    parts.push('à jour.')
+    parts.push(`Pas encore de chiffre d’affaires enregistré.`)
   }
-  if (opts.trialLabel) parts.push(opts.trialLabel)
+
+  if (opts.unpaid > 0) {
+    parts.push(`Il reste ${spokenEuro(opts.unpaid)} d’impayés à suivre.`)
+  } else {
+    parts.push(`Aucun impayé pour le moment.`)
+  }
+
+  if (opts.toReview > 0) {
+    parts.push(
+      opts.toReview === 1
+        ? `Un document attend une relecture.`
+        : `${opts.toReview} documents attendent une relecture.`,
+    )
+  }
+
   const priority = opts.alerts[0] || opts.recommendations[0]
-  if (priority) parts.push(`Priorité : ${priority}.`)
-  parts.push('Fin du récap.')
+  if (priority) {
+    parts.push(`Le point à regarder : ${softenPriority(priority)}.`)
+  }
+
   return parts.join(' ')
 }
 
@@ -108,7 +126,7 @@ export default function DashboardPage() {
       activeMembership?.permissions.includes('subscription.manage'),
   )
   const isElfAdmin = Boolean(user?.is_platform_admin)
-  const firstName = user?.first_name?.trim() || 'là'
+  const firstName = user?.first_name?.trim() || ''
 
   useEffect(() => {
     if (!token || !orgId) return
@@ -296,17 +314,15 @@ export default function DashboardPage() {
     const script = buildDashboardRecap({
       firstName,
       orgName: activeMembership?.organization_name || 'votre entreprise',
-      health,
       ca: pilot?.ca ?? 0,
       unpaid: unpaidAmount,
-      docs: stats.invoice_count,
       toReview: stats.to_review,
       alerts: pilot?.alerts ?? [],
       recommendations: pilot?.recommendations ?? [],
-      trialLabel: trialRemaining ? `Essai : ${trialRemaining} restant.` : null,
     })
     speakFrench(script, {
-      rate: 1.08,
+      rate: 0.86,
+      pitch: 0.84,
       onStart: () => setRecapSpeaking(true),
       onEnd: () => setRecapSpeaking(false),
     })
@@ -319,7 +335,8 @@ export default function DashboardPage() {
           <div>
             <span className="dash-welcome-eyebrow home-eyebrow">Copilote ComptaPilot</span>
             <h2 className="dash-welcome-title">
-              {greetingHour()} {firstName}
+              {greetingHour()}
+              {firstName ? ` ${firstName}` : ''}
             </h2>
           </div>
           <div className="dash-welcome-actions">
