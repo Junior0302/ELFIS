@@ -14,15 +14,29 @@ def test_email_not_configured_by_default(monkeypatch):
     assert email_transport() == "none"
 
 
-def test_brevo_preferred_when_key_set(monkeypatch):
+def test_brevo_used_when_smtp_incomplete(monkeypatch):
     from app import config
 
     monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
     monkeypatch.setattr(config.settings, "platform_email_from", "documents@elfiscore.com")
     monkeypatch.setattr(config.settings, "smtp_from", "")
     monkeypatch.setattr(config.settings, "smtp_host", "smtp.example.com")
+    monkeypatch.setattr(config.settings, "smtp_user", "")
+    monkeypatch.setattr(config.settings, "smtp_password", "")
     assert email_configured() is True
     assert email_transport() == "brevo"
+
+
+def test_smtp_preferred_when_fully_configured(monkeypatch):
+    from app import config
+
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "platform_email_from", "contact@elfis-core.com")
+    monkeypatch.setattr(config.settings, "smtp_host", "smtp-relay.brevo.com")
+    monkeypatch.setattr(config.settings, "smtp_user", "8dc723001@smtp-brevo.com")
+    monkeypatch.setattr(config.settings, "smtp_password", "xsmtpsib-test-key")
+    assert email_configured() is True
+    assert email_transport() == "smtp"
 
 
 def test_send_email_via_brevo_uses_org_identity(monkeypatch):

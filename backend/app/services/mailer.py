@@ -10,6 +10,14 @@ import httpx
 from app.config import settings
 
 
+def _normalize_credential(value: str) -> str:
+    """Nettoie les secrets collés depuis Render (guillemets, espaces invisibles)."""
+    cleaned = settings._clean_secret(value)
+    for ch in ("\u200b", "\u200c", "\u200d", "\ufeff", "\u00a0"):
+        cleaned = cleaned.replace(ch, "")
+    return cleaned.strip()
+
+
 @dataclass(frozen=True)
 class MailAttachment:
     filename: str
@@ -30,8 +38,64 @@ def _smtp_ready() -> bool:
     return bool(
         settings.smtp_host.strip()
         and settings.effective_platform_from
-        and (settings.smtp_user.strip() or settings.smtp_password.strip())
+        and settings.smtp_user.strip()
+        and settings.smtp_password.strip()
     )
+
+
+def _smtp_user_public() -> dict:
+    """Infos non secrètes sur SMTP_USER pour diagnostiquer un 535."""
+    user = _normalize_credential(settings.smtp_user)
+    password = _normalize_credential(settings.smtp_password)
+    looks_brevo_login = user.lower().endswith("@smtp-brevo.com")
+    masked = ""
+    if user:
+        if "@" in user:
+            local, _, domain = user.partition("@")
+            keep = local[:3] if len(local) > 3 else local[:1]
+            masked = f"{keep}…@{domain}"
+        else:
+            masked = f"{user[:3]}…" if len(user) > 3 else "***"
+    return {
+        "smtp_user_masked": masked,
+        "smtp_user_looks_brevo": looks_brevo_login,
+        "smtp_password_looks_brevo": password.startswith("xsmtpsib-") and len(password) > 20,
+        "smtp_password_length": len(password),
+        "smtp_host_value": settings.smtp_host.strip(),
+        "smtp_port_value": settings.smtp_port,
+    }
+
+
+def _probe_smtp_login() -> tuple[bool, str]:
+    """Vrai test d’auth SMTP (login + NOOP)."""
+    host = settings.smtp_host.strip()
+    user = _normalize_credential(settings.smtp_user)
+    password = _normalize_credential(settings.smtp_password)
+    if not host or not user or not password:
+        return False, "SMTP incomplet : SMTP_HOST, SMTP_USER et SMTP_PASSWORD requis."
+    try:
+        with smtplib.SMTP(host, settings.smtp_port, timeout=25) as smtp:
+            smtp.ehlo()
+            if settings.smtp_use_tls:
+                smtp.starttls()
+                smtp.ehlo()
+            smtp.login(user, password)
+            smtp.noop()
+        return True, ""
+    except smtplib.SMTPAuthenticationError as exc:
+        hint = (
+            "Auth SMTP refusée (535). "
+            "SMTP_USER doit être le login Brevo (…@smtp-brevo.com), "
+            "pas contact@ ni votre e-mail perso. "
+            "SMTP_PASSWORD = clé xsmtpsib-… (pas xkeysib-…)."
+        )
+        if not user.lower().endswith("@smtp-brevo.com"):
+            hint += (
+                f" Login actuel (masqué) : {_smtp_user_public()['smtp_user_masked']} — forme incorrecte."
+            )
+        return False, f"{hint} Détail: {exc}"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"Connexion SMTP impossible: {exc}"
 
 
 def email_configured() -> bool:
@@ -66,6 +130,7 @@ def email_status_public() -> dict:
         "has_smtp_host": bool(settings.smtp_host.strip()),
         "has_smtp_user": bool(settings.smtp_user.strip()),
         "has_smtp_password": bool(settings.smtp_password.strip()),
+        **_smtp_user_public(),
         "has_brevo_api_key": bool(key),
         "brevo_key_looks_valid": key.startswith("xkeysib-") and len(key) > 40,
         "brevo_key_prefix": key_prefix,
@@ -78,17 +143,25 @@ def email_status_public() -> dict:
 
 
 def probe_brevo_account() -> dict:
-    """Valide SMTP (prioritaire) ou ping API Brevo."""
+    """Valide SMTP par login réel (prioritaire) ou ping API Brevo."""
     status = email_status_public()
     if status["transport"] == "smtp" and status["smtp_ready"]:
+        ok, error = _probe_smtp_login()
+        if ok:
+            return {
+                **status,
+                "brevo_ok": True,
+                "brevo_error": "",
+                "hint": (
+                    "Auth SMTP Brevo validée "
+                    f"({settings.smtp_host.strip()} → {status['platform_from']})."
+                ),
+            }
         return {
             **status,
-            "brevo_ok": True,
-            "brevo_error": "",
-            "hint": (
-                "Envoi via SMTP Brevo prêt "
-                f"({settings.smtp_host.strip()} → {status['platform_from']})."
-            ),
+            "brevo_ok": False,
+            "brevo_error": error,
+            "hint": error,
         }
     key = settings.brevo_api_key.strip()
     if not key:
@@ -172,6 +245,11 @@ def send_email(
     from_email = (sender_email or settings.effective_platform_from).strip()
     from_name = (sender_name or settings.effective_platform_from_name).strip() or "ComptaPilot"
     transport = email_transport()
+    cc_list = [e.strip() for e in (cc or []) if e and e.strip()]
+    bcc_list = [e.strip() for e in (bcc or []) if e and e.strip()]
+    reply_email = (reply_to_email or "").strip() or None
+    reply_name = (reply_to_name or "").strip() or None
+    files = attachments or []
 
     if transport == "brevo":
         return _send_via_brevo(
@@ -179,31 +257,54 @@ def send_email(
             subject=subject,
             body=body,
             html_body=html_body,
-            attachments=attachments or [],
+            attachments=files,
             from_email=from_email,
             from_name=from_name,
-            reply_to_email=(reply_to_email or "").strip() or None,
-            reply_to_name=(reply_to_name or "").strip() or None,
-            cc=[e.strip() for e in (cc or []) if e and e.strip()],
-            bcc=[e.strip() for e in (bcc or []) if e and e.strip()],
+            reply_to_email=reply_email,
+            reply_to_name=reply_name,
+            cc=cc_list,
+            bcc=bcc_list,
         )
 
-    _send_via_smtp(
-        to_email=recipient,
-        subject=subject,
-        body=body,
-        attachments=attachments or [],
-        from_email=from_email,
-        from_name=from_name,
-        reply_to_email=(reply_to_email or "").strip() or None,
-        cc=[e.strip() for e in (cc or []) if e and e.strip()],
-        bcc=[e.strip() for e in (bcc or []) if e and e.strip()],
-    )
-    return SendEmailResult(
-        provider="smtp",
-        sender_email=from_email,
-        sender_name=from_name,
-    )
+    try:
+        _send_via_smtp(
+            to_email=recipient,
+            subject=subject,
+            body=body,
+            attachments=files,
+            from_email=from_email,
+            from_name=from_name,
+            reply_to_email=reply_email,
+            cc=cc_list,
+            bcc=bcc_list,
+        )
+        return SendEmailResult(
+            provider="smtp",
+            sender_email=from_email,
+            sender_name=from_name,
+        )
+    except RuntimeError as smtp_exc:
+        # Repli API si le login SMTP est refusé (535) mais qu'une clé API est présente.
+        if not settings.brevo_api_key.strip():
+            raise
+        if "535" not in str(smtp_exc) and "Auth SMTP" not in str(smtp_exc):
+            raise
+        try:
+            return _send_via_brevo(
+                to_email=recipient,
+                subject=subject,
+                body=body,
+                html_body=html_body,
+                attachments=files,
+                from_email=from_email,
+                from_name=from_name,
+                reply_to_email=reply_email,
+                reply_to_name=reply_name,
+                cc=cc_list,
+                bcc=bcc_list,
+            )
+        except RuntimeError as api_exc:
+            raise RuntimeError(f"{smtp_exc} | Repli API: {api_exc}") from api_exc
 
 
 def _send_via_brevo(
@@ -328,9 +429,24 @@ def _send_via_smtp(
             filename=item.filename,
         )
     recipients = [to_email, *cc, *bcc]
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
-        if settings.smtp_use_tls:
-            smtp.starttls()
-        if settings.smtp_user:
-            smtp.login(settings.smtp_user, settings.smtp_password)
-        smtp.send_message(msg, to_addrs=recipients)
+    user = _normalize_credential(settings.smtp_user)
+    password = _normalize_credential(settings.smtp_password)
+    host = settings.smtp_host.strip()
+    try:
+        with smtplib.SMTP(host, settings.smtp_port, timeout=30) as smtp:
+            smtp.ehlo()
+            if settings.smtp_use_tls:
+                smtp.starttls()
+                smtp.ehlo()
+            if user:
+                smtp.login(user, password)
+            smtp.send_message(msg, to_addrs=recipients)
+    except smtplib.SMTPAuthenticationError as exc:
+        masked = _smtp_user_public()["smtp_user_masked"] or "—"
+        raise RuntimeError(
+            "Auth SMTP Brevo refusée (535). "
+            f"Login utilisé (masqué) : {masked}. "
+            "SMTP_USER doit être …@smtp-brevo.com ; "
+            "SMTP_PASSWORD = clé xsmtpsib-… . "
+            f"Détail: {exc}"
+        ) from exc

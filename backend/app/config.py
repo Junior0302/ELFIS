@@ -85,6 +85,9 @@ class Settings(BaseSettings):
         self.stripe_webhook_secret = self._clean_secret(self.stripe_webhook_secret)
         self.stripe_price_pro = self.stripe_price_pro.strip()
         self.brevo_api_key = self._clean_secret(self.brevo_api_key)
+        self.smtp_user = self._clean_secret(self.smtp_user)
+        self.smtp_password = self._clean_secret(self.smtp_password)
+        self.smtp_host = (self.smtp_host or "").strip()
         self.platform_email_from = (self.platform_email_from or "").strip()
         self.smtp_from = (self.smtp_from or "").strip()
         self.frontend_url = self.frontend_url.strip() or "http://localhost:5173"

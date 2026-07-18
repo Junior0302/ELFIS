@@ -57,6 +57,11 @@ type MailStatus = {
   brevo_ok?: boolean
   brevo_error?: string
   brevo_account_email?: string
+  smtp_user_masked?: string
+  smtp_user_looks_brevo?: boolean
+  smtp_password_looks_brevo?: boolean
+  smtp_host_value?: string
+  smtp_port_value?: number
 }
 
 export default function PlatformProfessionalEmailsPage() {
@@ -253,11 +258,18 @@ export default function PlatformProfessionalEmailsPage() {
           {mailStatus.brevo_ok ? (
             <>
               <strong>
-                {mailStatus.transport === 'smtp' ? 'Brevo OK — SMTP prêt' : 'Brevo OK — API prête'}
+                {mailStatus.transport === 'smtp'
+                  ? 'Brevo OK — auth SMTP validée'
+                  : 'Brevo OK — API prête'}
               </strong>
               {mailStatus.brevo_account_email ? (
                 <span>
                   Compte Brevo : <code>{mailStatus.brevo_account_email}</code>
+                </span>
+              ) : null}
+              {mailStatus.smtp_user_masked ? (
+                <span>
+                  Login SMTP : <code>{mailStatus.smtp_user_masked}</code>
                 </span>
               ) : null}
               <span>
@@ -268,18 +280,30 @@ export default function PlatformProfessionalEmailsPage() {
             </>
           ) : (
             <>
-              <strong>Envoi KO</strong>
+              <strong>Envoi KO — auth non validée</strong>
               <span>{mailStatus.brevo_error || mailStatus.hint}</span>
+              {mailStatus.smtp_user_masked ? (
+                <span>
+                  Login SMTP vu par l’API : <code>{mailStatus.smtp_user_masked}</code>
+                  {mailStatus.smtp_user_looks_brevo === false
+                    ? ' — doit finir par @smtp-brevo.com'
+                    : ''}
+                </span>
+              ) : null}
+              {mailStatus.smtp_password_looks_brevo === false ? (
+                <span>
+                  Mot de passe SMTP : forme inattendue (attendu <code>xsmtpsib-…</code>).
+                </span>
+              ) : (
+                <span>
+                  Mot de passe SMTP : forme <code>xsmtpsib-</code> OK — vérifiez surtout{' '}
+                  <code>SMTP_USER</code>.
+                </span>
+              )}
               <span>
-                Solution simple : dans Brevo utilisez <strong>Générer une clé SMTP</strong>, puis sur
-                Render renseignez :
+                Sur Render : <code>SMTP_USER</code> = login Brevo <code>…@smtp-brevo.com</code> ·{' '}
+                <code>SMTP_PASSWORD</code> = clé <code>xsmtpsib-…</code> · puis Manual Deploy.
               </span>
-              <span>
-                <code>SMTP_HOST=smtp-relay.brevo.com</code> · <code>SMTP_PORT=587</code> ·{' '}
-                <code>SMTP_USER</code> (login Brevo) · <code>SMTP_PASSWORD</code> (clé SMTP) ·{' '}
-                <code>PLATFORM_EMAIL_FROM=contact@elfis-core.com</code>
-              </span>
-              <span>Puis Manual Deploy. L’API BREVO_API_KEY n’est plus obligatoire.</span>
             </>
           )}
         </div>
