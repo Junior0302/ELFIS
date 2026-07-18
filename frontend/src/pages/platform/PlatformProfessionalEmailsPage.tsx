@@ -46,10 +46,17 @@ type MailStatus = {
   configured: boolean
   transport: string
   has_brevo_api_key: boolean
+  brevo_key_looks_valid?: boolean
+  brevo_key_prefix?: string
+  brevo_key_suffix?: string
+  brevo_key_length?: number
   has_platform_from: boolean
   platform_from: string
   notify_to: string
   hint: string
+  brevo_ok?: boolean
+  brevo_error?: string
+  brevo_account_email?: string
 }
 
 export default function PlatformProfessionalEmailsPage() {
@@ -240,24 +247,38 @@ export default function PlatformProfessionalEmailsPage() {
 
       {mailStatus && (
         <div
-          className={`platform-alert ${mailStatus.configured ? 'platform-alert-ok' : ''}`}
+          className={`platform-alert ${mailStatus.brevo_ok ? 'platform-alert-ok' : ''}`}
           role="status"
         >
-          {mailStatus.configured ? (
+          {mailStatus.brevo_ok ? (
             <>
-              <strong>Envoi automatique OK</strong>
+              <strong>Brevo OK — clé acceptée</strong>
+              <span>
+                Compte Brevo : <code>{mailStatus.brevo_account_email || '—'}</code>
+              </span>
               <span>
                 De <code>{mailStatus.platform_from || '—'}</code> →{' '}
-                <code>{mailStatus.notify_to}</code> ({mailStatus.transport})
+                <code>{mailStatus.notify_to}</code>
               </span>
             </>
           ) : (
             <>
-              <strong>Envoi automatique KO</strong>
-              <span>{mailStatus.hint}</span>
+              <strong>Brevo KO — la clé est refusée</strong>
+              <span>{mailStatus.brevo_error || mailStatus.hint}</span>
               <span>
-                Clé Brevo : {mailStatus.has_brevo_api_key ? 'présente' : 'manquante'} · From :{' '}
-                {mailStatus.platform_from || 'vide'}
+                Clé vue par le serveur :{' '}
+                <code>
+                  {mailStatus.brevo_key_prefix || '…'}…{mailStatus.brevo_key_suffix || ''}
+                </code>{' '}
+                ({mailStatus.brevo_key_length || 0} car.)
+                {mailStatus.brevo_key_looks_valid === false
+                  ? ' — format suspect (doit commencer par xkeysib-)'
+                  : ''}
+              </span>
+              <span>
+                From : <code>{mailStatus.platform_from || 'vide'}</code> · Régénérez la clé API dans
+                Brevo, recollez-la dans Render <code>BREVO_API_KEY</code> sans guillemets, puis
+                Manual Deploy.
               </span>
             </>
           )}

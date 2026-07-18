@@ -1092,11 +1092,19 @@ export const api = {
       configured: boolean
       transport: string
       has_brevo_api_key: boolean
+      brevo_key_looks_valid?: boolean
+      brevo_key_prefix?: string
+      brevo_key_suffix?: string
+      brevo_key_length?: number
       has_platform_from: boolean
       platform_from: string
       platform_from_name: string
       notify_to: string
       hint: string
+      brevo_ok?: boolean
+      brevo_error?: string
+      brevo_account_email?: string
+      brevo_http?: number
     }>('/platform/email-status', undefined, { token }),
   platformOrganizations: (token: string) =>
     request<{ organizations: PlatformOrganization[] }>('/platform/organizations', undefined, { token }),

@@ -44,13 +44,78 @@ def email_transport() -> str:
 def email_status_public() -> dict:
     """État e-mail plateforme (sans secrets) pour diagnostic admin."""
     from_email = settings.effective_platform_from
+    key = settings.brevo_api_key.strip()
+    key_prefix = ""
+    key_suffix = ""
+    if key:
+        key_prefix = key[:10]
+        key_suffix = key[-4:] if len(key) > 4 else ""
     return {
         "configured": email_configured(),
         "transport": email_transport(),
-        "has_brevo_api_key": bool(settings.brevo_api_key.strip()),
+        "has_brevo_api_key": bool(key),
+        "brevo_key_looks_valid": key.startswith("xkeysib-") and len(key) > 40,
+        "brevo_key_prefix": key_prefix,
+        "brevo_key_suffix": key_suffix,
+        "brevo_key_length": len(key),
         "has_platform_from": bool(from_email),
         "platform_from": from_email,
         "platform_from_name": settings.effective_platform_from_name,
+    }
+
+
+def probe_brevo_account() -> dict:
+    """Appelle GET /v3/account pour valider la clé sans envoyer de mail."""
+    status = email_status_public()
+    key = settings.brevo_api_key.strip()
+    if not key:
+        return {
+            **status,
+            "brevo_ok": False,
+            "brevo_error": "BREVO_API_KEY vide côté serveur.",
+        }
+    try:
+        response = httpx.get(
+            "https://api.brevo.com/v3/account",
+            headers={
+                "api-key": key,
+                "accept": "application/json",
+            },
+            timeout=20.0,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {**status, "brevo_ok": False, "brevo_error": f"Réseau Brevo: {exc}"}
+
+    if response.status_code >= 400:
+        detail = ""
+        try:
+            data = response.json()
+            detail = str(data.get("message") or data.get("code") or response.text[:200])
+        except Exception:  # noqa: BLE001
+            detail = (response.text or "")[:200]
+        return {
+            **status,
+            "brevo_ok": False,
+            "brevo_http": response.status_code,
+            "brevo_error": detail or f"HTTP {response.status_code}",
+            "hint": (
+                "Regénérez une clé API dans Brevo (SMTP & API → API Keys), "
+                "collez-la dans Render BREVO_API_KEY sans guillemets, puis Manual Deploy."
+            ),
+        }
+
+    email = ""
+    try:
+        data = response.json()
+        email = str(data.get("email") or "")
+    except Exception:  # noqa: BLE001
+        email = ""
+    return {
+        **status,
+        "brevo_ok": True,
+        "brevo_http": response.status_code,
+        "brevo_account_email": email,
+        "hint": "Clé Brevo acceptée. Si l’envoi échoue encore, validez contact@ comme expéditeur.",
     }
 
 
@@ -158,7 +223,7 @@ def _send_via_brevo(
     response = httpx.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={
-            "api-key": settings.brevo_api_key.strip(),
+            "api-key": settings._clean_secret(settings.brevo_api_key),
             "accept": "application/json",
             "content-type": "application/json",
         },

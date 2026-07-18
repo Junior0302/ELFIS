@@ -9,7 +9,7 @@ from app.database import get_db
 from app.deps import require_platform_admin
 from app.models_saas import Organization, OrganizationMember, Role, Subscription, User
 from app.services.auth import write_audit
-from app.services.mailer import email_status_public
+from app.services.mailer import email_status_public, probe_brevo_account
 from app.services.professional_emails import ADMIN_NOTIFY_TO
 from app.services.stripe_billing import serialize_subscription
 
@@ -22,16 +22,16 @@ router = APIRouter(
 
 @router.get("/email-status")
 def platform_email_status():
-    """Diagnostic Brevo / PLATFORM_EMAIL_FROM (sans secrets)."""
-    status = email_status_public()
+    """Diagnostic Brevo / PLATFORM_EMAIL_FROM (sans secrets) + ping compte Brevo."""
+    probed = probe_brevo_account()
     return {
-        **status,
+        **probed,
         "notify_to": ADMIN_NOTIFY_TO,
-        "hint": (
+        "hint": probed.get("hint")
+        or (
             "OK pour envoyer les demandes vers urequest@"
-            if status["configured"]
-            else "Sur Render : BREVO_API_KEY + PLATFORM_EMAIL_FROM=contact@elfis-core.com "
-            "(expéditeur validé dans Brevo)."
+            if probed.get("brevo_ok")
+            else "Sur Render : BREVO_API_KEY (clé xkeysib-…) + PLATFORM_EMAIL_FROM=contact@elfis-core.com"
         ),
     }
 

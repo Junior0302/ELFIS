@@ -69,11 +69,24 @@ class Settings(BaseSettings):
     def effective_platform_from_name(self) -> str:
         return (self.platform_email_from_name or self.product_name or "ComptaPilot").strip()
 
+    @staticmethod
+    def _clean_secret(value: str) -> str:
+        """Enlève guillemets / espaces / retours ligne collés depuis Render."""
+        cleaned = (value or "").strip()
+        if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in {'"', "'"}:
+            cleaned = cleaned[1:-1].strip()
+        if cleaned.lower().startswith("bearer "):
+            cleaned = cleaned[7:].strip()
+        return cleaned.replace("\r", "").replace("\n", "").strip()
+
     @model_validator(mode="after")
     def validate_production_security(self):
-        self.stripe_secret_key = self.stripe_secret_key.strip()
-        self.stripe_webhook_secret = self.stripe_webhook_secret.strip()
+        self.stripe_secret_key = self._clean_secret(self.stripe_secret_key)
+        self.stripe_webhook_secret = self._clean_secret(self.stripe_webhook_secret)
         self.stripe_price_pro = self.stripe_price_pro.strip()
+        self.brevo_api_key = self._clean_secret(self.brevo_api_key)
+        self.platform_email_from = (self.platform_email_from or "").strip()
+        self.smtp_from = (self.smtp_from or "").strip()
         self.frontend_url = self.frontend_url.strip() or "http://localhost:5173"
         if self.app_env.lower() != "production":
             return self
