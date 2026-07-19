@@ -107,16 +107,30 @@ def _probe_smtp_login() -> tuple[bool, str]:
         return False, f"Connexion SMTP impossible: {exc}"
 
 
+def _brevo_api_key() -> str:
+    return settings._clean_secret(settings.brevo_api_key)
+
+
+def _brevo_api_key_usable() -> bool:
+    """Clé API Brevo (xkeysib-…), pas la clé SMTP (xsmtpsib-…)."""
+    key = _brevo_api_key()
+    if not key or not settings.effective_platform_from:
+        return False
+    if key.lower().startswith("xsmtpsib-"):
+        return False
+    return key.startswith("xkeysib-") and len(key) > 40
+
+
 def email_configured() -> bool:
     """True si SMTP Brevo ou API Brevo est prêt (clés plateforme uniquement)."""
     if _smtp_ready():
         return True
-    return bool(settings.brevo_api_key.strip() and settings.effective_platform_from)
+    return _brevo_api_key_usable()
 
 
 def email_transport() -> str:
-    # API Brevo en priorité (évite les 535 SMTP récurrents) ; SMTP en secours.
-    if settings.brevo_api_key.strip() and settings.effective_platform_from:
+    # API Brevo seulement si la clé ressemble à xkeysib- ; sinon SMTP.
+    if _brevo_api_key_usable():
         return "brevo"
     if _smtp_ready():
         return "smtp"
@@ -126,12 +140,13 @@ def email_transport() -> str:
 def email_status_public() -> dict:
     """État e-mail plateforme (sans secrets) pour diagnostic admin."""
     from_email = settings.effective_platform_from
-    key = settings.brevo_api_key.strip()
+    key = _brevo_api_key()
     key_prefix = ""
     key_suffix = ""
     if key:
         key_prefix = key[:10]
         key_suffix = key[-4:] if len(key) > 4 else ""
+    looks_smtp_key = key.lower().startswith("xsmtpsib-")
     return {
         "configured": email_configured(),
         "transport": email_transport(),
@@ -141,7 +156,8 @@ def email_status_public() -> dict:
         "has_smtp_password": bool(settings.smtp_password.strip()),
         **_smtp_user_public(),
         "has_brevo_api_key": bool(key),
-        "brevo_key_looks_valid": key.startswith("xkeysib-") and len(key) > 40,
+        "brevo_key_looks_valid": _brevo_api_key_usable(),
+        "brevo_key_is_smtp_key_by_mistake": looks_smtp_key,
         "brevo_key_prefix": key_prefix,
         "brevo_key_suffix": key_suffix,
         "brevo_key_length": len(key),
@@ -172,7 +188,7 @@ def probe_brevo_account() -> dict:
             "brevo_error": error,
             "hint": error,
         }
-    key = settings.brevo_api_key.strip()
+    key = _brevo_api_key()
     if not key:
         return {
             **status,
@@ -180,6 +196,16 @@ def probe_brevo_account() -> dict:
             "brevo_error": (
                 "Ni SMTP ni clé API. Sur Render ajoutez SMTP_HOST / SMTP_USER / "
                 "SMTP_PASSWORD (clé SMTP Brevo) ou BREVO_API_KEY."
+            ),
+        }
+    if key.lower().startswith("xsmtpsib-"):
+        return {
+            **status,
+            "brevo_ok": False,
+            "brevo_error": "BREVO_API_KEY contient une clé SMTP (xsmtpsib-).",
+            "hint": (
+                "Dans Brevo → SMTP & API → Clés API, créez une clé API (xkeysib-…) "
+                "et mettez-la dans BREVO_API_KEY. La clé xsmtpsib- va dans SMTP_PASSWORD."
             ),
         }
     try:
@@ -360,10 +386,23 @@ def _send_via_brevo(
             for item in attachments
         ]
 
+    api_key = _brevo_api_key()
+    if api_key.lower().startswith("xsmtpsib-"):
+        raise RuntimeError(
+            "BREVO_API_KEY contient une clé SMTP (xsmtpsib-). "
+            "Utilisez une clé API (xkeysib-…) dans BREVO_API_KEY, "
+            "et xsmtpsib-… uniquement dans SMTP_PASSWORD."
+        )
+    if not api_key.startswith("xkeysib-"):
+        raise RuntimeError(
+            "BREVO_API_KEY invalide : elle doit commencer par xkeysib-. "
+            "Sur Render : Manual Deploy après avoir collé la clé (sans guillemets)."
+        )
+
     response = httpx.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={
-            "api-key": settings._clean_secret(settings.brevo_api_key),
+            "api-key": api_key,
             "accept": "application/json",
             "content-type": "application/json",
         },
@@ -383,9 +422,8 @@ def _send_via_brevo(
         except Exception:  # noqa: BLE001
             detail = (response.text or "")[:280]
         hint = (
-            "Sur Render → Environment : collez une vraie clé API Brevo dans BREVO_API_KEY "
-            "(SMTP & API → API Keys), puis PLATFORM_EMAIL_FROM=contact@elfis-core.com "
-            "(expéditeur validé dans Brevo)."
+            "Sur Render → Environment → BREVO_API_KEY : collez une clé API xkeysib-… "
+            "sans guillemets, puis Manual Deploy (pas seulement Save)."
         )
         if "key not found" in detail.lower() or "unauthorized" in detail.lower():
             raise RuntimeError(
