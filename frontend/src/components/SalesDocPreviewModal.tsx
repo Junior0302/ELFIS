@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import {
   api,
   type DocumentEmailLog,
@@ -91,11 +92,44 @@ export default function SalesDocPreviewModal({
       .then((data) => {
         if (cancelled) return
         setLogs(data.email_logs)
-        setConnections(data.connections || [])
-        setEmailReady(
-          Boolean(data.can_send_direct || data.email_configured || data.smtp_configured),
+        const conns = data.connections || []
+        setConnections(conns)
+        // Prêt si Brevo/platform OU au moins une boîte connectée (Google/Microsoft/SMTP)
+        const hasMailbox = conns.some(
+          (c) =>
+            c.status === 'connected' &&
+            (c.provider === 'google' ||
+              c.provider === 'microsoft' ||
+              c.provider === 'custom_smtp' ||
+              c.provider === 'platform'),
         )
-        setConnectionId(data.default_connection_id ?? data.preview?.connection_id ?? null)
+        setEmailReady(
+          Boolean(
+            hasMailbox ||
+              data.can_send_direct ||
+              data.email_configured ||
+              data.smtp_configured,
+          ),
+        )
+        const preferred =
+          conns.find(
+            (c) =>
+              c.id === data.default_connection_id &&
+              c.status === 'connected' &&
+              c.provider !== 'platform',
+          ) ||
+          conns.find(
+            (c) =>
+              c.status === 'connected' &&
+              (c.provider === 'google' ||
+                c.provider === 'microsoft' ||
+                c.provider === 'custom_smtp'),
+          ) ||
+          conns.find((c) => c.id === data.default_connection_id) ||
+          conns.find((c) => c.status === 'connected')
+        setConnectionId(
+          preferred?.id ?? data.default_connection_id ?? data.preview?.connection_id ?? null,
+        )
         if (data.preview) {
           setPreview(data.preview)
           setRecipient(data.preview.recipient || doc.customer_email || '')
@@ -280,7 +314,7 @@ export default function SalesDocPreviewModal({
                 </p>
               )}
 
-              {connections.length > 1 && (
+              {connections.filter((c) => c.status === 'connected').length > 0 && (
                 <div className="field">
                   <label>Boîte d’envoi</label>
                   <select
@@ -289,12 +323,20 @@ export default function SalesDocPreviewModal({
                       setConnectionId(e.target.value ? Number(e.target.value) : null)
                     }
                   >
-                    {connections.map((conn) => (
-                      <option key={conn.id} value={conn.id}>
-                        {conn.display_name || conn.email_address} ({conn.provider})
-                      </option>
-                    ))}
+                    {connections
+                      .filter((c) => c.status === 'connected')
+                      .map((conn) => (
+                        <option key={conn.id} value={conn.id}>
+                          {conn.display_name || conn.email_address} ({conn.provider}
+                          {conn.is_default ? ' · défaut' : ''})
+                        </option>
+                      ))}
                   </select>
+                  <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
+                    Astuce : connectez Google / Microsoft dans{' '}
+                    <Link to="/settings">Paramètres</Link> pour envoyer depuis votre boîte avec le
+                    PDF joint.
+                  </p>
                 </div>
               )}
 
