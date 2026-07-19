@@ -49,7 +49,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="ELFIS Core API",
     description="Moteur IA commun — ComptaPilot IA (AI Finance Copilot)",
-    version="0.8.7",
+    version="0.8.8",
     lifespan=lifespan,
 )
 
@@ -164,27 +164,29 @@ app.include_router(modules.router, prefix="/api")
 
 @app.get("/api/health")
 def health():
-    from app.services.mailer import email_configured, email_transport
+    from app.services.mailer import email_configured, email_transport, probe_brevo_account
 
     firebase_ok = bool(settings.firebase_web_api_key and settings.firebase_project_id)
     stripe_ok = bool(settings.stripe_secret_key and settings.stripe_price_pro)
+    email_probe = probe_brevo_account()
     return {
         "status": "ok",
         "app": settings.app_name,
         "product": settings.product_name,
         "details": {
             "slogan": "Déposez une facture. L'IA prépare votre comptabilité.",
-            "version": "0.8.7",
+            "version": "0.8.8",
             "auth_required": settings.auth_required,
             "billing_ready": stripe_ok,
             "auth_ready": firebase_ok,
             "email_ready": email_configured(),
             "email_transport": email_transport(),
             "platform_email_from": settings.effective_platform_from or "",
-            "brevo_key_looks_valid": (
-                settings._clean_secret(settings.brevo_api_key).startswith("xkeysib-")
-                and len(settings._clean_secret(settings.brevo_api_key)) > 40
-            ),
-            "brevo_key_prefix": (settings._clean_secret(settings.brevo_api_key)[:10] or ""),
+            "brevo_key_looks_valid": bool(email_probe.get("brevo_key_looks_valid")),
+            "brevo_key_prefix": email_probe.get("brevo_key_prefix") or "",
+            "smtp_ready": bool(email_probe.get("smtp_ready")),
+            "brevo_ok": bool(email_probe.get("brevo_ok")),
+            "brevo_error": (email_probe.get("brevo_error") or "")[:180],
+            "email_hint": (email_probe.get("hint") or "")[:220],
         },
     }

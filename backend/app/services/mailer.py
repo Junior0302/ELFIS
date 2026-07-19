@@ -129,11 +129,12 @@ def email_configured() -> bool:
 
 
 def email_transport() -> str:
-    # API Brevo seulement si la clé ressemble à xkeysib- ; sinon SMTP.
-    if _brevo_api_key_usable():
-        return "brevo"
+    # SMTP prioritaire si configuré (souvent OK même quand la clé API est refusée).
+    # API Brevo en secours / si SMTP absent.
     if _smtp_ready():
         return "smtp"
+    if _brevo_api_key_usable():
+        return "brevo"
     return "none"
 
 
@@ -170,7 +171,7 @@ def email_status_public() -> dict:
 def probe_brevo_account() -> dict:
     """Valide SMTP par login réel (prioritaire) ou ping API Brevo."""
     status = email_status_public()
-    if status["transport"] == "smtp" and status["smtp_ready"]:
+    if status["smtp_ready"]:
         ok, error = _probe_smtp_login()
         if ok:
             return {
@@ -182,11 +183,10 @@ def probe_brevo_account() -> dict:
                     f"({settings.smtp_host.strip()} → {status['platform_from']})."
                 ),
             }
-        return {
+        # SMTP HS : continuer vers le test API pour un diagnostic complet
+        status = {
             **status,
-            "brevo_ok": False,
-            "brevo_error": error,
-            "hint": error,
+            "smtp_probe_error": error,
         }
     key = _brevo_api_key()
     if not key:
@@ -279,53 +279,28 @@ def send_email(
 
     from_email = (sender_email or settings.effective_platform_from).strip()
     from_name = (sender_name or settings.effective_platform_from_name).strip() or "ComptaPilot"
-    transport = email_transport()
     cc_list = [e.strip() for e in (cc or []) if e and e.strip()]
     bcc_list = [e.strip() for e in (bcc or []) if e and e.strip()]
     reply_email = (reply_to_email or "").strip() or None
     reply_name = (reply_to_name or "").strip() or None
     files = attachments or []
 
-    if transport == "brevo":
-        try:
-            return _send_via_brevo(
-                to_email=recipient,
-                subject=subject,
-                body=body,
-                html_body=html_body,
-                attachments=files,
-                from_email=from_email,
-                from_name=from_name,
-                reply_to_email=reply_email,
-                reply_to_name=reply_name,
-                cc=cc_list,
-                bcc=bcc_list,
-            )
-        except RuntimeError as api_exc:
-            # Repli SMTP si l’API refuse (clé API) mais que SMTP est prêt.
-            if not _smtp_ready():
-                raise
-            try:
-                _send_via_smtp(
-                    to_email=recipient,
-                    subject=subject,
-                    body=body,
-                    attachments=files,
-                    from_email=from_email,
-                    from_name=from_name,
-                    reply_to_email=reply_email,
-                    cc=cc_list,
-                    bcc=bcc_list,
-                )
-                return SendEmailResult(
-                    provider="smtp",
-                    sender_email=from_email,
-                    sender_name=from_name,
-                )
-            except RuntimeError as smtp_exc:
-                raise RuntimeError(str(api_exc) or str(smtp_exc)) from smtp_exc
+    def _via_brevo() -> SendEmailResult:
+        return _send_via_brevo(
+            to_email=recipient,
+            subject=subject,
+            body=body,
+            html_body=html_body,
+            attachments=files,
+            from_email=from_email,
+            from_name=from_name,
+            reply_to_email=reply_email,
+            reply_to_name=reply_name,
+            cc=cc_list,
+            bcc=bcc_list,
+        )
 
-    try:
+    def _via_smtp() -> SendEmailResult:
         _send_via_smtp(
             to_email=recipient,
             subject=subject,
@@ -342,8 +317,24 @@ def send_email(
             sender_email=from_email,
             sender_name=from_name,
         )
-    except RuntimeError:
-        raise
+
+    # SMTP d’abord (souvent OK même si la clé API est refusée), puis API en secours.
+    errors: list[str] = []
+    if _smtp_ready():
+        try:
+            return _via_smtp()
+        except RuntimeError as smtp_exc:
+            errors.append(str(smtp_exc))
+    if _brevo_api_key_usable():
+        try:
+            return _via_brevo()
+        except RuntimeError as api_exc:
+            errors.append(str(api_exc))
+    if errors:
+        raise RuntimeError(" | ".join(errors[:2]))
+    raise RuntimeError(
+        "Aucun canal d’envoi disponible. Configurez SMTP_* ou BREVO_API_KEY sur Render."
+    )
 
 
 def _send_via_brevo(

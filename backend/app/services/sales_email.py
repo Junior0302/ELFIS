@@ -47,11 +47,19 @@ def _user_facing_error(exc: Exception) -> tuple[str, str]:
             "Sur Render : SMTP_USER = login …@smtp-brevo.com, "
             "SMTP_PASSWORD = clé xsmtpsib-…, ou renseignez BREVO_API_KEY (xkeysib-…).",
         )
-    if "key not found" in lower or "clé brevo invalide" in lower:
+    if "xsmtpsib" in lower and "brevo_api_key" in lower:
+        return (
+            "brevo_wrong_key_type",
+            "BREVO_API_KEY contient une clé SMTP. Mettez xkeysib-… dans BREVO_API_KEY "
+            "et xsmtpsib-… dans SMTP_PASSWORD, puis Manual Deploy.",
+        )
+    if "key not found" in lower or "clé brevo invalide" in lower or "clé api brevo invalide" in lower:
         return (
             "brevo_key_invalid",
-            "Clé API Brevo invalide. Sur Render, mettez à jour BREVO_API_KEY "
-            "(SMTP & API → API Keys, préfixe xkeysib-…).",
+            "Brevo refuse la clé API (Key not found). "
+            "Dans Brevo → SMTP & API → Clés API : désactivez les IP autorisées, "
+            "régénérez une clé xkeysib-…, collez-la dans Render BREVO_API_KEY, "
+            "puis Manual Deploy. Vérifiez aussi SMTP_PASSWORD (xsmtpsib-…).",
         )
     if "sender" in lower and (
         "not verified" in lower or "invalid" in lower or "unrecognised" in lower or "unauthorized" in lower
