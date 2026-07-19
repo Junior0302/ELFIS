@@ -152,9 +152,8 @@ export default function DevisPage() {
             aussi disponible dans <Link to="/facturation">Facturation</Link>.
           </p>
           <p className="muted" style={{ marginTop: '0.5rem' }}>
-            À l’envoi : <strong>1)</strong> votre messagerie personnelle, ou <strong>2)</strong>{' '}
-            votre adresse ELFIS Core (après demande dans <Link to="/compte">Mon compte</Link> et
-            validation admin).
+            À l’envoi : ouvrez le devis puis <strong>Envoyer maintenant</strong> — le PDF part
+            automatiquement en pièce jointe.
           </p>
         </div>
       </div>

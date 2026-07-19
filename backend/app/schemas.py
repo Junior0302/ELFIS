@@ -111,6 +111,9 @@ class InvoiceOut(BaseModel):
     anomalies: list[str] = Field(default_factory=list)
     missing_fields: list[str] = Field(default_factory=list)
     accounting_entry: AccountingEntry | None = None
+    supplier_contact_id: int | None = None
+    customer_contact_id: int | None = None
+    contact_suggestions: list[dict] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

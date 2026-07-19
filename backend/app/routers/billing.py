@@ -132,8 +132,8 @@ class EmailSendIn(BaseModel):
     is_test: bool = False
     idempotency_key: str | None = None
     connection_id: int | None = None
-    # mailto = ouverture messagerie utilisateur (sans SMTP) ; server = Brevo/OAuth
-    send_mode: str = "mailto"
+    # server = envoi backend + PDF joint ; mailto = messagerie utilisateur (secours)
+    send_mode: str = "server"
     sender_acknowledged: bool = False
     # Expéditeur choisi (ELFIS pro / perso) — utilisé pour Reply-To et journal
     preferred_from_email: str | None = None

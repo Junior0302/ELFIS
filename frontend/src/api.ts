@@ -16,6 +16,82 @@ export type AccountingEntry = {
   imputation?: string
 }
 
+export type ContactExtractedData = {
+  company_name?: string | null
+  trade_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  siren?: string | null
+  siret?: string | null
+  vat_number?: string | null
+  email?: string | null
+  phone?: string | null
+  address_line_1?: string | null
+  address_line_2?: string | null
+  postal_code?: string | null
+  city?: string | null
+  country?: string | null
+  iban?: string | null
+  bic?: string | null
+  payment_terms?: string | null
+  payment_method?: string | null
+}
+
+export type ContactDuplicateMatch = {
+  contact_id: number
+  company_name: string
+  contact_type?: string
+  siret?: string
+  match_type: string
+  match_score: number
+}
+
+export type ContactSuggestion = {
+  id: number
+  document_id: number
+  role: string
+  status: string
+  suggested_contact_type: string
+  suggested_action: string
+  confidence: number
+  requires_user_confirmation: boolean
+  extracted_data: ContactExtractedData
+  possible_duplicates: ContactDuplicateMatch[]
+  matched_contact_id?: number | null
+  new_fields?: Record<string, string>
+  iban_alert?: boolean
+}
+
+export type Contact = {
+  id: number
+  organization_id: number
+  contact_type: string
+  status: string
+  company_name: string
+  trade_name?: string
+  first_name?: string
+  last_name?: string
+  siren?: string
+  siret?: string
+  vat_number?: string
+  email?: string
+  phone?: string
+  address_line_1?: string
+  address_line_2?: string
+  postal_code?: string
+  city?: string
+  country?: string
+  iban?: string
+  bic?: string
+  payment_terms?: string
+  payment_method?: string
+  source?: string
+  source_document_id?: number | null
+  extraction_confidence?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 export type Invoice = {
   id: number
   filename: string
@@ -34,6 +110,9 @@ export type Invoice = {
   anomalies: string[]
   missing_fields: string[]
   accounting_entry: AccountingEntry | null
+  supplier_contact_id?: number | null
+  customer_contact_id?: number | null
+  contact_suggestions?: ContactSuggestion[]
   created_at: string
   updated_at: string
 }
@@ -216,6 +295,84 @@ export const api = {
     }, { token, orgId }),
   reprocessDocument: (id: number, token: string, orgId?: number | null) =>
     request<Invoice>(`/documents/${id}/reprocess`, { method: 'POST' }, { token, orgId }),
+  getContactSuggestions: (documentId: number, token: string, orgId?: number | null) =>
+    request<{
+      document_id: number
+      supplier_contact_id?: number | null
+      customer_contact_id?: number | null
+      suggestions: ContactSuggestion[]
+    }>(`/documents/${documentId}/contact-suggestions`, undefined, { token, orgId }),
+  createContactFromDocument: (
+    payload: {
+      document_id: number
+      role: string
+      contact_type: string
+      suggestion_id?: number | null
+      confirmed_data: ContactExtractedData
+    },
+    token: string,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; contact: Contact; document_id: number }>(
+      '/contacts/from-document',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  linkDocumentContact: (
+    documentId: number,
+    payload: { contact_id: number; role: string; suggestion_id?: number | null },
+    token: string,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; contact: Contact; document_id: number }>(
+      `/documents/${documentId}/link-contact`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  ignoreContactSuggestion: (
+    documentId: number,
+    payload: { role: string; suggestion_id?: number | null },
+    token: string,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; ignored_count: number }>(
+      `/documents/${documentId}/contact-suggestions/ignore`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  enrichContactFromDocument: (
+    contactId: number,
+    payload: {
+      document_id: number
+      accepted_fields: string[]
+      field_values?: Record<string, string>
+      suggestion_id?: number | null
+      confirm_iban?: boolean
+    },
+    token: string,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; contact: Contact }>(
+      `/contacts/${contactId}/enrich-from-document`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
   getElfisReport: (id: number, token: string, orgId?: number | null) =>
     request<{ report: import('./elfisTypes').ElfisReport; history: import('./elfisTypes').ElfisAnalysisHistoryItem[] }>(
       `/elfis-ai/documents/${id}/report`,

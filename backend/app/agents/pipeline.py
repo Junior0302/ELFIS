@@ -87,6 +87,16 @@ def _safe_elfis_analysis(db: Session, invoice: Invoice, extraction: ExtractionRe
         pass
 
 
+def _safe_contact_suggestions(db: Session, invoice: Invoice) -> list[dict]:
+    """Suggestions contacts : secondaire, ne doit jamais faire échouer le pipeline."""
+    try:
+        from app.services.contacts.detection_service import safe_generate_suggestions
+
+        return safe_generate_suggestions(db, invoice)
+    except Exception:
+        return []
+
+
 async def process_invoice(db: Session, invoice: Invoice) -> Invoice:
     company = get_or_create_settings(db, invoice.organization_id)
     path = Path(invoice.stored_path)
@@ -96,6 +106,8 @@ async def process_invoice(db: Session, invoice: Invoice) -> Invoice:
     db.commit()
     db.refresh(invoice)
     _safe_elfis_analysis(db, invoice, extraction)
+    db.refresh(invoice)
+    _safe_contact_suggestions(db, invoice)
     db.refresh(invoice)
     return invoice
 
@@ -121,5 +133,7 @@ def refresh_from_manual_edit(db: Session, invoice: Invoice) -> Invoice:
     db.commit()
     db.refresh(invoice)
     _safe_elfis_analysis(db, invoice, extraction)
+    db.refresh(invoice)
+    _safe_contact_suggestions(db, invoice)
     db.refresh(invoice)
     return invoice

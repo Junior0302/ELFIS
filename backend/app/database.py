@@ -155,3 +155,10 @@ def init_db() -> None:
     }
     for column, ddl in email_log_columns.items():
         _sqlite_add_column_if_missing("document_email_logs", column, ddl)
+
+    _sqlite_add_column_if_missing(
+        "invoices", "supplier_contact_id", "supplier_contact_id INTEGER"
+    )
+    _sqlite_add_column_if_missing(
+        "invoices", "customer_contact_id", "customer_contact_id INTEGER"
+    )

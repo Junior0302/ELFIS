@@ -1,7 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, downloadApiFile, formatEuro, type Invoice } from '../api'
+import {
+  api,
+  downloadApiFile,
+  formatEuro,
+  type ContactSuggestion,
+  type Invoice,
+} from '../api'
 import ConfidenceMeter from '../components/ConfidenceMeter'
+import ContactSuggestionCard from '../components/ContactSuggestionCard'
 import ElfisReportPanel from '../components/elfis/ElfisReportPanel'
 import StatusBadge from '../components/StatusBadge'
 import { useAuth } from '../auth'
@@ -43,6 +50,7 @@ export default function ResultPage() {
   const [error, setError] = useState('')
   const [reportError, setReportError] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
+  const [suggestions, setSuggestions] = useState<ContactSuggestion[]>([])
 
   const loadReport = async (docId: number) => {
     if (!token) return
@@ -56,13 +64,25 @@ export default function ResultPage() {
     }
   }
 
+  const loadSuggestions = async (docId: number) => {
+    if (!token) return
+    try {
+      const data = await api.getContactSuggestions(docId, token, orgId)
+      setSuggestions(data.suggestions || [])
+    } catch {
+      setSuggestions([])
+    }
+  }
+
   useEffect(() => {
     if (!invoiceId || !token) return
     api
       .getDocument(invoiceId, token, orgId)
       .then((doc) => {
         setInvoice(doc)
+        setSuggestions(doc.contact_suggestions || [])
         void loadReport(doc.id)
+        void loadSuggestions(doc.id)
       })
       .catch((e) => setError(e.message || 'Document introuvable'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,8 +144,10 @@ export default function ResultPage() {
     try {
       const updated = await api.reprocessDocument(invoice.id, token, orgId)
       setInvoice(updated)
+      setSuggestions(updated.contact_suggestions || [])
       setMessage('Document retraité par le pipeline IA.')
       await loadReport(updated.id)
+      await loadSuggestions(updated.id)
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Échec du retraitement')
     } finally {
@@ -185,6 +207,22 @@ export default function ResultPage() {
           Historique
         </Link>
       </div>
+
+      {suggestions.length > 0 && (
+        <div style={{ display: 'grid', gap: '0.85rem', marginBottom: '1rem' }}>
+          {suggestions.map((item) => (
+            <ContactSuggestionCard
+              key={item.id}
+              documentId={invoice.id}
+              suggestion={item}
+              token={token!}
+              orgId={orgId}
+              onMessage={setMessage}
+              onResolved={() => void loadSuggestions(invoice.id)}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="result-grid">
         <section className="panel" style={{ padding: '0.75rem' }}>

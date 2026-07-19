@@ -514,3 +514,77 @@ class ProfessionalEmail(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+
+# ─── CONTACTS (clients / fournisseurs / prospects) ───────────────
+
+
+class Contact(Base):
+    """Contact CRM unifié (client, fournisseur, prospect)."""
+
+    __tablename__ = "contacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+    contact_type: Mapped[str] = mapped_column(String(32), default="customer", index=True)
+    # customer | supplier | prospect | customer_and_supplier
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+
+    company_name: Mapped[str] = mapped_column(String(255), default="")
+    trade_name: Mapped[str] = mapped_column(String(255), default="")
+    first_name: Mapped[str] = mapped_column(String(128), default="")
+    last_name: Mapped[str] = mapped_column(String(128), default="")
+
+    siren: Mapped[str] = mapped_column(String(16), default="", index=True)
+    siret: Mapped[str] = mapped_column(String(20), default="", index=True)
+    vat_number: Mapped[str] = mapped_column(String(64), default="", index=True)
+
+    email: Mapped[str] = mapped_column(String(255), default="", index=True)
+    phone: Mapped[str] = mapped_column(String(64), default="")
+
+    address_line_1: Mapped[str] = mapped_column(String(255), default="")
+    address_line_2: Mapped[str] = mapped_column(String(255), default="")
+    postal_code: Mapped[str] = mapped_column(String(32), default="")
+    city: Mapped[str] = mapped_column(String(128), default="")
+    country: Mapped[str] = mapped_column(String(64), default="France")
+
+    iban: Mapped[str] = mapped_column(String(64), default="")
+    bic: Mapped[str] = mapped_column(String(32), default="")
+    payment_terms: Mapped[str] = mapped_column(String(255), default="")
+    payment_method: Mapped[str] = mapped_column(String(128), default="")
+
+    source: Mapped[str] = mapped_column(String(64), default="manual")
+    # manual | document_extraction | import
+    source_document_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    extraction_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class ContactSuggestion(Base):
+    """Suggestion de contact issue d’un document — confirmation utilisateur requise."""
+
+    __tablename__ = "contact_suggestions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(Integer, index=True)
+    document_id: Mapped[int] = mapped_column(Integer, index=True)
+    role: Mapped[str] = mapped_column(String(32), default="supplier")  # supplier | customer
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    # pending | accepted | linked | ignored | rejected
+    suggested_contact_type: Mapped[str] = mapped_column(String(32), default="supplier")
+    suggested_action: Mapped[str] = mapped_column(String(64), default="create_contact")
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    extracted_data_json: Mapped[str] = mapped_column(Text, default="{}")
+    duplicates_json: Mapped[str] = mapped_column(Text, default="[]")
+    matched_contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    new_fields_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_by: Mapped[int | None] = mapped_column(Integer, nullable=True)

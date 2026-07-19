@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import json
 
+from sqlalchemy.orm import Session
+
 from app.models import Invoice
 from app.schemas import AccountingEntry, InvoiceOut
 
 
-def serialize_invoice(invoice: Invoice) -> InvoiceOut:
+def serialize_invoice(
+    invoice: Invoice,
+    *,
+    db: Session | None = None,
+    include_contact_suggestions: bool = False,
+) -> InvoiceOut:
     anomalies = json.loads(invoice.anomalies or "[]")
     missing = json.loads(invoice.missing_fields or "[]")
     entry = None
@@ -15,6 +22,18 @@ def serialize_invoice(invoice: Invoice) -> InvoiceOut:
             entry = AccountingEntry.model_validate_json(invoice.accounting_entry)
         except Exception:
             entry = None
+    suggestions: list[dict] = []
+    if include_contact_suggestions and db is not None:
+        try:
+            from app.services.contacts.detection_service import list_pending_suggestions
+
+            suggestions = list_pending_suggestions(
+                db,
+                document_id=invoice.id,
+                organization_id=invoice.organization_id,
+            )
+        except Exception:
+            suggestions = []
     return InvoiceOut(
         id=invoice.id,
         filename=invoice.filename,
@@ -33,6 +52,9 @@ def serialize_invoice(invoice: Invoice) -> InvoiceOut:
         anomalies=anomalies,
         missing_fields=missing,
         accounting_entry=entry,
+        supplier_contact_id=getattr(invoice, "supplier_contact_id", None),
+        customer_contact_id=getattr(invoice, "customer_contact_id", None),
+        contact_suggestions=suggestions,
         created_at=invoice.created_at,
         updated_at=invoice.updated_at,
     )

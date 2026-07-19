@@ -31,6 +31,8 @@ class Invoice(Base):
     missing_fields: Mapped[str | None] = mapped_column(Text, nullable=True)
     accounting_entry: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_extraction: Mapped[str | None] = mapped_column(Text, nullable=True)
+    supplier_contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    customer_contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

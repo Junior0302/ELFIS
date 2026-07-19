@@ -78,7 +78,7 @@ async def upload_document(
         db.commit()
         db.refresh(invoice)
 
-    return serialize_invoice(invoice)
+    return serialize_invoice(invoice, db=db, include_contact_suggestions=True)
 
 
 @router.get("", response_model=list[InvoiceOut])
@@ -117,7 +117,7 @@ def get_document(
 ):
     auth.require("documents.read")
     invoice = _organization_invoice(db, invoice_id, auth.require_organization_id())
-    return serialize_invoice(invoice)
+    return serialize_invoice(invoice, db=db, include_contact_suggestions=True)
 
 
 @router.patch("/{invoice_id}", response_model=InvoiceOut)
@@ -151,7 +151,7 @@ async def reprocess_document(
     db.add(invoice)
     db.commit()
     invoice = await process_invoice(db, invoice)
-    return serialize_invoice(invoice)
+    return serialize_invoice(invoice, db=db, include_contact_suggestions=True)
 
 
 @router.get("/{invoice_id}/file")
