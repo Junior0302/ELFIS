@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type CompanySettings, type OrgDetail, type OrgEmailSettings } from '../api'
 import { useAuth } from '../auth'
-import EmailConnectionsPanel from '../components/EmailConnectionsPanel'
 
 type BrandForm = {
   name: string
@@ -80,11 +79,10 @@ function fromOrg(org: OrgDetail['organization']): BrandForm {
 }
 
 export default function SettingsPage() {
-  const { token, orgId, user, memberships } = useAuth()
+  const { token, orgId } = useAuth()
   const [brand, setBrand] = useState<BrandForm>(emptyBrand)
   const [form, setForm] = useState(emptySettings)
   const [canEdit, setCanEdit] = useState(false)
-  const [canManageEmail, setCanManageEmail] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -106,13 +104,6 @@ export default function SettingsPage() {
     ])
       .then(([settings, detail, email]) => {
         setCanEdit(Boolean(detail.can_edit))
-        const membership = memberships.find((m) => m.organization_id === orgId)
-        const perms = membership?.permissions || []
-        setCanManageEmail(
-          perms.includes('*') ||
-            perms.includes('email_accounts.manage') ||
-            Boolean(detail.can_edit),
-        )
         setBrand(fromOrg(detail.organization))
         setForm({
           company_name: settings.company_name || detail.organization.legal_name || detail.organization.name,
@@ -141,7 +132,7 @@ export default function SettingsPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Chargement impossible'))
       .finally(() => setLoading(false))
-  }, [token, orgId, memberships])
+  }, [token, orgId])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -487,24 +478,11 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <h3 style={{ marginTop: '1.5rem' }}>Envoi des factures & devis</h3>
+        <h3 style={{ marginTop: '1.5rem' }}>Modèles d’e-mail</h3>
         <p className="muted">
-          Connectez la boîte mail de votre entreprise (Google, Microsoft ou SMTP). Le PDF est joint
-          automatiquement à l’envoi. Les modèles d’objet et de message restent configurables
-          ci-dessous.
+          Les devis et factures s’envoient en un clic depuis ComptaPilot, avec le PDF joint
+          automatiquement. Préparez ici les objets et messages par défaut.
         </p>
-
-        {token && orgId ? (
-          <EmailConnectionsPanel
-            token={token}
-            orgId={orgId}
-            canManage={canManageEmail}
-            userEmail={user?.email}
-          />
-        ) : null}
-
-        <h4 style={{ marginTop: '1.25rem' }}>Modèles d’e-mail</h4>
-        <p className="muted">Objets et messages par défaut pour les devis et factures.</p>
 
         {emailSettings ? (
           <>

@@ -100,8 +100,8 @@ export const navSections: NavSection[] = [
         permission: 'invoice.read',
         guide: [
           'Point d’entrée commercial : factures, devis, encaissements et suivi client.',
-          'Pour envoyer un document : ouvrez-le, puis « Envoyer maintenant » — le PDF part automatiquement en pièce jointe.',
-          'Exemple : créez une facture, vérifiez le destinataire, cliquez Envoyer maintenant.',
+          'Pour envoyer : ouvrez le document, vérifiez le destinataire, cliquez Envoyer maintenant.',
+          'Le PDF part automatiquement en pièce jointe — rien à joindre à la main.',
           'Avec l’essai ComptaPilot IA, toute la chaîne devis → facture devient disponible.',
         ],
       },

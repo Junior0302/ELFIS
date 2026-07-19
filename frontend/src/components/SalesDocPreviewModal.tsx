@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 import {
   api,
   type DocumentEmailLog,
-  type EmailConnection,
   type EmailSendPreview,
   type SalesDoc,
 } from '../api'
@@ -48,13 +46,10 @@ export default function SalesDocPreviewModal({
   const [sending, setSending] = useState(false)
   const [recipient, setRecipient] = useState(doc.customer_email || '')
   const [cc, setCc] = useState('')
-  const [bcc, setBcc] = useState('')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [preview, setPreview] = useState<EmailSendPreview | null>(null)
   const [logs, setLogs] = useState<DocumentEmailLog[]>([])
-  const [connections, setConnections] = useState<EmailConnection[]>([])
-  const [connectionId, setConnectionId] = useState<number | null>(null)
   const [emailReady, setEmailReady] = useState(true)
   const [fromEmail, setFromEmail] = useState('')
   const sendingLock = useRef(false)
@@ -92,49 +87,11 @@ export default function SalesDocPreviewModal({
       .then((data) => {
         if (cancelled) return
         setLogs(data.email_logs)
-        const conns = data.connections || []
-        setConnections(conns)
-        // Prêt si Brevo/platform OU au moins une boîte connectée (Google/Microsoft/SMTP)
-        const hasMailbox = conns.some(
-          (c) =>
-            c.status === 'connected' &&
-            (c.provider === 'google' ||
-              c.provider === 'microsoft' ||
-              c.provider === 'custom_smtp' ||
-              c.provider === 'platform'),
-        )
-        setEmailReady(
-          Boolean(
-            hasMailbox ||
-              data.can_send_direct ||
-              data.email_configured ||
-              data.smtp_configured,
-          ),
-        )
-        const preferred =
-          conns.find(
-            (c) =>
-              c.id === data.default_connection_id &&
-              c.status === 'connected' &&
-              c.provider !== 'platform',
-          ) ||
-          conns.find(
-            (c) =>
-              c.status === 'connected' &&
-              (c.provider === 'google' ||
-                c.provider === 'microsoft' ||
-                c.provider === 'custom_smtp'),
-          ) ||
-          conns.find((c) => c.id === data.default_connection_id) ||
-          conns.find((c) => c.status === 'connected')
-        setConnectionId(
-          preferred?.id ?? data.default_connection_id ?? data.preview?.connection_id ?? null,
-        )
+        setEmailReady(Boolean(data.can_send_direct || data.email_configured || data.smtp_configured))
         if (data.preview) {
           setPreview(data.preview)
           setRecipient(data.preview.recipient || doc.customer_email || '')
           setCc(data.preview.cc || '')
-          setBcc(data.preview.bcc || '')
           setSubject(data.preview.subject || '')
           setMessage(data.preview.message || '')
           setFromEmail(
@@ -170,7 +127,6 @@ export default function SalesDocPreviewModal({
     }
   }
 
-  /** Envoi réel côté serveur — le PDF est joint automatiquement (jamais de mailto). */
   const sendDirect = async () => {
     if (sendingLock.current) return
     if (!recipient.trim()) {
@@ -179,7 +135,7 @@ export default function SalesDocPreviewModal({
     }
     if (!replyTo) {
       setError(
-        'Indiquez une adresse de réponse (e-mail de votre entreprise) avant l’envoi.',
+        'Indiquez l’e-mail de votre entreprise (Réponse à) avant l’envoi.',
       )
       return
     }
@@ -195,9 +151,7 @@ export default function SalesDocPreviewModal({
           message,
           subject,
           cc: cc.trim() || undefined,
-          bcc: bcc.trim() || undefined,
           send_mode: 'server',
-          connection_id: connectionId,
           preferred_from_email: replyTo,
           preferred_from_label: replyTo,
           idempotency_key: `${idempotencyRef.current}-server`,
@@ -224,7 +178,7 @@ export default function SalesDocPreviewModal({
       idempotencyRef.current = `send-${doc.id}-${Date.now()}`
       const pdfName = preview?.pdf_filename || `${doc.number}.pdf`
       setSuccess(
-        `E-mail envoyé à ${result.email_log.recipient_email || recipient} avec la pièce jointe ${pdfName}. Aucun téléchargement sur votre PC n’est nécessaire.`,
+        `E-mail envoyé à ${result.email_log.recipient_email || recipient} avec la pièce jointe ${pdfName}.`,
       )
       await refreshLogs()
     } catch (reason) {
@@ -242,10 +196,7 @@ export default function SalesDocPreviewModal({
 
   const label = doc.doc_type === 'devis' ? 'Devis' : doc.doc_type === 'avoir' ? 'Avoir' : 'Facture'
   const pdfName = preview?.pdf_filename || `${label}-${doc.number}.pdf`
-  const senderDisplay =
-    preview?.sender_email ||
-    connections.find((c) => c.id === connectionId)?.email_address ||
-    'ComptaPilot'
+  const senderDisplay = preview?.sender_email || 'ComptaPilot'
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label={`Aperçu ${doc.number}`}>
@@ -286,15 +237,14 @@ export default function SalesDocPreviewModal({
               <header className="mailto-send-head">
                 <h4>Envoyer au client</h4>
                 <p>
-                  Un clic sur <strong>Envoyer maintenant</strong> envoie l’e-mail depuis ComptaPilot
-                  avec le <strong>PDF joint automatiquement</strong>. Pas besoin d’ouvrir Outlook ni
-                  de joindre le fichier à la main.
+                  Vérifiez le destinataire, puis cliquez <strong>Envoyer maintenant</strong>.
+                  ComptaPilot envoie l’e-mail avec le <strong>PDF en pièce jointe</strong>.
                 </p>
               </header>
 
-              <div className="mailto-recap" aria-label="Pièce jointe automatique">
+              <div className="mailto-recap" aria-label="Récapitulatif d’envoi">
                 <div>
-                  <span>Expéditeur</span>
+                  <span>De</span>
                   <strong>{senderDisplay}</strong>
                 </div>
                 <div>
@@ -303,45 +253,19 @@ export default function SalesDocPreviewModal({
                 </div>
                 <div>
                   <span>Pièce jointe</span>
-                  <strong>{pdfName} · jointe automatiquement</strong>
+                  <strong>{pdfName}</strong>
                 </div>
               </div>
 
               {!emailReady && (
                 <p className="form-error" role="status">
-                  Le service d’envoi serveur n’est pas détecté. Vérifiez la configuration e-mail
-                  (Brevo/SMTP) puis réessayez. Le téléchargement manuel reste disponible ci-dessus.
+                  L’envoi e-mail n’est pas disponible pour le moment. Réessayez plus tard ou
+                  téléchargez le PDF ci-dessus.
                 </p>
               )}
 
-              {connections.filter((c) => c.status === 'connected').length > 0 && (
-                <div className="field">
-                  <label>Boîte d’envoi</label>
-                  <select
-                    value={connectionId ?? ''}
-                    onChange={(e) =>
-                      setConnectionId(e.target.value ? Number(e.target.value) : null)
-                    }
-                  >
-                    {connections
-                      .filter((c) => c.status === 'connected')
-                      .map((conn) => (
-                        <option key={conn.id} value={conn.id}>
-                          {conn.display_name || conn.email_address} ({conn.provider}
-                          {conn.is_default ? ' · défaut' : ''})
-                        </option>
-                      ))}
-                  </select>
-                  <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
-                    Astuce : connectez Google / Microsoft dans{' '}
-                    <Link to="/settings">Paramètres</Link> pour envoyer depuis votre boîte avec le
-                    PDF joint.
-                  </p>
-                </div>
-              )}
-
               <div className="field">
-                <label>Réponse à (Reply-To)</label>
+                <label>Votre e-mail (pour les réponses du client)</label>
                 <input
                   type="email"
                   required
@@ -363,7 +287,7 @@ export default function SalesDocPreviewModal({
               </div>
 
               <div className="field">
-                <label>Copie (CC)</label>
+                <label>Copie (CC) — optionnel</label>
                 <input
                   type="email"
                   value={cc}
@@ -400,7 +324,7 @@ export default function SalesDocPreviewModal({
             )}
 
             <section className="mailto-history">
-              <h4>Historique d’activité</h4>
+              <h4>Historique</h4>
               {logs.length === 0 ? (
                 <p className="muted">Aucun envoi pour ce document.</p>
               ) : (
@@ -410,17 +334,9 @@ export default function SalesDocPreviewModal({
                       <div>
                         <strong>{log.recipient_email || log.recipient || '—'}</strong>
                         <span>
-                          {log.sender_email ? `De ${log.sender_email} · ` : ''}
                           {new Date(log.sent_at).toLocaleString('fr-FR')}
-                          {log.provider === 'mailto'
-                            ? ' · Messagerie (manuel)'
-                            : log.provider
-                              ? ` · ${log.provider}`
-                              : ''}
+                          {log.error_message ? ` · ${log.error_message}` : ''}
                         </span>
-                        {log.error_message ? (
-                          <span className="muted"> · {log.error_message}</span>
-                        ) : null}
                       </div>
                       <span
                         className={`badge ${
