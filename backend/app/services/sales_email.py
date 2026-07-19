@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.models_saas import DocumentEmailLog, Organization, SalesDocument, User
 from app.services.email_connections import ensure_platform_connection
@@ -321,6 +324,13 @@ def send_sales_document_email(
                 doc.signature_status = "pending"
             db.add(doc)
     except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Échec envoi document %s org=%s to=%s: %s",
+            doc.id,
+            doc.organization_id,
+            to_email,
+            exc,
+        )
         code, message = _user_facing_error(exc)
         log.status = "failed"
         log.error_code = code

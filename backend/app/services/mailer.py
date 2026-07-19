@@ -115,11 +115,11 @@ def email_configured() -> bool:
 
 
 def email_transport() -> str:
-    # SMTP en priorité si configuré (plus fiable quand la clé API est refusée).
-    if _smtp_ready():
-        return "smtp"
+    # API Brevo en priorité (évite les 535 SMTP récurrents) ; SMTP en secours.
     if settings.brevo_api_key.strip() and settings.effective_platform_from:
         return "brevo"
+    if _smtp_ready():
+        return "smtp"
     return "none"
 
 
@@ -261,19 +261,43 @@ def send_email(
     files = attachments or []
 
     if transport == "brevo":
-        return _send_via_brevo(
-            to_email=recipient,
-            subject=subject,
-            body=body,
-            html_body=html_body,
-            attachments=files,
-            from_email=from_email,
-            from_name=from_name,
-            reply_to_email=reply_email,
-            reply_to_name=reply_name,
-            cc=cc_list,
-            bcc=bcc_list,
-        )
+        try:
+            return _send_via_brevo(
+                to_email=recipient,
+                subject=subject,
+                body=body,
+                html_body=html_body,
+                attachments=files,
+                from_email=from_email,
+                from_name=from_name,
+                reply_to_email=reply_email,
+                reply_to_name=reply_name,
+                cc=cc_list,
+                bcc=bcc_list,
+            )
+        except RuntimeError as api_exc:
+            # Repli SMTP si l’API refuse (clé API) mais que SMTP est prêt.
+            if not _smtp_ready():
+                raise
+            try:
+                _send_via_smtp(
+                    to_email=recipient,
+                    subject=subject,
+                    body=body,
+                    attachments=files,
+                    from_email=from_email,
+                    from_name=from_name,
+                    reply_to_email=reply_email,
+                    cc=cc_list,
+                    bcc=bcc_list,
+                )
+                return SendEmailResult(
+                    provider="smtp",
+                    sender_email=from_email,
+                    sender_name=from_name,
+                )
+            except RuntimeError as smtp_exc:
+                raise RuntimeError(str(api_exc) or str(smtp_exc)) from smtp_exc
 
     try:
         _send_via_smtp(
@@ -292,31 +316,8 @@ def send_email(
             sender_email=from_email,
             sender_name=from_name,
         )
-    except RuntimeError as smtp_exc:
-        # Repli API Brevo si SMTP échoue et qu'une clé API est présente.
-        if not settings.brevo_api_key.strip():
-            raise
-        try:
-            return _send_via_brevo(
-                to_email=recipient,
-                subject=subject,
-                body=body,
-                html_body=html_body,
-                attachments=files,
-                from_email=from_email,
-                from_name=from_name,
-                reply_to_email=reply_email,
-                reply_to_name=reply_name,
-                cc=cc_list,
-                bcc=bcc_list,
-            )
-        except RuntimeError as api_exc:
-            # Message court actionnable (évite le message générique trop long côté UI)
-            smtp_s = str(smtp_exc)
-            api_s = str(api_exc)
-            if "535" in smtp_s or "Auth SMTP" in smtp_s:
-                raise RuntimeError(api_s) from api_exc
-            raise RuntimeError(api_s or smtp_s) from api_exc
+    except RuntimeError:
+        raise
 
 
 def _send_via_brevo(

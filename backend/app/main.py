@@ -49,7 +49,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="ELFIS Core API",
     description="Moteur IA commun — ComptaPilot IA (AI Finance Copilot)",
-    version="0.8.5",
+    version="0.8.6",
     lifespan=lifespan,
 )
 
@@ -174,11 +174,12 @@ def health():
         "product": settings.product_name,
         "details": {
             "slogan": "Déposez une facture. L'IA prépare votre comptabilité.",
-            "version": "0.8.5",
+            "version": "0.8.6",
             "auth_required": settings.auth_required,
             "billing_ready": stripe_ok,
             "auth_ready": firebase_ok,
             "email_ready": email_configured(),
             "email_transport": email_transport(),
+            "platform_email_from": settings.effective_platform_from or "",
         },
     }
