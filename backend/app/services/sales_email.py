@@ -31,19 +31,60 @@ def _user_facing_error(exc: Exception) -> tuple[str, str]:
     lower = msg.lower()
     if "adresse e-mail destinataire manquante" in lower or lower.strip() == "missing recipient":
         return "missing_recipient", "Ajoutez une adresse e-mail au client avant l’envoi."
-    if "pdf" in lower:
+    if "pdf" in lower and ("indisponible" in lower or "génér" in lower or "volumineux" in lower):
         return "pdf_error", "Le document PDF n’a pas pu être généré. Veuillez réessayer."
     if "reconnectez" in lower or "expiré" in lower or "révoqué" in lower:
-        return "connection_expired", msg
+        return "connection_expired", msg[:280]
     if "introuvable" in lower and "boîte" in lower:
-        return "connection_missing", msg
-    if "indisponible" in lower or "non configuré" in lower:
-        return "platform_unavailable", msg if "comptapilot" in lower else (
-            "Le service d’envoi est temporairement indisponible."
+        return "connection_missing", msg[:280]
+    if "535" in lower or "auth smtp" in lower:
+        return (
+            "smtp_auth_failed",
+            "Authentification SMTP Brevo refusée (535). "
+            "Sur Render : SMTP_USER = login …@smtp-brevo.com, "
+            "SMTP_PASSWORD = clé xsmtpsib-…, ou renseignez BREVO_API_KEY (xkeysib-…).",
         )
-    if "réponse" in lower or ("reply" in lower and "to" in lower):
+    if "key not found" in lower or "clé brevo invalide" in lower:
+        return (
+            "brevo_key_invalid",
+            "Clé API Brevo invalide. Sur Render, mettez à jour BREVO_API_KEY "
+            "(SMTP & API → API Keys, préfixe xkeysib-…).",
+        )
+    if "sender" in lower and (
+        "not verified" in lower or "invalid" in lower or "unrecognised" in lower or "unauthorized" in lower
+    ):
+        return (
+            "sender_not_verified",
+            "L’expéditeur PLATFORM_EMAIL_FROM n’est pas validé dans Brevo. "
+            "Utilisez contact@elfis-core.com (ou un expéditeur vérifié) dans Render.",
+        )
+    if "brevo a refusé" in lower:
+        # Extraire le détail court entre parenthèses si présent
+        detail = ""
+        start = msg.find("(")
+        end = msg.find(")", start + 1) if start >= 0 else -1
+        if 0 <= start < end and end - start < 120:
+            detail = msg[start + 1 : end].strip()
+        return (
+            "brevo_refused",
+            (
+                f"Brevo a refusé l’envoi ({detail}). "
+                if detail
+                else "Brevo a refusé l’envoi. "
+            )
+            + "Vérifiez BREVO_API_KEY et PLATFORM_EMAIL_FROM sur Render.",
+        )
+    if "indisponible" in lower or "non configuré" in lower:
+        return "platform_unavailable", (
+            "Le service d’envoi est temporairement indisponible. "
+            "Vérifiez SMTP/Brevo sur Render."
+        )
+    if "réponse" in lower or ("reply" in lower and "to" in lower and "manqu" in lower):
         return "missing_reply_to", "Ajoutez l’adresse e-mail de votre entreprise dans Paramètres → Entreprise."
-    return "provider_error", msg if len(msg) < 280 else (
+    short = msg.strip().replace("\n", " ")
+    if len(short) > 240:
+        short = short[:237] + "…"
+    return "provider_error", short or (
         "L’e-mail n’a pas pu être envoyé. Aucun message n’a été remis au destinataire."
     )
 
@@ -160,8 +201,27 @@ def send_sales_document_email(
         return log
 
     log.email_connection_id = conn.id
-    log.sender_name = (preferred_from_label or conn.display_name or "").strip() or conn.display_name or ""
-    log.sender_email = (preferred_from_email or conn.email_address or "").strip() or conn.email_address or ""
+    # Expéditeur affiché = From plateforme (ou boîte connectée), pas l’e-mail perso Reply-To
+    log.sender_name = (
+        (
+            preferred_from_label
+            if preferred_from_email and preferred_from_email.lower().endswith("@elfis-core.com")
+            else ""
+        )
+        or conn.display_name
+        or platform_sender.sender_name
+        or ""
+    ).strip()
+    log.sender_email = (
+        (
+            preferred_from_email
+            if preferred_from_email and preferred_from_email.lower().endswith("@elfis-core.com")
+            else ""
+        )
+        or conn.email_address
+        or platform_sender.sender_email
+        or ""
+    ).strip()
     if preferred_from_email and is_valid_email(preferred_from_email.strip()):
         log.reply_to_email = preferred_from_email.strip()
     elif conn.provider == "platform":

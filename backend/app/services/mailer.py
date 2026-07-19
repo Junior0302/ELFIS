@@ -293,10 +293,8 @@ def send_email(
             sender_name=from_name,
         )
     except RuntimeError as smtp_exc:
-        # Repli API si le login SMTP est refusé (535) mais qu'une clé API est présente.
+        # Repli API Brevo si SMTP échoue et qu'une clé API est présente.
         if not settings.brevo_api_key.strip():
-            raise
-        if "535" not in str(smtp_exc) and "Auth SMTP" not in str(smtp_exc):
             raise
         try:
             return _send_via_brevo(
@@ -313,7 +311,12 @@ def send_email(
                 bcc=bcc_list,
             )
         except RuntimeError as api_exc:
-            raise RuntimeError(f"{smtp_exc} | Repli API: {api_exc}") from api_exc
+            # Message court actionnable (évite le message générique trop long côté UI)
+            smtp_s = str(smtp_exc)
+            api_s = str(api_exc)
+            if "535" in smtp_s or "Auth SMTP" in smtp_s:
+                raise RuntimeError(api_s) from api_exc
+            raise RuntimeError(api_s or smtp_s) from api_exc
 
 
 def _send_via_brevo(

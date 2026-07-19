@@ -176,9 +176,13 @@ export default function SalesDocPreviewModal({
         setEmailReady(false)
       }
       if (result.email_log.status === 'failed' || result.email_log.status === 'blocked') {
+        const detail = (result.email_log.error_message || '').trim()
+        const code = (result.email_log.error_code || '').trim()
         setError(
-          result.email_log.error_message ||
-            'L’e-mail n’a pas pu être envoyé. Aucun message n’a été remis au destinataire.',
+          detail ||
+            (code
+              ? `Échec d’envoi (${code}).`
+              : 'L’e-mail n’a pas pu être envoyé. Aucun message n’a été remis au destinataire.'),
         )
         return
       }
