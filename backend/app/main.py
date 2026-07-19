@@ -185,6 +185,7 @@ def health():
             "brevo_key_looks_valid": bool(email_probe.get("brevo_key_looks_valid")),
             "brevo_key_prefix": email_probe.get("brevo_key_prefix") or "",
             "smtp_ready": bool(email_probe.get("smtp_ready")),
+            "smtp_probe_error": (email_probe.get("smtp_probe_error") or "")[:180],
             "brevo_ok": bool(email_probe.get("brevo_ok")),
             "brevo_error": (email_probe.get("brevo_error") or "")[:180],
             "email_hint": (email_probe.get("hint") or "")[:220],
