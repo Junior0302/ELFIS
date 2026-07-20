@@ -156,6 +156,59 @@ export type VaultDocument = {
   created_at: string
 }
 
+export type VaultDocumentListItem = {
+  id: string
+  tenant_id: number
+  document_type: VaultDocumentType
+  document_number: string | null
+  original_filename: string
+  mime_type: string
+  file_size: number
+  invoice_date: string | null
+  due_date: string | null
+  amount_ht: number | string | null
+  amount_vat: number | string | null
+  amount_ttc: number | string | null
+  currency: string
+  archive_status: string
+  accounting_status: string
+  email_status: string
+  version: number
+  archived_at: string
+  created_at: string
+}
+
+export type VaultDocumentDetail = VaultDocumentListItem & {
+  is_locked: boolean
+  updated_at: string
+}
+
+export type VaultDocumentsListResponse = {
+  items: VaultDocumentListItem[]
+  pagination: {
+    page: number
+    page_size: number
+    total_items: number
+    total_pages: number
+  }
+}
+
+export type VaultDownloadUrlResponse = {
+  document_id: string
+  download_url: string
+  expires_in: number
+  expires_at: string
+}
+
+export type VaultDocumentsQuery = {
+  page?: number
+  page_size?: number
+  document_type?: VaultDocumentType | ''
+  search?: string
+  sort_by?: 'created_at' | 'invoice_date' | 'document_number' | 'amount_ttc'
+  sort_order?: 'asc' | 'desc'
+}
+
 export type DashboardStats = {
   invoice_count: number
   total_ht: number
@@ -349,6 +402,29 @@ export const api = {
     if (meta.amount_ttc != null && meta.amount_ttc !== '') form.append('amount_ttc', String(meta.amount_ttc))
     return request<VaultDocument>('/vault/documents/archive', { method: 'POST', body: form }, { token, orgId })
   },
+  getVaultDocuments: (params: VaultDocumentsQuery, token: string, orgId?: number | null) => {
+    const sp = new URLSearchParams()
+    if (params.page) sp.set('page', String(params.page))
+    if (params.page_size) sp.set('page_size', String(params.page_size))
+    if (params.document_type) sp.set('document_type', params.document_type)
+    if (params.search) sp.set('search', params.search)
+    if (params.sort_by) sp.set('sort_by', params.sort_by)
+    if (params.sort_order) sp.set('sort_order', params.sort_order)
+    const qs = sp.toString()
+    return request<VaultDocumentsListResponse>(
+      `/vault/documents${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token, orgId },
+    )
+  },
+  getVaultDocument: (documentId: string, token: string, orgId?: number | null) =>
+    request<VaultDocumentDetail>(`/vault/documents/${documentId}`, undefined, { token, orgId }),
+  getVaultDocumentDownloadUrl: (documentId: string, token: string, orgId?: number | null) =>
+    request<VaultDownloadUrlResponse>(
+      `/vault/documents/${documentId}/download-url`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
   updateDocument: (
     id: number,
     payload: Partial<Invoice>,

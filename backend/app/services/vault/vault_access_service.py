@@ -13,20 +13,21 @@ logger = logging.getLogger(__name__)
 
 # Rôles autorisés à archiver (V1) — « employe » = member
 VAULT_ARCHIVE_ROLES = frozenset({"owner", "admin", "employe"})
-# Comptable / lecture seule (et CFO hors liste V1)
 VAULT_ARCHIVE_DENIED_ROLES = frozenset({"comptable", "auditeur", "cfo"})
+
+# Lecture / téléchargement
+VAULT_READ_ROLES = frozenset({"owner", "admin", "employe", "comptable", "auditeur", "cfo"})
 
 ACCESS_DENIED_MESSAGE = (
     "Vous n’êtes pas autorisé à archiver un document pour cette entreprise."
 )
+ORG_ACCESS_DENIED_MESSAGE = "Organisation inaccessible."
+DOCUMENT_NOT_FOUND_MESSAGE = "Document introuvable"
 
 
-def assert_can_archive(db: Session, *, user_id: int, organization_id: int) -> str:
-    """Vérifie membership active + rôle autorisé.
-
-    Ne révèle jamais si l'organisation existe ou non.
-    Retourne le nom du rôle en cas de succès.
-    """
+def _active_membership_role(
+    db: Session, *, user_id: int, organization_id: int
+) -> str | None:
     row = (
         db.query(OrganizationMember, Role)
         .join(Role, Role.id == OrganizationMember.role_id)
@@ -38,14 +39,21 @@ def assert_can_archive(db: Session, *, user_id: int, organization_id: int) -> st
         .first()
     )
     if not row:
+        return None
+    _member, role = row
+    return (role.name or "").strip().lower()
+
+
+def assert_can_archive(db: Session, *, user_id: int, organization_id: int) -> str:
+    """Vérifie membership active + rôle autorisé à archiver."""
+    role_name = _active_membership_role(db, user_id=user_id, organization_id=organization_id)
+    if not role_name:
         logger.info(
             "vault_access_denied",
             extra={"user_id": user_id, "organization_id": organization_id, "reason": "no_membership"},
         )
         raise VaultAccessDeniedError(ACCESS_DENIED_MESSAGE)
 
-    _member, role = row
-    role_name = (role.name or "").strip().lower()
     if role_name in VAULT_ARCHIVE_DENIED_ROLES or role_name not in VAULT_ARCHIVE_ROLES:
         logger.info(
             "vault_access_denied",
@@ -58,4 +66,21 @@ def assert_can_archive(db: Session, *, user_id: int, organization_id: int) -> st
         )
         raise VaultAccessDeniedError(ACCESS_DENIED_MESSAGE)
 
+    return role_name
+
+
+def assert_can_read(db: Session, *, user_id: int, organization_id: int) -> str:
+    """Vérifie membership active + rôle autorisé en lecture."""
+    role_name = _active_membership_role(db, user_id=user_id, organization_id=organization_id)
+    if not role_name or role_name not in VAULT_READ_ROLES:
+        logger.info(
+            "vault_read_access_denied",
+            extra={
+                "user_id": user_id,
+                "organization_id": organization_id,
+                "reason": "no_membership_or_role",
+                "role": role_name,
+            },
+        )
+        raise VaultAccessDeniedError(ORG_ACCESS_DENIED_MESSAGE)
     return role_name

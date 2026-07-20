@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     elfis_vault_bucket: str = "elfis-vault"
     elfis_vault_max_file_size_mb: int = 15
+    elfis_vault_signed_url_ttl_seconds: int = 300
 
     @property
     def effective_platform_from(self) -> str:

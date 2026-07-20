@@ -6,24 +6,40 @@ import logging
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context, require_active_subscription
-from app.schemas_vault import VaultArchiveFormMeta, VaultDocumentResponse, VaultDocumentType
+from app.schemas_vault import (
+    VaultArchiveFormMeta,
+    VaultArchiveStatus,
+    VaultDocumentDetail,
+    VaultDocumentListResponse,
+    VaultDocumentResponse,
+    VaultDocumentType,
+    VaultDownloadUrlResponse,
+    VaultSortBy,
+    VaultSortOrder,
+)
 from app.services.vault.exceptions import (
     VaultAccessDeniedError,
     VaultDatabaseError,
     VaultDuplicateDocumentError,
     VaultFileTooLargeError,
     VaultInvalidFileError,
+    VaultNotFoundError,
     VaultStorageError,
+    VaultValidationError,
 )
-from app.services.vault.vault_access_service import ACCESS_DENIED_MESSAGE
-from app.services.vault.vault_service import archive_document
+from app.services.vault.vault_access_service import (
+    ACCESS_DENIED_MESSAGE,
+    DOCUMENT_NOT_FOUND_MESSAGE,
+    ORG_ACCESS_DENIED_MESSAGE,
+)
+from app.services.vault import vault_service
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +69,12 @@ def _parse_optional_int(value: str | None) -> int | None:
     if value is None or value.strip() == "":
         return None
     return int(value.strip())
+
+
+def _require_user(auth: AuthContext):
+    if auth.user is None:
+        return None
+    return auth.user
 
 
 @router.post(
@@ -100,7 +122,7 @@ async def archive_vault_document(
             supplier_id=_parse_optional_int(supplier_id),
         )
         content = await file.read()
-        result = archive_document(
+        result = vault_service.archive_document(
             db,
             user_id=auth.user.id,
             meta=meta,
@@ -139,4 +161,103 @@ async def archive_vault_document(
         return JSONResponse(status_code=400, content={"detail": str(exc)})
     except Exception:
         logger.exception("vault_archive_unhandled")
+        return JSONResponse(status_code=500, content={"detail": "Erreur interne"})
+
+
+@router.get("/documents", response_model=VaultDocumentListResponse)
+def list_vault_documents(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    document_type: VaultDocumentType | None = Query(default=None),
+    archive_status: VaultArchiveStatus | None = Query(default=None),
+    search: str | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    sort_by: VaultSortBy = Query(default=VaultSortBy.created_at),
+    sort_order: VaultSortOrder = Query(default=VaultSortOrder.desc),
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if auth.user is None:
+        return JSONResponse(status_code=401, content={"detail": "Authentification requise"})
+    try:
+        organization_id = auth.require_organization_id()
+        return vault_service.list_documents(
+            db,
+            user_id=auth.user.id,
+            organization_id=organization_id,
+            page=page,
+            page_size=page_size,
+            document_type=document_type,
+            archive_status=archive_status,
+            search=search,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+    except VaultAccessDeniedError:
+        return JSONResponse(status_code=403, content={"detail": ORG_ACCESS_DENIED_MESSAGE})
+    except VaultValidationError as exc:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+    except Exception:
+        logger.exception("vault_list_unhandled")
+        return JSONResponse(status_code=500, content={"detail": "Erreur interne"})
+
+
+@router.get("/documents/{document_id}", response_model=VaultDocumentDetail)
+def get_vault_document(
+    document_id: str,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if auth.user is None:
+        return JSONResponse(status_code=401, content={"detail": "Authentification requise"})
+    try:
+        organization_id = auth.require_organization_id()
+        return vault_service.get_document_details(
+            db,
+            user_id=auth.user.id,
+            organization_id=organization_id,
+            document_id=document_id,
+        )
+    except VaultAccessDeniedError:
+        return JSONResponse(status_code=403, content={"detail": ORG_ACCESS_DENIED_MESSAGE})
+    except VaultNotFoundError:
+        return JSONResponse(status_code=404, content={"detail": DOCUMENT_NOT_FOUND_MESSAGE})
+    except Exception:
+        logger.exception("vault_detail_unhandled")
+        return JSONResponse(status_code=500, content={"detail": "Erreur interne"})
+
+
+@router.post(
+    "/documents/{document_id}/download-url",
+    response_model=VaultDownloadUrlResponse,
+)
+def create_vault_download_url(
+    document_id: str,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    if auth.user is None:
+        return JSONResponse(status_code=401, content={"detail": "Authentification requise"})
+    try:
+        organization_id = auth.require_organization_id()
+        return vault_service.create_download_url(
+            db,
+            user_id=auth.user.id,
+            organization_id=organization_id,
+            document_id=document_id,
+        )
+    except VaultAccessDeniedError:
+        return JSONResponse(status_code=403, content={"detail": ORG_ACCESS_DENIED_MESSAGE})
+    except VaultNotFoundError:
+        return JSONResponse(status_code=404, content={"detail": DOCUMENT_NOT_FOUND_MESSAGE})
+    except VaultStorageError:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Stockage temporairement indisponible"},
+        )
+    except Exception:
+        logger.exception("vault_download_url_unhandled")
         return JSONResponse(status_code=500, content={"detail": "Erreur interne"})

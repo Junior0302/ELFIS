@@ -37,3 +37,14 @@ class VaultStorageError(VaultError):
 
 class VaultDatabaseError(VaultError):
     """Échec d'écriture / lecture base de données Vault."""
+
+
+class VaultNotFoundError(VaultError):
+    """Document introuvable (ou hors organisation — message générique)."""
+
+    def __init__(self, message: str = "Document introuvable"):
+        super().__init__(message)
+
+
+class VaultValidationError(VaultError):
+    """Paramètres de requête invalides."""

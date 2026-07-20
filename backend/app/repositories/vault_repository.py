@@ -4,17 +4,31 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.models_vault import VaultActivityLog, VaultDocument
-from app.schemas_vault import VaultActivityAction, VaultArchiveStatus, VaultDocumentType
+from app.schemas_vault import (
+    VaultActivityAction,
+    VaultArchiveStatus,
+    VaultDocumentType,
+    VaultSortBy,
+    VaultSortOrder,
+)
 from app.services.vault.exceptions import VaultDatabaseError
 
 logger = logging.getLogger(__name__)
+
+_SORT_COLUMNS = {
+    VaultSortBy.created_at: VaultDocument.created_at,
+    VaultSortBy.invoice_date: VaultDocument.invoice_date,
+    VaultSortBy.document_number: VaultDocument.document_number,
+    VaultSortBy.amount_ttc: VaultDocument.amount_ttc,
+}
 
 
 class VaultRepository:
@@ -101,7 +115,6 @@ class VaultRepository:
         action: VaultActivityAction,
         metadata: dict[str, Any],
     ) -> VaultActivityLog:
-        # Ne jamais stocker secrets / contenu PDF
         safe_meta = {
             k: v
             for k, v in metadata.items()
@@ -115,6 +128,8 @@ class VaultRepository:
                 "pdf_bytes",
                 "iban",
                 "bic",
+                "download_url",
+                "signed_url",
             }
         }
         log = VaultActivityLog(
@@ -136,6 +151,16 @@ class VaultRepository:
         return log
 
     def get_document(self, *, document_id: str, organization_id: int) -> VaultDocument | None:
+        return self.get_document_for_tenant(
+            document_id=document_id, organization_id=organization_id
+        )
+
+    def get_document_by_id(self, *, document_id: str) -> VaultDocument | None:
+        return self._db.query(VaultDocument).filter(VaultDocument.id == document_id).first()
+
+    def get_document_for_tenant(
+        self, *, document_id: str, organization_id: int
+    ) -> VaultDocument | None:
         return (
             self._db.query(VaultDocument)
             .filter(
@@ -144,3 +169,84 @@ class VaultRepository:
             )
             .first()
         )
+
+    def _list_filters(
+        self,
+        *,
+        organization_id: int,
+        document_type: VaultDocumentType | None,
+        archive_status: VaultArchiveStatus | None,
+        search: str | None,
+        date_from: date | None,
+        date_to: date | None,
+    ):
+        q = self._db.query(VaultDocument).filter(
+            VaultDocument.organization_id == organization_id,
+            VaultDocument.archive_status != VaultArchiveStatus.deleted.value,
+        )
+        if document_type is not None:
+            q = q.filter(VaultDocument.document_type == document_type.value)
+        if archive_status is not None:
+            q = q.filter(VaultDocument.archive_status == archive_status.value)
+        if date_from is not None:
+            q = q.filter(VaultDocument.invoice_date >= date_from)
+        if date_to is not None:
+            q = q.filter(VaultDocument.invoice_date <= date_to)
+        if search:
+            term = f"%{search.strip()}%"
+            q = q.filter(
+                or_(
+                    VaultDocument.document_number.ilike(term),
+                    VaultDocument.original_filename.ilike(term),
+                    VaultDocument.storage_path.ilike(term),
+                )
+            )
+        return q
+
+    def count_documents(
+        self,
+        *,
+        organization_id: int,
+        document_type: VaultDocumentType | None = None,
+        archive_status: VaultArchiveStatus | None = None,
+        search: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> int:
+        q = self._list_filters(
+            organization_id=organization_id,
+            document_type=document_type,
+            archive_status=archive_status,
+            search=search,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        return int(q.with_entities(func.count(VaultDocument.id)).scalar() or 0)
+
+    def list_documents(
+        self,
+        *,
+        organization_id: int,
+        page: int,
+        page_size: int,
+        document_type: VaultDocumentType | None = None,
+        archive_status: VaultArchiveStatus | None = None,
+        search: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        sort_by: VaultSortBy = VaultSortBy.created_at,
+        sort_order: VaultSortOrder = VaultSortOrder.desc,
+    ) -> list[VaultDocument]:
+        q = self._list_filters(
+            organization_id=organization_id,
+            document_type=document_type,
+            archive_status=archive_status,
+            search=search,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        col = _SORT_COLUMNS.get(sort_by, VaultDocument.created_at)
+        order_fn = asc if sort_order == VaultSortOrder.asc else desc
+        q = q.order_by(order_fn(col), desc(VaultDocument.id))
+        offset = (page - 1) * page_size
+        return q.offset(offset).limit(page_size).all()

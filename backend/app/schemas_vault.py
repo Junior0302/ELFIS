@@ -43,6 +43,19 @@ class VaultActivityAction(str, Enum):
     document_archived = "document_archived"
     document_deleted = "document_deleted"
     document_downloaded = "document_downloaded"
+    document_viewed = "document_viewed"
+
+
+class VaultSortBy(str, Enum):
+    created_at = "created_at"
+    invoice_date = "invoice_date"
+    document_number = "document_number"
+    amount_ttc = "amount_ttc"
+
+
+class VaultSortOrder(str, Enum):
+    asc = "asc"
+    desc = "desc"
 
 
 DOCUMENT_TYPE_CATEGORIES: dict[VaultDocumentType, str] = {
@@ -116,6 +129,75 @@ class VaultDocumentResponse(BaseModel):
     version: int
     archived_at: datetime
     created_at: datetime
+
+
+class VaultDocumentListItem(BaseModel):
+    """Réponse liste — sans storage_path ni checksum."""
+
+    id: str
+    tenant_id: int
+    document_type: VaultDocumentType
+    document_number: str | None = None
+    original_filename: str
+    mime_type: str
+    file_size: int
+    invoice_date: date | None = None
+    due_date: date | None = None
+    amount_ht: Decimal | None = None
+    amount_vat: Decimal | None = None
+    amount_ttc: Decimal | None = None
+    currency: str
+    archive_status: VaultArchiveStatus
+    accounting_status: VaultAccountingStatus
+    email_status: VaultEmailStatus
+    version: int
+    archived_at: datetime
+    created_at: datetime
+
+
+class VaultDocumentDetail(BaseModel):
+    """Détail document — sans storage_path / checksum / URL."""
+
+    id: str
+    tenant_id: int
+    document_type: VaultDocumentType
+    document_number: str | None = None
+    original_filename: str
+    mime_type: str
+    file_size: int
+    invoice_date: date | None = None
+    due_date: date | None = None
+    amount_ht: Decimal | None = None
+    amount_vat: Decimal | None = None
+    amount_ttc: Decimal | None = None
+    currency: str
+    archive_status: VaultArchiveStatus
+    accounting_status: VaultAccountingStatus
+    email_status: VaultEmailStatus
+    version: int
+    is_locked: bool = False
+    archived_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class VaultPagination(BaseModel):
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+
+
+class VaultDocumentListResponse(BaseModel):
+    items: list[VaultDocumentListItem]
+    pagination: VaultPagination
+
+
+class VaultDownloadUrlResponse(BaseModel):
+    document_id: str
+    download_url: str
+    expires_in: int
+    expires_at: datetime
 
 
 class VaultDuplicateErrorBody(BaseModel):

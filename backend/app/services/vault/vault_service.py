@@ -1,8 +1,9 @@
-"""Orchestration d'archivage ELFIS Vault."""
+"""Orchestration d'archivage et consultation ELFIS Vault."""
 
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -13,8 +14,16 @@ from app.repositories.vault_repository import VaultRepository
 from app.schemas_vault import (
     VaultActivityAction,
     VaultArchiveFormMeta,
+    VaultArchiveStatus,
+    VaultDocumentDetail,
+    VaultDocumentListItem,
+    VaultDocumentListResponse,
     VaultDocumentResponse,
     VaultDocumentType,
+    VaultDownloadUrlResponse,
+    VaultPagination,
+    VaultSortBy,
+    VaultSortOrder,
 )
 from app.services.vault.checksum_service import calculate_sha256
 from app.services.vault.exceptions import (
@@ -22,10 +31,16 @@ from app.services.vault.exceptions import (
     VaultDuplicateDocumentError,
     VaultFileTooLargeError,
     VaultInvalidFileError,
+    VaultNotFoundError,
     VaultStorageError,
+    VaultValidationError,
 )
 from app.services.vault.storage_service import VaultStorageService, build_storage_path
-from app.services.vault.vault_access_service import assert_can_archive
+from app.services.vault.vault_access_service import (
+    DOCUMENT_NOT_FOUND_MESSAGE,
+    assert_can_archive,
+    assert_can_read,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -161,3 +176,191 @@ def archive_document(
         )
 
     return _to_response(doc)
+
+
+def _to_list_item(doc: VaultDocument) -> VaultDocumentListItem:
+    return VaultDocumentListItem(
+        id=doc.id,
+        tenant_id=doc.organization_id,
+        document_type=VaultDocumentType(doc.document_type),
+        document_number=doc.document_number,
+        original_filename=doc.original_filename,
+        mime_type=doc.mime_type,
+        file_size=doc.file_size,
+        invoice_date=doc.invoice_date,
+        due_date=doc.due_date,
+        amount_ht=doc.amount_ht,
+        amount_vat=doc.amount_vat,
+        amount_ttc=doc.amount_ttc,
+        currency=doc.currency,
+        archive_status=doc.archive_status,  # type: ignore[arg-type]
+        accounting_status=doc.accounting_status,  # type: ignore[arg-type]
+        email_status=doc.email_status,  # type: ignore[arg-type]
+        version=doc.version,
+        archived_at=doc.archived_at,
+        created_at=doc.created_at,
+    )
+
+
+def _to_detail(doc: VaultDocument) -> VaultDocumentDetail:
+    return VaultDocumentDetail(
+        id=doc.id,
+        tenant_id=doc.organization_id,
+        document_type=VaultDocumentType(doc.document_type),
+        document_number=doc.document_number,
+        original_filename=doc.original_filename,
+        mime_type=doc.mime_type,
+        file_size=doc.file_size,
+        invoice_date=doc.invoice_date,
+        due_date=doc.due_date,
+        amount_ht=doc.amount_ht,
+        amount_vat=doc.amount_vat,
+        amount_ttc=doc.amount_ttc,
+        currency=doc.currency,
+        archive_status=doc.archive_status,  # type: ignore[arg-type]
+        accounting_status=doc.accounting_status,  # type: ignore[arg-type]
+        email_status=doc.email_status,  # type: ignore[arg-type]
+        version=doc.version,
+        is_locked=False,
+        archived_at=doc.archived_at,
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+    )
+
+
+def list_documents(
+    db: Session,
+    *,
+    user_id: int,
+    organization_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    document_type: VaultDocumentType | None = None,
+    archive_status: VaultArchiveStatus | None = None,
+    search: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    sort_by: VaultSortBy = VaultSortBy.created_at,
+    sort_order: VaultSortOrder = VaultSortOrder.desc,
+) -> VaultDocumentListResponse:
+    assert_can_read(db, user_id=user_id, organization_id=organization_id)
+    if page < 1 or page_size < 1 or page_size > 100:
+        raise VaultValidationError("Paramètres de pagination invalides")
+
+    repo = VaultRepository(db)
+    total = repo.count_documents(
+        organization_id=organization_id,
+        document_type=document_type,
+        archive_status=archive_status,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    rows = repo.list_documents(
+        organization_id=organization_id,
+        page=page,
+        page_size=page_size,
+        document_type=document_type,
+        archive_status=archive_status,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+    total_pages = (total + page_size - 1) // page_size if total else 0
+    return VaultDocumentListResponse(
+        items=[_to_list_item(r) for r in rows],
+        pagination=VaultPagination(
+            page=page,
+            page_size=page_size,
+            total_items=total,
+            total_pages=total_pages,
+        ),
+    )
+
+
+def get_document_details(
+    db: Session,
+    *,
+    user_id: int,
+    organization_id: int,
+    document_id: str,
+) -> VaultDocumentDetail:
+    assert_can_read(db, user_id=user_id, organization_id=organization_id)
+    repo = VaultRepository(db)
+    doc = repo.get_document_for_tenant(
+        document_id=document_id, organization_id=organization_id
+    )
+    if not doc or doc.archive_status == VaultArchiveStatus.deleted.value:
+        raise VaultNotFoundError(DOCUMENT_NOT_FOUND_MESSAGE)
+
+    try:
+        repo.create_activity_log(
+            organization_id=organization_id,
+            document_id=doc.id,
+            user_id=user_id,
+            action=VaultActivityAction.document_viewed,
+            metadata={"document_id": doc.id, "source": "vault_document_details"},
+        )
+    except Exception:
+        logger.exception(
+            "vault_view_log_failed",
+            extra={"document_id": doc.id, "organization_id": organization_id},
+        )
+
+    return _to_detail(doc)
+
+
+def create_download_url(
+    db: Session,
+    *,
+    user_id: int,
+    organization_id: int,
+    document_id: str,
+    expires_in: int | None = None,
+    storage: VaultStorageService | None = None,
+) -> VaultDownloadUrlResponse:
+    assert_can_read(db, user_id=user_id, organization_id=organization_id)
+    repo = VaultRepository(db)
+    doc = repo.get_document_for_tenant(
+        document_id=document_id, organization_id=organization_id
+    )
+    if not doc or doc.archive_status == VaultArchiveStatus.deleted.value:
+        raise VaultNotFoundError(DOCUMENT_NOT_FOUND_MESSAGE)
+
+    ttl = expires_in if expires_in is not None else settings.elfis_vault_signed_url_ttl_seconds
+    ttl = max(60, min(900, int(ttl)))
+
+    storage_svc = storage or VaultStorageService()
+    # Ne jamais logger l'URL signée
+    download_url = storage_svc.create_signed_download_url(
+        storage_path=doc.storage_path,
+        expires_in=ttl,
+    )
+    expires_at = datetime.utcnow() + timedelta(seconds=ttl)
+
+    try:
+        repo.create_activity_log(
+            organization_id=organization_id,
+            document_id=doc.id,
+            user_id=user_id,
+            action=VaultActivityAction.document_downloaded,
+            metadata={
+                "document_id": doc.id,
+                "expires_in": ttl,
+                "source": "vault_download_url",
+            },
+        )
+    except Exception:
+        logger.exception(
+            "vault_download_log_failed",
+            extra={"document_id": doc.id, "organization_id": organization_id},
+        )
+
+    return VaultDownloadUrlResponse(
+        document_id=doc.id,
+        download_url=download_url,
+        expires_in=ttl,
+        expires_at=expires_at,
+    )
