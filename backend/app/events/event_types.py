@@ -25,6 +25,17 @@ class EventNames:
     NOTIFICATION_EMAIL_FAILED = "notification.email.failed.v1"
     NOTIFICATION_READ = "notification.read.v1"
 
+    JOB_CREATED = "job.created.v1"
+    JOB_STARTED = "job.started.v1"
+    JOB_PROGRESS = "job.progress.v1"
+    JOB_COMPLETED = "job.completed.v1"
+    JOB_RETRY_SCHEDULED = "job.retry_scheduled.v1"
+    JOB_FAILED = "job.failed.v1"
+    JOB_DEAD_LETTERED = "job.dead_lettered.v1"
+    JOB_CANCELLED = "job.cancelled.v1"
+    JOB_TIMED_OUT = "job.timed_out.v1"
+    JOB_RETRIED = "job.retried.v1"
+
 
 ALL_KNOWN_EVENT_NAMES: frozenset[str] = frozenset(
     getattr(EventNames, name)

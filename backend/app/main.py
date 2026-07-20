@@ -21,6 +21,7 @@ from app.routers import (
     elfis_ai,
     email_connections,
     exports,
+    jobs,
     modules,
     notifications,
     org,
@@ -47,11 +48,15 @@ async def lifespan(_app: FastAPI):
         db.close()
 
     from app.events import bootstrap_handlers
+    from app.jobs import bootstrap_job_handlers
 
     bootstrap_handlers()
+    bootstrap_job_handlers()
 
     worker_stop = None
     worker_thread = None
+    job_worker_stop = None
+    job_worker_thread = None
     if settings.elfis_event_worker_enabled and settings.app_env.lower() != "production":
         # Mode local optionnel uniquement — en prod : processus séparé
         import threading
@@ -79,12 +84,45 @@ async def lifespan(_app: FastAPI):
         )
         worker_thread.start()
 
+    if settings.elfis_job_worker_enabled and settings.app_env.lower() != "production":
+        import threading
+
+        from app.jobs.job_worker import JobWorker, default_job_worker_id, parse_queues
+
+        job_worker_stop = threading.Event()
+        job_wid = default_job_worker_id()
+        job_queues = parse_queues()
+
+        def _local_job_worker_loop() -> None:
+            while not job_worker_stop.is_set():
+                session = SessionLocal()
+                try:
+                    JobWorker(
+                        session, worker_id=job_wid, queues=job_queues
+                    ).process_next_batch()
+                except Exception:
+                    pass
+                finally:
+                    session.close()
+                job_worker_stop.wait(settings.elfis_job_worker_poll_interval_seconds)
+
+        job_worker_thread = threading.Thread(
+            target=_local_job_worker_loop,
+            name="elfis-job-worker-local",
+            daemon=True,
+        )
+        job_worker_thread.start()
+
     yield
 
     if worker_stop is not None:
         worker_stop.set()
     if worker_thread is not None:
         worker_thread.join(timeout=5)
+    if job_worker_stop is not None:
+        job_worker_stop.set()
+    if job_worker_thread is not None:
+        job_worker_thread.join(timeout=5)
 
 
 app = FastAPI(
@@ -203,6 +241,7 @@ app.include_router(exports.router, prefix="/api")
 app.include_router(modules.router, prefix="/api")
 app.include_router(vault.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(jobs.router, prefix="/api")
 
 
 @app.get("/api/health")

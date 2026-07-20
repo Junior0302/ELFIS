@@ -587,3 +587,194 @@ def platform_get_notification(notification_id: str, db: Session = Depends(get_db
             for d in deliveries
         ],
     }
+
+
+@router.get("/jobs")
+def platform_list_jobs(
+    organization_id: int | None = None,
+    job_name: str | None = None,
+    queue_name: str | None = None,
+    status: str | None = None,
+    worker_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    """Liste admin jobs — sans payload/result complets."""
+    from datetime import datetime
+
+    from app.jobs import bootstrap_job_handlers
+    from app.jobs.job_service import JobService
+
+    bootstrap_job_handlers()
+
+    def _parse(v: str | None) -> datetime | None:
+        if not v:
+            return None
+        try:
+            return datetime.fromisoformat(v.replace("Z", ""))
+        except ValueError:
+            return None
+
+    rows, total = JobService(db).list_jobs(
+        organization_id=organization_id,
+        job_name=job_name,
+        queue_name=queue_name,
+        status=status,
+        worker_id=worker_id,
+        date_from=_parse(date_from),
+        date_to=_parse(date_to),
+        page=page,
+        page_size=page_size,
+    )
+    return {
+        "total": total,
+        "page": max(1, page),
+        "page_size": min(100, max(1, page_size)),
+        "jobs": [
+            {
+                "job_id": r.job_id,
+                "job_name": r.job_name,
+                "job_version": r.job_version,
+                "queue_name": r.queue_name,
+                "status": r.status,
+                "priority": r.priority,
+                "progress": r.progress,
+                "progress_message": r.progress_message,
+                "attempt_count": r.attempt_count,
+                "max_attempts": r.max_attempts,
+                "organization_id": r.organization_id,
+                "user_id": r.user_id,
+                "locked_by": r.locked_by,
+                "available_at": r.available_at,
+                "scheduled_at": r.scheduled_at,
+                "started_at": r.started_at,
+                "completed_at": r.completed_at,
+                "failed_at": r.failed_at,
+                "cancelled_at": r.cancelled_at,
+                "correlation_id": r.correlation_id,
+                "created_at": r.created_at,
+                "updated_at": r.updated_at,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/jobs/{job_id}")
+def platform_get_job(job_id: str, db: Session = Depends(get_db)):
+    from app.jobs import bootstrap_job_handlers
+    from app.jobs.job_exceptions import JobNotFoundError
+    from app.jobs.job_logging import sanitize_job_error
+    from app.jobs.job_service import JobService
+
+    bootstrap_job_handlers()
+    svc = JobService(db)
+    try:
+        job = svc.get_job(job_id)
+    except JobNotFoundError:
+        raise HTTPException(404, detail="Job introuvable") from None
+    return {
+        "job_id": job.job_id,
+        "job_name": job.job_name,
+        "job_version": job.job_version,
+        "queue_name": job.queue_name,
+        "status": job.status,
+        "priority": job.priority,
+        "progress": job.progress,
+        "progress_message": job.progress_message,
+        "attempt_count": job.attempt_count,
+        "max_attempts": job.max_attempts,
+        "organization_id": job.organization_id,
+        "user_id": job.user_id,
+        "locked_by": job.locked_by,
+        "available_at": job.available_at,
+        "scheduled_at": job.scheduled_at,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "failed_at": job.failed_at,
+        "cancelled_at": job.cancelled_at,
+        "timeout_seconds": job.timeout_seconds,
+        "idempotency_key": job.idempotency_key,
+        "correlation_id": job.correlation_id,
+        "causation_event_id": job.causation_event_id,
+        "parent_job_id": job.parent_job_id,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "last_error": sanitize_job_error(job.last_error),
+        "payload_summary": svc.filter_sensitive_dict(
+            job.payload if isinstance(job.payload, dict) else {}
+        ),
+        "result_summary": svc.filter_sensitive_dict(
+            job.result if isinstance(job.result, dict) else None
+        )
+        or None,
+    }
+
+
+@router.get("/jobs/{job_id}/attempts")
+def platform_job_attempts(job_id: str, db: Session = Depends(get_db)):
+    from app.jobs import bootstrap_job_handlers
+    from app.jobs.job_exceptions import JobNotFoundError
+    from app.jobs.job_logging import sanitize_job_error
+    from app.jobs.job_service import JobService
+
+    bootstrap_job_handlers()
+    svc = JobService(db)
+    try:
+        attempts = svc.get_job_attempts(job_id)
+    except JobNotFoundError:
+        raise HTTPException(404, detail="Job introuvable") from None
+    return {
+        "job_id": job_id,
+        "attempts": [
+            {
+                "attempt_number": a.attempt_number,
+                "worker_id": a.worker_id,
+                "status": a.status,
+                "started_at": a.started_at,
+                "completed_at": a.completed_at,
+                "failed_at": a.failed_at,
+                "duration_ms": a.duration_ms,
+                "error_type": a.error_type,
+                "error_message": sanitize_job_error(a.error_message),
+            }
+            for a in attempts
+        ],
+    }
+
+
+@router.post("/jobs/{job_id}/retry")
+def platform_retry_job(job_id: str, db: Session = Depends(get_db), admin: User = Depends(require_platform_admin)):
+    from app.jobs import bootstrap_job_handlers
+    from app.jobs.job_exceptions import JobNotFoundError, JobValidationError
+    from app.jobs.job_service import JobService
+
+    bootstrap_job_handlers()
+    svc = JobService(db)
+    try:
+        job = svc.retry_job(job_id, actor_user_id=admin.id)
+    except JobNotFoundError:
+        raise HTTPException(404, detail="Job introuvable") from None
+    except JobValidationError as exc:
+        raise HTTPException(400, detail=exc.message) from None
+    return {"job_id": job.job_id, "status": job.status, "attempt_count": job.attempt_count}
+
+
+@router.post("/jobs/{job_id}/cancel")
+def platform_cancel_job(job_id: str, db: Session = Depends(get_db), admin: User = Depends(require_platform_admin)):
+    from app.jobs import bootstrap_job_handlers
+    from app.jobs.job_exceptions import JobNotFoundError, JobValidationError
+    from app.jobs.job_service import JobService
+
+    bootstrap_job_handlers()
+    svc = JobService(db)
+    try:
+        job = svc.cancel_job(job_id, actor_user_id=admin.id)
+    except JobNotFoundError:
+        raise HTTPException(404, detail="Job introuvable") from None
+    except JobValidationError as exc:
+        raise HTTPException(400, detail=exc.message) from None
+    return {"job_id": job.job_id, "status": job.status, "cancelled_at": job.cancelled_at}

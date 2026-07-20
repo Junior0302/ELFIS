@@ -74,6 +74,20 @@ class Settings(BaseSettings):
     elfis_event_retry_base_seconds: int = 10
     elfis_event_lock_timeout_seconds: int = 300
     elfis_event_worker_id: str = ""
+    # ELFIS Job Queue V1
+    elfis_job_worker_enabled: bool = False
+    elfis_job_worker_queues: str = "default"
+    elfis_job_worker_batch_size: int = 10
+    elfis_job_worker_poll_interval_seconds: float = 2.0
+    elfis_job_max_attempts: int = 5
+    elfis_job_retry_base_seconds: int = 15
+    elfis_job_lock_timeout_seconds: int = 300
+    elfis_job_heartbeat_interval_seconds: int = 30
+    elfis_job_default_timeout_seconds: int = 300
+    elfis_job_worker_id: str = ""
+    elfis_job_max_payload_bytes: int = 65536
+    elfis_job_max_result_bytes: int = 65536
+    elfis_vault_metadata_job_enabled: bool = True
 
     @property
     def effective_platform_from(self) -> str:

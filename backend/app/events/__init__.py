@@ -19,7 +19,11 @@ def bootstrap_handlers(registry: EventHandlerRegistry | None = None) -> None:
     if registry is None and _handlers_bootstrapped:
         return
     from app.events.handlers.document_handlers import DocumentArchivedAuditHandler
+    from app.jobs.handlers.event_bridge import DocumentArchivedMetadataJobHandler
     from app.notifications import register_notification_handlers
+    from app.jobs import bootstrap_job_handlers
+
+    bootstrap_job_handlers()
 
     handler = DocumentArchivedAuditHandler()
     existing = [
@@ -29,6 +33,15 @@ def bootstrap_handlers(registry: EventHandlerRegistry | None = None) -> None:
     ]
     if not existing:
         reg.register(EventNames.VAULT_DOCUMENT_ARCHIVED, handler)
+
+    meta_handler = DocumentArchivedMetadataJobHandler()
+    meta_existing = [
+        h
+        for h in reg.get_handlers(EventNames.VAULT_DOCUMENT_ARCHIVED)
+        if h.handler_name == meta_handler.handler_name
+    ]
+    if not meta_existing:
+        reg.register(EventNames.VAULT_DOCUMENT_ARCHIVED, meta_handler)
 
     register_notification_handlers(reg)
 

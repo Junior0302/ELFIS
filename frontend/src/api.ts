@@ -1415,6 +1415,34 @@ export const api = {
       { method: 'POST' },
       { token, orgId },
     ),
+  getJobStatus: (jobId: string, token?: string | null, orgId?: number | null) =>
+    request<{
+      job_id: string
+      job_name: string
+      status: string
+      progress: number
+      progress_message?: string | null
+      attempt_count: number
+      max_attempts: number
+      created_at: string
+      started_at?: string | null
+      completed_at?: string | null
+      failed_at?: string | null
+    }>(`/jobs/${jobId}`, undefined, { token, orgId }),
+  cancelJob: (jobId: string, token?: string | null, orgId?: number | null) =>
+    request<{
+      job_id: string
+      job_name: string
+      status: string
+      progress: number
+      progress_message?: string | null
+      attempt_count: number
+      max_attempts: number
+      created_at: string
+      started_at?: string | null
+      completed_at?: string | null
+      failed_at?: string | null
+    }>(`/jobs/${jobId}/cancel`, { method: 'POST' }, { token, orgId }),
 }
 
 
