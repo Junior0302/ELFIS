@@ -132,8 +132,8 @@ class EmailSendIn(BaseModel):
     is_test: bool = False
     idempotency_key: str | None = None
     connection_id: int | None = None
-    # server = envoi backend + PDF joint ; mailto = messagerie utilisateur (secours)
-    send_mode: str = "server"
+    # mailto = ouverture messagerie utilisateur (PDF à joindre à la main) ; server = Brevo
+    send_mode: str = "mailto"
     sender_acknowledged: bool = False
     # Expéditeur choisi (ELFIS pro / perso) — utilisé pour Reply-To et journal
     preferred_from_email: str | None = None
@@ -778,10 +778,10 @@ def email_document(
         "document": _serialize(doc),
         "email_log": _serialize_email_log(log, db),
         "smtp_configured": smtp_configured(),
-        "email_configured": smtp_configured() if mode == "server" else True,
+        "email_configured": True,
         "send_mode": mode,
         "sender_email": log.sender_email,
-        "can_send_direct": smtp_configured(),
+        "can_send_direct": False,
     }
 
 
@@ -844,7 +844,7 @@ def document_emails(
             "connection_id": default_connection_id,
             "user_email": (auth.user.email if auth.user else "") or "",
             "org_email": (org.email or "").strip(),
-            "preferred_send_mode": "server" if smtp_configured() else "mailto",
+            "preferred_send_mode": "mailto",
         }
     return {
         "email_logs": [
@@ -856,7 +856,7 @@ def document_emails(
         "preview": preview,
         "connections": connections,
         "default_connection_id": default_connection_id,
-        "can_send_direct": smtp_configured(),
+        "can_send_direct": False,
     }
 
 

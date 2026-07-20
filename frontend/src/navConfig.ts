@@ -100,8 +100,8 @@ export const navSections: NavSection[] = [
         permission: 'invoice.read',
         guide: [
           'Point d’entrée commercial : factures, devis, encaissements et suivi client.',
-          'Pour envoyer : ouvrez le document, vérifiez le destinataire, cliquez Envoyer maintenant.',
-          'Le PDF part automatiquement en pièce jointe — rien à joindre à la main.',
+          'Pour envoyer : ouvrez le document, puis « Ouvrir ma messagerie ».',
+          'Le PDF est téléchargé : joignez-le dans Gmail ou Outlook avant d’envoyer.',
           'Avec l’essai ComptaPilot IA, toute la chaîne devis → facture devient disponible.',
         ],
       },
@@ -160,7 +160,7 @@ export const navSections: NavSection[] = [
           'Vous êtes sur Entreprise. Identité, TVA et modèles d’e-mail au même endroit.',
         guide: [
           'Renseignez l’identité, la TVA, et les modèles d’objet/message pour devis et factures.',
-          'L’envoi part depuis ComptaPilot avec le PDF joint automatiquement.',
+          'L’envoi se fait depuis votre messagerie personnelle — joignez le PDF téléchargé.',
           'Exemple : raison sociale, logo, objet par défaut « Devis {{quote_number}} ».',
           'Accessible dès l’inscription ; affinez pendant l’essai.',
         ],

@@ -480,8 +480,8 @@ export default function SettingsPage() {
 
         <h3 style={{ marginTop: '1.5rem' }}>Modèles d’e-mail</h3>
         <p className="muted">
-          Les devis et factures s’envoient en un clic depuis ComptaPilot, avec le PDF joint
-          automatiquement. Préparez ici les objets et messages par défaut.
+          Les devis et factures s’envoient depuis <strong>votre messagerie</strong> (Gmail, Outlook…).
+          Préparez ici les objets et messages par défaut qui s’ouvrent automatiquement.
         </p>
 
         {emailSettings ? (

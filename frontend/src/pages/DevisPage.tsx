@@ -152,8 +152,8 @@ export default function DevisPage() {
             aussi disponible dans <Link to="/facturation">Facturation</Link>.
           </p>
           <p className="muted" style={{ marginTop: '0.5rem' }}>
-            À l’envoi : ouvrez le devis puis <strong>Envoyer maintenant</strong> — le PDF part
-            automatiquement en pièce jointe.
+            À l’envoi : ouvrez le devis, puis <strong>Ouvrir ma messagerie</strong> — joignez le PDF
+            téléchargé et envoyez depuis votre boîte.
           </p>
         </div>
       </div>
