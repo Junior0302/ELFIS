@@ -5,12 +5,16 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.events import EventNames, bootstrap_handlers, safe_publish
+from app.events.event_context import new_correlation_id
+from app.events.event_schemas import DomainEvent
 from app.models_saas import DocumentEmailLog, Organization, SalesDocument
 from app.repositories.vault_repository import VaultRepository
 from app.schemas_vault import VaultActivityAction, VaultDocumentType, VaultEmailStatus
@@ -126,6 +130,41 @@ class DocumentDeliveryService:
 
     def __init__(self, db: Session):
         self._db = db
+        bootstrap_handlers()
+
+    def _publish(
+        self,
+        *,
+        event_name: str,
+        organization_id: int,
+        payload: dict,
+        metadata: dict,
+        idempotency_key: str | None,
+        correlation_id: str,
+        causation_id: str | None = None,
+        aggregate_type: str | None = None,
+        aggregate_id: str | None = None,
+    ) -> None:
+        """
+        Publication complémentaire (non bloquante).
+
+        Limite transactionnelle : VaultRepository et sales_email commitent déjà
+        leurs propres transactions ; l'événement n'est pas dans la même TX métier.
+        """
+        safe_publish(
+            self._db,
+            DomainEvent(
+                event_name=event_name,
+                organization_id=organization_id,
+                aggregate_type=aggregate_type,
+                aggregate_id=aggregate_id,
+                payload=payload,
+                metadata=metadata,
+                idempotency_key=idempotency_key,
+                correlation_id=uuid.UUID(correlation_id),
+                causation_id=uuid.UUID(causation_id) if causation_id else None,
+            ),
+        )
 
     def send_document(
         self,
@@ -245,6 +284,12 @@ class DocumentDeliveryService:
         attachment_name = delivery_attachment_filename(doc)
         vault_type = DOC_TYPE_TO_VAULT[doc_type]
         repo = VaultRepository(self._db)
+        correlation_id = new_correlation_id()
+        actor_meta = {
+            "source": "document_delivery",
+            "actor_user_id": str(authenticated_user_id),
+            "request_id": None,
+        }
 
         try:
             vault_doc, reused = archive_or_reuse_pdf(
@@ -279,6 +324,37 @@ class DocumentDeliveryService:
                 "Le document n’a pas pu être archivé. L’e-mail n’a pas été envoyé.",
             ) from exc
 
+        archive_payload = {
+            "vault_document_id": vault_doc.id,
+            "business_document_id": str(doc.id),
+            "business_document_type": BUSINESS_TYPE_LABEL[doc_type],
+            "document_type": vault_type.value,
+            "archive_status": vault_doc.archive_status,
+            "reused_existing_archive": reused,
+        }
+        if reused:
+            self._publish(
+                event_name=EventNames.VAULT_DOCUMENT_REUSED,
+                organization_id=organization_id,
+                payload=archive_payload,
+                metadata=actor_meta,
+                idempotency_key=f"vault:reused:{organization_id}:{vault_doc.id}:{key}",
+                correlation_id=correlation_id,
+                aggregate_type="vault_document",
+                aggregate_id=vault_doc.id,
+            )
+        else:
+            self._publish(
+                event_name=EventNames.VAULT_DOCUMENT_ARCHIVED,
+                organization_id=organization_id,
+                payload=archive_payload,
+                metadata=actor_meta,
+                idempotency_key=f"vault:archived:{organization_id}:{vault_doc.id}:{key}",
+                correlation_id=correlation_id,
+                aggregate_type="vault_document",
+                aggregate_id=vault_doc.id,
+            )
+
         meta_base = {
             "business_document_id": str(doc.id),
             "business_document_type": BUSINESS_TYPE_LABEL[doc_type],
@@ -293,6 +369,24 @@ class DocumentDeliveryService:
             user_id=authenticated_user_id,
             action=VaultActivityAction.email_send_started,
             metadata=meta_base,
+        )
+
+        email_payload = {
+            "vault_document_id": vault_doc.id,
+            "business_document_id": str(doc.id),
+            "business_document_type": BUSINESS_TYPE_LABEL[doc_type],
+            "document_type": vault_type.value,
+            "recipient_domain": _recipient_domain(to_email),
+        }
+        self._publish(
+            event_name=EventNames.DELIVERY_EMAIL_STARTED,
+            organization_id=organization_id,
+            payload=email_payload,
+            metadata=actor_meta,
+            idempotency_key=f"delivery:email_started:{organization_id}:{doc.id}:{key}",
+            correlation_id=correlation_id,
+            aggregate_type="sales_document",
+            aggregate_id=str(doc.id),
         )
 
         email_log = send_sales_document_email(
@@ -331,6 +425,20 @@ class DocumentDeliveryService:
                 action=VaultActivityAction.email_sent,
                 metadata=meta_base,
             )
+            self._publish(
+                event_name=EventNames.DELIVERY_EMAIL_SENT,
+                organization_id=organization_id,
+                payload={
+                    **email_payload,
+                    "email_log_id": str(email_log.id) if email_log.id else None,
+                    "email_status": "sent",
+                },
+                metadata=actor_meta,
+                idempotency_key=f"delivery:email_sent:{organization_id}:{doc.id}:{email_log.id or key}",
+                correlation_id=correlation_id,
+                aggregate_type="sales_document",
+                aggregate_id=str(doc.id),
+            )
             return DocumentDeliveryResult(
                 status="sent",
                 business_document_id=doc.id,
@@ -361,6 +469,21 @@ class DocumentDeliveryService:
             user_id=authenticated_user_id,
             action=VaultActivityAction.email_failed,
             metadata={**meta_base, "error_code": email_log.error_code or "provider_error"},
+        )
+        self._publish(
+            event_name=EventNames.DELIVERY_EMAIL_FAILED,
+            organization_id=organization_id,
+            payload={
+                **email_payload,
+                "email_log_id": str(email_log.id) if email_log.id else None,
+                "email_status": "failed",
+                "error_code": email_log.error_code or "provider_error",
+            },
+            metadata=actor_meta,
+            idempotency_key=f"delivery:email_failed:{organization_id}:{doc.id}:{email_log.id or key}",
+            correlation_id=correlation_id,
+            aggregate_type="sales_document",
+            aggregate_id=str(doc.id),
         )
         return DocumentDeliveryResult(
             status="email_failed",

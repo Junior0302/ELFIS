@@ -66,6 +66,14 @@ class Settings(BaseSettings):
     elfis_vault_bucket: str = "elfis-vault"
     elfis_vault_max_file_size_mb: int = 15
     elfis_vault_signed_url_ttl_seconds: int = 300
+    # ELFIS Event Bus V1
+    elfis_event_worker_enabled: bool = False
+    elfis_event_worker_batch_size: int = 20
+    elfis_event_worker_poll_interval_seconds: float = 2.0
+    elfis_event_max_attempts: int = 5
+    elfis_event_retry_base_seconds: int = 10
+    elfis_event_lock_timeout_seconds: int = 300
+    elfis_event_worker_id: str = ""
 
     @property
     def effective_platform_from(self) -> str:

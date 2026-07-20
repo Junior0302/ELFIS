@@ -414,3 +414,87 @@ def update_platform_user(
             .count(),
         },
     }
+
+
+@router.get("/events")
+def platform_list_events(
+    status: str | None = None,
+    event_name: str | None = None,
+    organization_id: int | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    """Liste admin Event Bus — sans payload/metadata (ELF Admin uniquement)."""
+    from app.events.event_repository import EventRepository
+
+    rows, total = EventRepository(db).list_events(
+        status=status,
+        event_name=event_name,
+        organization_id=organization_id,
+        page=page,
+        page_size=page_size,
+    )
+    return {
+        "total": total,
+        "page": max(1, page),
+        "page_size": min(100, max(1, page_size)),
+        "events": [
+            {
+                "id": row.id,
+                "event_id": row.event_id,
+                "event_name": row.event_name,
+                "organization_id": row.organization_id,
+                "status": row.status,
+                "attempt_count": row.attempt_count,
+                "max_attempts": row.max_attempts,
+                "available_at": row.available_at,
+                "processed_at": row.processed_at,
+                "failed_at": row.failed_at,
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ],
+    }
+
+
+@router.get("/events/{event_id}")
+def platform_get_event(event_id: str, db: Session = Depends(get_db)):
+    """Détail admin — payload filtré (sans secrets)."""
+    from app.events.event_repository import EventRepository
+    from app.events.event_schemas import FORBIDDEN_PAYLOAD_KEYS
+
+    row = EventRepository(db).find_by_event_id(event_id)
+    if not row:
+        raise HTTPException(404, detail="Événement introuvable")
+
+    def _filter(data: dict | None) -> dict:
+        out = {}
+        for key, value in (data or {}).items():
+            if str(key).lower() in FORBIDDEN_PAYLOAD_KEYS:
+                continue
+            out[key] = value
+        return out
+
+    return {
+        "id": row.id,
+        "event_id": row.event_id,
+        "event_name": row.event_name,
+        "event_version": row.event_version,
+        "organization_id": row.organization_id,
+        "aggregate_type": row.aggregate_type,
+        "aggregate_id": row.aggregate_id,
+        "status": row.status,
+        "attempt_count": row.attempt_count,
+        "max_attempts": row.max_attempts,
+        "available_at": row.available_at,
+        "processed_at": row.processed_at,
+        "failed_at": row.failed_at,
+        "last_error": row.last_error,
+        "idempotency_key": row.idempotency_key,
+        "correlation_id": row.correlation_id,
+        "causation_id": row.causation_id,
+        "created_at": row.created_at,
+        "payload": _filter(row.payload if isinstance(row.payload, dict) else {}),
+        "metadata": _filter(row.metadata_json if isinstance(row.metadata_json, dict) else {}),
+    }

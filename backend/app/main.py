@@ -44,7 +44,46 @@ async def lifespan(_app: FastAPI):
         purge_demo_finance_data(db)
     finally:
         db.close()
+
+    from app.events import bootstrap_handlers
+
+    bootstrap_handlers()
+
+    worker_stop = None
+    worker_thread = None
+    if settings.elfis_event_worker_enabled and settings.app_env.lower() != "production":
+        # Mode local optionnel uniquement — en prod : processus séparé
+        import threading
+
+        from app.events.event_worker import EventWorker, default_worker_id
+
+        worker_stop = threading.Event()
+        worker_id = default_worker_id()
+
+        def _local_worker_loop() -> None:
+            while not worker_stop.is_set():
+                session = SessionLocal()
+                try:
+                    EventWorker(session, worker_id=worker_id).process_next_batch()
+                except Exception:
+                    pass
+                finally:
+                    session.close()
+                worker_stop.wait(settings.elfis_event_worker_poll_interval_seconds)
+
+        worker_thread = threading.Thread(
+            target=_local_worker_loop,
+            name="elfis-event-worker-local",
+            daemon=True,
+        )
+        worker_thread.start()
+
     yield
+
+    if worker_stop is not None:
+        worker_stop.set()
+    if worker_thread is not None:
+        worker_thread.join(timeout=5)
 
 
 app = FastAPI(
