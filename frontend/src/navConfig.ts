@@ -78,6 +78,20 @@ export const navSections: NavSection[] = [
         ],
       },
       {
+        to: '/documents',
+        label: 'Documents',
+        hint: 'Coffre-fort PDF',
+        spokenIntro:
+          'Voici Documents. Archivez vos PDF dans le coffre sécurisé ELFIS Vault.',
+        permission: 'documents.read',
+        guide: [
+          'Archivez un PDF (facture, devis, avoir…) dans le coffre privé de votre entreprise.',
+          'Onglet « Déposer un document » pour archiver, « Mes documents » pour consulter (bientôt).',
+          'Exemple : vous archivez une facture signée pour la conserver hors messagerie.',
+          'Réservé aux rôles autorisés ; un abonnement actif est requis pour archiver.',
+        ],
+      },
+      {
         to: '/history',
         label: 'Comptabilité',
         hint: 'Documents & exports',

@@ -117,6 +117,45 @@ export type Invoice = {
   updated_at: string
 }
 
+export type VaultDocumentType =
+  | 'customer_invoice'
+  | 'supplier_invoice'
+  | 'quote'
+  | 'credit_note'
+  | 'expense_report'
+  | 'bank_statement'
+  | 'contract'
+  | 'other'
+
+export type VaultArchiveMeta = {
+  document_type: VaultDocumentType
+  document_number?: string
+  invoice_date?: string
+  due_date?: string
+  amount_ht?: string
+  amount_vat?: string
+  amount_ttc?: string
+  currency?: string
+}
+
+export type VaultDocument = {
+  id: string
+  tenant_id: number
+  document_type: VaultDocumentType
+  document_number: string | null
+  original_filename: string
+  storage_path: string
+  mime_type: string
+  file_size: number
+  checksum_sha256: string
+  archive_status: string
+  accounting_status: string
+  email_status: string
+  version: number
+  archived_at: string
+  created_at: string
+}
+
 export type DashboardStats = {
   invoice_count: number
   total_ht: number
@@ -169,8 +208,13 @@ function apiRoot(): string {
 async function parseError(res: Response): Promise<string> {
   const text = await res.text()
   try {
-    const data = JSON.parse(text) as { detail?: unknown }
-    if (typeof data.detail === 'string') return data.detail
+    const data = JSON.parse(text) as { detail?: unknown; existing_document_id?: string }
+    if (typeof data.detail === 'string') {
+      if (data.existing_document_id) {
+        return `${data.detail} (réf. ${data.existing_document_id})`
+      }
+      return data.detail
+    }
     if (
       typeof data.detail === 'object' &&
       data.detail &&
@@ -194,6 +238,9 @@ function friendlyError(status: number, message: string, path?: string): string {
   const isLocalApi =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  if (status === 409) {
+    return message || 'Ce document est déjà présent dans ELFIS Vault.'
+  }
   if (status === 404 || message.toLowerCase().includes('not found')) {
     if (path?.includes('/billing/documents/') && path.includes('/pdf')) {
       return isLocalApi
@@ -281,6 +328,26 @@ export const api = {
     const form = new FormData()
     form.append('file', file)
     return request<Invoice>('/documents/upload', { method: 'POST', body: form }, { token, orgId })
+  },
+  archiveVaultDocument: async (
+    file: File,
+    meta: VaultArchiveMeta,
+    token: string,
+    orgId?: number | null,
+  ) => {
+    if (!orgId) throw new Error('Organisation requise')
+    const form = new FormData()
+    form.append('file', file)
+    form.append('tenant_id', String(orgId))
+    form.append('document_type', meta.document_type)
+    form.append('currency', meta.currency || 'EUR')
+    if (meta.document_number) form.append('document_number', meta.document_number)
+    if (meta.invoice_date) form.append('invoice_date', meta.invoice_date)
+    if (meta.due_date) form.append('due_date', meta.due_date)
+    if (meta.amount_ht != null && meta.amount_ht !== '') form.append('amount_ht', String(meta.amount_ht))
+    if (meta.amount_vat != null && meta.amount_vat !== '') form.append('amount_vat', String(meta.amount_vat))
+    if (meta.amount_ttc != null && meta.amount_ttc !== '') form.append('amount_ttc', String(meta.amount_ttc))
+    return request<VaultDocument>('/vault/documents/archive', { method: 'POST', body: form }, { token, orgId })
   },
   updateDocument: (
     id: number,

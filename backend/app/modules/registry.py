@@ -26,6 +26,20 @@ MODULES: list[dict] = [
         "route": "/history",
     },
     {
+        "id": 14,
+        "slug": "elfis-vault",
+        "name": "ELFIS Vault",
+        "status": "live",
+        "summary": "Coffre-fort documentaire : archivage PDF sécurisé multi-entreprise.",
+        "capabilities": [
+            "archivage_pdf",
+            "checksum_sha256",
+            "stockage_prive",
+            "multi_tenant",
+        ],
+        "route": "/documents",
+    },
+    {
         "id": 4,
         "slug": "facturation",
         "name": "Facturation",

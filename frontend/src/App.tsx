@@ -15,6 +15,7 @@ import CopilotePage from './pages/CopilotePage'
 import DashboardPage from './pages/DashboardPage'
 import DevisPage from './pages/DevisPage'
 import DepositPage from './pages/DepositPage'
+import DocumentsPage from './pages/DocumentsPage'
 import FacturationPage from './pages/FacturationPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import HistoryPage from './pages/HistoryPage'
@@ -26,6 +27,7 @@ import OrganisationPage from './pages/OrganisationPage'
 import RegisterPage from './pages/RegisterPage'
 import ResultPage from './pages/ResultPage'
 import SettingsPage from './pages/SettingsPage'
+import VaultRedirect from './pages/VaultRedirect'
 import PlatformOrganizationsPage from './pages/platform/PlatformOrganizationsPage'
 import PlatformOverviewPage from './pages/platform/PlatformOverviewPage'
 import PlatformSubscriptionsPage from './pages/platform/PlatformSubscriptionsPage'
@@ -47,6 +49,8 @@ export default function App() {
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="intelligence" element={<IntelligencePage />} />
               <Route path="deposit" element={<DepositPage />} />
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="vault" element={<VaultRedirect />} />
               <Route path="result/:id" element={<ResultPage />} />
               <Route path="history" element={<HistoryPage />} />
               <Route path="facturation" element={<FacturationPage />} />

@@ -6,6 +6,7 @@ import {
   formatEuro,
   type ContactSuggestion,
   type Invoice,
+  type VaultDocumentType,
 } from '../api'
 import ConfidenceMeter from '../components/ConfidenceMeter'
 import ContactSuggestionCard from '../components/ContactSuggestionCard'
@@ -23,6 +24,23 @@ const SOFTWARE_EXPORTS = [
   { id: 'odoo', label: 'Odoo' },
   { id: 'csv', label: 'CSV' },
 ]
+
+function mapInvoiceToVaultType(documentType: string | null | undefined): VaultDocumentType {
+  switch ((documentType || '').toLowerCase()) {
+    case 'avoir':
+      return 'credit_note'
+    case 'devis':
+      return 'quote'
+    case 'note_frais':
+      return 'expense_report'
+    case 'releve':
+      return 'bank_statement'
+    case 'facture':
+      return 'supplier_invoice'
+    default:
+      return 'other'
+  }
+}
 
 function isImage(invoice: Invoice) {
   const mime = (invoice.mime_type || '').toLowerCase()
@@ -46,6 +64,7 @@ export default function ResultPage() {
   const [saving, setSaving] = useState(false)
   const [reprocessing, setReprocessing] = useState(false)
   const [reanalyzing, setReanalyzing] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [reportError, setReportError] = useState('')
@@ -177,6 +196,53 @@ export default function ResultPage() {
       await downloadApiFile(path, token, orgId)
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : 'Export impossible')
+    }
+  }
+
+  const onArchive = async () => {
+    if (!invoice || !token || !orgId) return
+    setArchiving(true)
+    setMessage('')
+    try {
+      const { blob, filename } = await api.documentFile(invoice.id, token, orgId)
+      const mime = (blob.type || invoice.mime_type || '').toLowerCase()
+      const looksPdf =
+        mime.includes('pdf') ||
+        filename.toLowerCase().endsWith('.pdf') ||
+        invoice.filename.toLowerCase().endsWith('.pdf')
+
+      if (!looksPdf) {
+        throw new Error(
+          'ELFIS Vault n’accepte que les PDF pour l’instant. Exportez en PDF ou déposez un PDF.',
+        )
+      }
+
+      const safeName = filename.toLowerCase().endsWith('.pdf')
+        ? filename
+        : invoice.filename.toLowerCase().endsWith('.pdf')
+          ? invoice.filename
+          : `${invoice.filename.replace(/\.[^.]+$/, '') || 'document'}.pdf`
+
+      const file = new File([blob], safeName, { type: 'application/pdf' })
+      const archived = await api.archiveVaultDocument(
+        file,
+        {
+          document_type: mapInvoiceToVaultType(invoice.document_type),
+          document_number: invoice.invoice_number || undefined,
+          invoice_date: invoice.invoice_date || undefined,
+          amount_ht: invoice.amount_ht != null ? String(invoice.amount_ht) : undefined,
+          amount_vat: invoice.amount_tva != null ? String(invoice.amount_tva) : undefined,
+          amount_ttc: invoice.amount_ttc != null ? String(invoice.amount_ttc) : undefined,
+          currency: 'EUR',
+        },
+        token,
+        orgId,
+      )
+      setMessage(`Document archivé dans ELFIS Vault (${archived.id}).`)
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Archivage impossible')
+    } finally {
+      setArchiving(false)
     }
   }
 
@@ -349,6 +415,14 @@ export default function ResultPage() {
               </button>
               <button className="btn secondary" type="button" onClick={onReprocess} disabled={reprocessing}>
                 {reprocessing ? 'Retraitement…' : 'Réanalyser'}
+              </button>
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => void onArchive()}
+                disabled={archiving}
+              >
+                {archiving ? 'Archivage…' : 'Archiver'}
               </button>
               <button
                 className="btn secondary"
