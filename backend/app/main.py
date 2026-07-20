@@ -49,9 +49,11 @@ async def lifespan(_app: FastAPI):
 
     from app.events import bootstrap_handlers
     from app.jobs import bootstrap_job_handlers
+    from app.ai import bootstrap_ai_tasks
 
     bootstrap_handlers()
     bootstrap_job_handlers()
+    bootstrap_ai_tasks()
 
     worker_stop = None
     worker_thread = None

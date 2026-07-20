@@ -778,3 +778,199 @@ def platform_cancel_job(job_id: str, db: Session = Depends(get_db), admin: User 
     except JobValidationError as exc:
         raise HTTPException(400, detail=exc.message) from None
     return {"job_id": job.job_id, "status": job.status, "cancelled_at": job.cancelled_at}
+
+
+@router.get("/ai/executions")
+def platform_list_ai_executions(
+    organization_id: int | None = None,
+    task_name: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+    status: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime
+
+    from app.ai import bootstrap_ai_tasks
+    from app.ai.ai_service import AIService
+
+    bootstrap_ai_tasks()
+
+    def _parse(v: str | None):
+        if not v:
+            return None
+        try:
+            return datetime.fromisoformat(v.replace("Z", ""))
+        except ValueError:
+            return None
+
+    rows, total = AIService(db).list_executions(
+        organization_id=organization_id,
+        task_name=task_name,
+        provider=provider,
+        model=model,
+        status=status,
+        date_from=_parse(date_from),
+        date_to=_parse(date_to),
+        page=page,
+        page_size=page_size,
+    )
+    return {
+        "total": total,
+        "page": max(1, page),
+        "page_size": min(100, max(1, page_size)),
+        "executions": [
+            {
+                "execution_id": r.execution_id,
+                "task_name": r.task_name,
+                "provider": r.provider,
+                "model": r.model,
+                "status": r.status,
+                "organization_id": r.organization_id,
+                "input_reference_type": r.input_reference_type,
+                "input_reference_id": r.input_reference_id,
+                "input_tokens": r.input_tokens,
+                "output_tokens": r.output_tokens,
+                "total_tokens": r.total_tokens,
+                "estimated_cost": float(r.estimated_cost) if r.estimated_cost is not None else None,
+                "latency_ms": r.latency_ms,
+                "job_id": r.job_id,
+                "correlation_id": r.correlation_id,
+                "created_at": r.created_at,
+                "completed_at": r.completed_at,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/ai/executions/{execution_id}")
+def platform_get_ai_execution(execution_id: str, db: Session = Depends(get_db)):
+    from app.ai import bootstrap_ai_tasks
+    from app.ai.ai_exceptions import AINotFoundError
+    from app.ai.ai_security import sanitize_ai_error
+    from app.ai.ai_service import AIService
+
+    bootstrap_ai_tasks()
+    try:
+        row = AIService(db).get_execution(execution_id)
+    except AINotFoundError:
+        raise HTTPException(404, detail="Exécution IA introuvable") from None
+    result = row.result if isinstance(row.result, dict) else None
+    # Filtrage léger — pas de raw_text / prompts
+    if result and "compatible_extraction" in result:
+        result = {k: v for k, v in result.items() if k != "compatible_extraction"}
+        result["compatible_extraction"] = {"present": True}
+    return {
+        "execution_id": row.execution_id,
+        "task_name": row.task_name,
+        "provider": row.provider,
+        "model": row.model,
+        "status": row.status,
+        "organization_id": row.organization_id,
+        "user_id": row.user_id,
+        "input_reference_type": row.input_reference_type,
+        "input_reference_id": row.input_reference_id,
+        "result_summary": result,
+        "input_tokens": row.input_tokens,
+        "output_tokens": row.output_tokens,
+        "total_tokens": row.total_tokens,
+        "estimated_cost": float(row.estimated_cost) if row.estimated_cost is not None else None,
+        "currency": row.currency,
+        "latency_ms": row.latency_ms,
+        "job_id": row.job_id,
+        "correlation_id": row.correlation_id,
+        "last_error": sanitize_ai_error(row.last_error),
+        "created_at": row.created_at,
+        "completed_at": row.completed_at,
+        "failed_at": row.failed_at,
+    }
+
+
+@router.get("/ai/usage")
+def platform_ai_usage(
+    organization_id: int | None = None,
+    task_name: str | None = None,
+    provider: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    from app.ai import bootstrap_ai_tasks
+    from app.ai.ai_service import AIService
+
+    bootstrap_ai_tasks()
+    rows, total = AIService(db).get_usage(
+        organization_id=organization_id,
+        task_name=task_name,
+        provider=provider,
+        page=page,
+        page_size=page_size,
+    )
+    return {
+        "total": total,
+        "page": max(1, page),
+        "page_size": min(100, max(1, page_size)),
+        "usage": [
+            {
+                "execution_id": r.execution_id,
+                "organization_id": r.organization_id,
+                "task_name": r.task_name,
+                "provider": r.provider,
+                "model": r.model,
+                "input_tokens": r.input_tokens,
+                "output_tokens": r.output_tokens,
+                "total_tokens": r.total_tokens,
+                "estimated_cost": float(r.estimated_cost) if r.estimated_cost is not None else None,
+                "currency": r.currency,
+                "request_date": r.request_date,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/ai/document-analyses")
+def platform_document_analyses(
+    organization_id: int | None = None,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    from app.ai import bootstrap_ai_tasks
+    from app.ai.ai_repository import AIRepository
+
+    bootstrap_ai_tasks()
+    rows, total = AIRepository(db).list_analyses(
+        organization_id=organization_id,
+        status=status,
+        page=page,
+        page_size=page_size,
+    )
+    return {
+        "total": total,
+        "page": max(1, page),
+        "page_size": min(100, max(1, page_size)),
+        "analyses": [
+            {
+                "analysis_id": r.analysis_id,
+                "organization_id": r.organization_id,
+                "vault_document_id": r.vault_document_id,
+                "document_version": r.document_version,
+                "document_type": r.document_type,
+                "status": r.status,
+                "current_stage": r.current_stage,
+                "confidence": float(r.confidence) if r.confidence is not None else None,
+                "requires_review": r.requires_review,
+                "created_at": r.created_at,
+                "completed_at": r.completed_at,
+            }
+            for r in rows
+        ],
+    }

@@ -20,6 +20,14 @@ def bootstrap_job_handlers(registry: JobHandlerRegistry | None = None) -> None:
 
     from app.jobs.handlers.health_handlers import HealthCheckJobHandler
     from app.jobs.handlers.vault_handlers import VaultDocumentMetadataCheckHandler
+    from app.jobs.handlers.ai_handlers import (
+        DocumentClassificationJobHandler,
+        DocumentInvoiceExtractionJobHandler,
+        DocumentQualityCheckJobHandler,
+    )
+    from app.ai import bootstrap_ai_tasks
+
+    bootstrap_ai_tasks()
 
     health = HealthCheckJobHandler()
     if not reg.has(health.job_name):
@@ -28,6 +36,14 @@ def bootstrap_job_handlers(registry: JobHandlerRegistry | None = None) -> None:
     meta = VaultDocumentMetadataCheckHandler()
     if not reg.has(meta.job_name):
         reg.register(job_name=meta.job_name, handler=meta)
+
+    for handler in (
+        DocumentClassificationJobHandler(),
+        DocumentInvoiceExtractionJobHandler(),
+        DocumentQualityCheckJobHandler(),
+    ):
+        if not reg.has(handler.job_name):
+            reg.register(job_name=handler.job_name, handler=handler)
 
     if registry is None:
         _handlers_bootstrapped = True

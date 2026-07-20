@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.ai import bootstrap_ai_tasks
+from app.ai.ai_exceptions import AINotFoundError
+from app.ai.ai_schemas import DocumentAnalyzeRequest
+from app.ai.document_analysis_service import DocumentAnalysisService
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.services.finance_agent import answer_finance_question, list_conversations
@@ -63,3 +67,54 @@ def ai_suggestions(auth: AuthContext = Depends(get_auth_context)):
             "Où en est ma TVA récupérable ?",
         ],
     }
+
+
+@router.post(
+    "/documents/{vault_document_id}/analyze",
+    status_code=202,
+    dependencies=[Depends(require_active_subscription)],
+)
+def analyze_vault_document(
+    vault_document_id: str,
+    payload: DocumentAnalyzeRequest | None = None,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    """Démarre une analyse IA (classification → extraction → quality). 202 Accepted."""
+    bootstrap_ai_tasks()
+    org_id = auth.require_organization_id()
+    if not auth.user:
+        raise HTTPException(401, detail="Authentification requise")
+    body = payload or DocumentAnalyzeRequest()
+    try:
+        result = DocumentAnalysisService(db).start_analysis(
+            organization_id=org_id,
+            user_id=auth.user.id,
+            vault_document_id=vault_document_id,
+            extracted_text=body.extracted_text,
+            filename=body.filename,
+        )
+    except AINotFoundError as exc:
+        raise HTTPException(404, detail=exc.message) from None
+    return result.model_dump()
+
+
+@router.get(
+    "/documents/{vault_document_id}/analysis",
+    dependencies=[Depends(require_active_subscription)],
+)
+def get_vault_document_analysis(
+    vault_document_id: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    bootstrap_ai_tasks()
+    org_id = auth.require_organization_id()
+    try:
+        view = DocumentAnalysisService(db).get_analysis_for_document(
+            organization_id=org_id,
+            vault_document_id=vault_document_id,
+        )
+    except AINotFoundError as exc:
+        raise HTTPException(404, detail=exc.message) from None
+    return view.model_dump()

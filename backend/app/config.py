@@ -88,6 +88,18 @@ class Settings(BaseSettings):
     elfis_job_max_payload_bytes: int = 65536
     elfis_job_max_result_bytes: int = 65536
     elfis_vault_metadata_job_enabled: bool = True
+    # ELFIS AI Engine V1
+    elfis_ai_enabled: bool = True
+    elfis_ai_provider: str = "openai"
+    elfis_ai_default_model: str = ""  # vide → openai_chat_model
+    elfis_ai_fast_model: str = ""
+    elfis_ai_complex_model: str = ""
+    elfis_ai_request_timeout_seconds: int = 120
+    elfis_ai_max_retries: int = 2
+    elfis_ai_max_input_bytes: int = 262144
+    elfis_ai_max_output_bytes: int = 65536
+    elfis_ai_max_executions_per_org_per_day: int = 1000
+    elfis_ai_max_concurrent_jobs_per_org: int = 10
 
     @property
     def effective_platform_from(self) -> str:
@@ -121,6 +133,12 @@ class Settings(BaseSettings):
         self.platform_email_from = (self.platform_email_from or "").strip()
         self.smtp_from = (self.smtp_from or "").strip()
         self.frontend_url = self.frontend_url.strip() or "http://localhost:5173"
+        if not (self.elfis_ai_default_model or "").strip():
+            self.elfis_ai_default_model = self.openai_chat_model or "gpt-4o-mini"
+        if not (self.elfis_ai_fast_model or "").strip():
+            self.elfis_ai_fast_model = self.elfis_ai_default_model
+        if not (self.elfis_ai_complex_model or "").strip():
+            self.elfis_ai_complex_model = self.elfis_ai_default_model
         if self.app_env.lower() != "production":
             return self
         if self.jwt_secret == "comptapilot-elfis-dev-secret-change-me" or len(self.jwt_secret) < 32:

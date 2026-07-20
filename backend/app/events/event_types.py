@@ -36,6 +36,14 @@ class EventNames:
     JOB_TIMED_OUT = "job.timed_out.v1"
     JOB_RETRIED = "job.retried.v1"
 
+    AI_EXECUTION_CREATED = "ai.execution.created.v1"
+    AI_EXECUTION_STARTED = "ai.execution.started.v1"
+    AI_EXECUTION_COMPLETED = "ai.execution.completed.v1"
+    AI_EXECUTION_FAILED = "ai.execution.failed.v1"
+    AI_EXECUTION_REQUIRES_REVIEW = "ai.execution.requires_review.v1"
+    AI_USAGE_RECORDED = "ai.usage.recorded.v1"
+    DOCUMENT_ANALYSIS_COMPLETED = "document.analysis.completed.v1"
+
 
 ALL_KNOWN_EVENT_NAMES: frozenset[str] = frozenset(
     getattr(EventNames, name)

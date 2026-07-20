@@ -1443,6 +1443,37 @@ export const api = {
       completed_at?: string | null
       failed_at?: string | null
     }>(`/jobs/${jobId}/cancel`, { method: 'POST' }, { token, orgId }),
+  startDocumentAnalysis: (
+    vaultDocumentId: string,
+    body?: { extracted_text?: string; filename?: string },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{
+      analysis_id: string
+      vault_document_id: string
+      status: string
+      current_stage?: string | null
+      job_id?: string | null
+      reused_existing_analysis: boolean
+    }>(
+      `/ai/documents/${vaultDocumentId}/analyze`,
+      { method: 'POST', body: JSON.stringify(body || {}) },
+      { token, orgId },
+    ),
+  getDocumentAnalysis: (vaultDocumentId: string, token?: string | null, orgId?: number | null) =>
+    request<{
+      analysis_id: string
+      status: string
+      current_stage?: string | null
+      document_type?: string | null
+      confidence?: number | null
+      requires_review: boolean
+      quality_summary?: Record<string, unknown> | null
+      created_at: string
+      updated_at: string
+      completed_at?: string | null
+    }>(`/ai/documents/${vaultDocumentId}/analysis`, undefined, { token, orgId }),
 }
 
 

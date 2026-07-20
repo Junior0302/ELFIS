@@ -37,6 +37,7 @@ def init_db() -> None:
     from app.events import event_models  # noqa: F401
     from app.notifications import notification_models  # noqa: F401
     from app.jobs import job_models  # noqa: F401
+    from app.ai import ai_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _sqlite_add_column_if_missing("users", "firebase_uid", "firebase_uid VARCHAR(128) DEFAULT ''")
