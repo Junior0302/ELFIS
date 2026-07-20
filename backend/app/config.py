@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     microsoft_client_secret: str = ""
     microsoft_tenant_id: str = "common"
     microsoft_oauth_redirect_uri: str = ""
+    # ELFIS Vault — Supabase Storage (service role côté serveur uniquement)
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    elfis_vault_bucket: str = "elfis-vault"
+    elfis_vault_max_file_size_mb: int = 15
 
     @property
     def effective_platform_from(self) -> str:
@@ -85,6 +90,8 @@ class Settings(BaseSettings):
         self.stripe_webhook_secret = self._clean_secret(self.stripe_webhook_secret)
         self.stripe_price_pro = self.stripe_price_pro.strip()
         self.brevo_api_key = self._clean_secret(self.brevo_api_key)
+        self.supabase_service_role_key = self._clean_secret(self.supabase_service_role_key)
+        self.supabase_url = (self.supabase_url or "").strip().rstrip("/")
         self.smtp_user = self._clean_secret(self.smtp_user)
         self.smtp_password = self._clean_secret(self.smtp_password)
         self.smtp_host = (self.smtp_host or "").strip()

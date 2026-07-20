@@ -33,6 +33,7 @@ def _sqlite_add_column_if_missing(table: str, column: str, ddl: str) -> None:
 def init_db() -> None:
     from app import models  # noqa: F401
     from app import models_saas  # noqa: F401
+    from app import models_vault  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     _sqlite_add_column_if_missing("users", "firebase_uid", "firebase_uid VARCHAR(128) DEFAULT ''")

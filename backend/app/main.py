@@ -27,6 +27,7 @@ from app.routers import (
     platform,
     settings as settings_router,
     subscriptions,
+    vault,
     webhooks_brevo,
 )
 from app.services.auth import seed_auth
@@ -160,6 +161,7 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
 app.include_router(exports.router, prefix="/api")
 app.include_router(modules.router, prefix="/api")
+app.include_router(vault.router, prefix="/api")
 
 
 @app.get("/api/health")
