@@ -17,7 +17,7 @@ def test_email_not_configured_by_default(monkeypatch):
 def test_brevo_used_when_smtp_incomplete(monkeypatch):
     from app import config
 
-    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-" + ("a" * 40))
     monkeypatch.setattr(config.settings, "platform_email_from", "documents@elfiscore.com")
     monkeypatch.setattr(config.settings, "smtp_from", "")
     monkeypatch.setattr(config.settings, "smtp_host", "smtp.example.com")
@@ -30,7 +30,7 @@ def test_brevo_used_when_smtp_incomplete(monkeypatch):
 def test_smtp_preferred_when_fully_configured(monkeypatch):
     from app import config
 
-    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-" + ("a" * 40))
     monkeypatch.setattr(config.settings, "platform_email_from", "contact@elfis-core.com")
     monkeypatch.setattr(config.settings, "smtp_host", "smtp-relay.brevo.com")
     monkeypatch.setattr(config.settings, "smtp_user", "8dc723001@smtp-brevo.com")
@@ -42,7 +42,7 @@ def test_smtp_preferred_when_fully_configured(monkeypatch):
 def test_send_email_via_brevo_uses_org_identity(monkeypatch):
     from app import config
 
-    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-" + ("a" * 40))
     monkeypatch.setattr(config.settings, "platform_email_from", "documents@elfiscore.com")
     monkeypatch.setattr(config.settings, "platform_email_from_name", "ComptaPilot")
 

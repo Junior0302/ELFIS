@@ -17,6 +17,8 @@ VAULT_ARCHIVE_DENIED_ROLES = frozenset({"comptable", "auditeur", "cfo"})
 
 # Lecture / téléchargement
 VAULT_READ_ROLES = frozenset({"owner", "admin", "employe", "comptable", "auditeur", "cfo"})
+# Envoi + archivage auto (hors auditeur / cfo lecture seule)
+VAULT_DELIVER_ROLES = frozenset({"owner", "admin", "employe", "comptable"})
 
 ACCESS_DENIED_MESSAGE = (
     "Vous n’êtes pas autorisé à archiver un document pour cette entreprise."
@@ -75,6 +77,23 @@ def assert_can_read(db: Session, *, user_id: int, organization_id: int) -> str:
     if not role_name or role_name not in VAULT_READ_ROLES:
         logger.info(
             "vault_read_access_denied",
+            extra={
+                "user_id": user_id,
+                "organization_id": organization_id,
+                "reason": "no_membership_or_role",
+                "role": role_name,
+            },
+        )
+        raise VaultAccessDeniedError(ORG_ACCESS_DENIED_MESSAGE)
+    return role_name
+
+
+def assert_can_deliver(db: Session, *, user_id: int, organization_id: int) -> str:
+    """Rôles autorisés à envoyer un document (archivage Vault + e-mail)."""
+    role_name = _active_membership_role(db, user_id=user_id, organization_id=organization_id)
+    if not role_name or role_name not in VAULT_DELIVER_ROLES:
+        logger.info(
+            "vault_deliver_access_denied",
             extra={
                 "user_id": user_id,
                 "organization_id": organization_id,

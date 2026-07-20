@@ -115,6 +115,8 @@ def send_sales_document_email(
     connection_id: int | None = None,
     preferred_from_email: str | None = None,
     preferred_from_label: str | None = None,
+    pdf_bytes: bytes | None = None,
+    attachment_filename: str | None = None,
 ) -> DocumentEmailLog:
     organization = db.get(Organization, doc.organization_id)
     if not organization:
@@ -273,11 +275,14 @@ def send_sales_document_email(
         return log
 
     try:
-        pdf_bytes = sales_document_to_pdf(doc, organization)
+        if pdf_bytes is None:
+            pdf_bytes = sales_document_to_pdf(doc, organization)
         if not pdf_bytes or len(pdf_bytes) < 20:
             raise RuntimeError("PDF indisponible")
         if len(pdf_bytes) > 14 * 1024 * 1024:
             raise RuntimeError("PDF trop volumineux")
+
+        attach_name = (attachment_filename or "").strip() or pdf_filename(doc, organization)
 
         # Adresse ELFIS Core (@elfis-core.com) : From réel via Brevo si validée.
         # Adresse personnelle : Reply-To uniquement (Brevo ne peut pas usurper Gmail/Outlook).
@@ -302,7 +307,7 @@ def send_sales_document_email(
             body=body,
             attachments=[
                 MailAttachment(
-                    filename=pdf_filename(doc, organization),
+                    filename=attach_name,
                     content=pdf_bytes,
                     maintype="application",
                     subtype="pdf",

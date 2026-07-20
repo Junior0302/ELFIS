@@ -11,6 +11,8 @@ type Props = {
   onSent: (doc: SalesDoc, log: DocumentEmailLog) => void
 }
 
+type SendPhase = 'idle' | 'prepare' | 'archive' | 'send' | 'done'
+
 function statusLabel(status: string) {
   const map: Record<string, string> = {
     preparing: 'Préparation',
@@ -21,24 +23,25 @@ function statusLabel(status: string) {
     bounced: 'Rebond',
     blocked: 'Bloqué',
     failed: 'Échec',
+    already_sent: 'Déjà envoyé',
+    email_failed: 'Échec e-mail',
   }
   return map[status] || status
 }
 
-function buildMailtoUrl(opts: {
-  to: string
-  subject: string
-  body: string
-  cc?: string
-  bcc?: string
-}) {
-  const parts: string[] = []
-  if (opts.subject) parts.push(`subject=${encodeURIComponent(opts.subject)}`)
-  if (opts.body) parts.push(`body=${encodeURIComponent(opts.body)}`)
-  if (opts.cc) parts.push(`cc=${encodeURIComponent(opts.cc)}`)
-  if (opts.bcc) parts.push(`bcc=${encodeURIComponent(opts.bcc)}`)
-  const to = opts.to.trim()
-  return `mailto:${to}${parts.length ? `?${parts.join('&')}` : ''}`
+function phaseLabel(phase: SendPhase) {
+  switch (phase) {
+    case 'prepare':
+      return 'Préparation du document…'
+    case 'archive':
+      return 'Archivage sécurisé…'
+    case 'send':
+      return 'Envoi de l’e-mail…'
+    case 'done':
+      return 'Terminé'
+    default:
+      return ''
+  }
 }
 
 export default function SalesDocPreviewModal({
@@ -54,6 +57,7 @@ export default function SalesDocPreviewModal({
   const [loadingPdf, setLoadingPdf] = useState(true)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
+  const [phase, setPhase] = useState<SendPhase>('idle')
   const [recipient, setRecipient] = useState(doc.customer_email || '')
   const [cc, setCc] = useState('')
   const [bcc, setBcc] = useState('')
@@ -62,13 +66,9 @@ export default function SalesDocPreviewModal({
   const [preview, setPreview] = useState<EmailSendPreview | null>(null)
   const [logs, setLogs] = useState<DocumentEmailLog[]>([])
   const [hint, setHint] = useState('')
-  const [fromEmail, setFromEmail] = useState('')
+  const [canSendDirect, setCanSendDirect] = useState(false)
   const sendingLock = useRef(false)
   const idempotencyRef = useRef(`send-${doc.id}-${Date.now()}`)
-
-  const accountEmail = (preview?.user_email || user?.email || '').trim()
-  const orgEmail = (preview?.org_email || '').trim()
-  const effectiveFrom = (fromEmail || accountEmail || orgEmail).trim()
 
   useEffect(() => {
     let objectUrl: string | null = null
@@ -76,6 +76,7 @@ export default function SalesDocPreviewModal({
     setLoadingPdf(true)
     setError('')
     setHint('')
+    setPhase('idle')
     idempotencyRef.current = `send-${doc.id}-${Date.now()}`
     api
       .openSalesDocPdfBlob(doc.id, token, orgId)
@@ -98,6 +99,7 @@ export default function SalesDocPreviewModal({
       .then((data) => {
         if (cancelled) return
         setLogs(data.email_logs)
+        setCanSendDirect(Boolean(data.can_send_direct ?? data.email_configured))
         if (data.preview) {
           setPreview(data.preview)
           setRecipient(data.preview.recipient || doc.customer_email || '')
@@ -105,7 +107,6 @@ export default function SalesDocPreviewModal({
           setBcc(data.preview.bcc || '')
           setSubject(data.preview.subject || '')
           setMessage(data.preview.message || '')
-          setFromEmail(data.preview.user_email || data.preview.org_email || '')
         }
       })
       .catch(() => undefined)
@@ -123,12 +124,8 @@ export default function SalesDocPreviewModal({
     }
   }
 
-  const openMailbox = async () => {
+  const sendServer = async () => {
     if (sendingLock.current) return
-    if (!effectiveFrom) {
-      setError('Indiquez votre adresse e-mail (celle depuis laquelle vous enverrez).')
-      return
-    }
     if (!recipient.trim()) {
       setError('Indiquez le destinataire.')
       return
@@ -137,8 +134,10 @@ export default function SalesDocPreviewModal({
     setSending(true)
     setError('')
     setHint('')
+    setPhase('prepare')
+    const prepareTimer = window.setTimeout(() => setPhase('archive'), 400)
+    const archiveTimer = window.setTimeout(() => setPhase('send'), 900)
     try {
-      await api.downloadSalesDocPdf(doc.id, token, orgId)
       const result = await api.emailSalesDoc(
         doc.id,
         {
@@ -147,30 +146,61 @@ export default function SalesDocPreviewModal({
           subject,
           cc,
           bcc,
-          send_mode: 'mailto',
-          sender_acknowledged: true,
-          preferred_from_email: effectiveFrom,
-          preferred_from_label: effectiveFrom,
-          idempotency_key: `${idempotencyRef.current}-mailto`,
+          send_mode: 'server',
+          preferred_from_email: (user?.email || '').trim() || undefined,
+          preferred_from_label: (user?.email || '').trim() || undefined,
+          idempotency_key: idempotencyRef.current,
         },
         token,
         orgId,
       )
-      setLogs((current) => [result.email_log, ...current])
-      onSent(result.document, result.email_log)
+      window.clearTimeout(prepareTimer)
+      window.clearTimeout(archiveTimer)
+      setPhase('done')
+      if (result.email_log) {
+        setLogs((current) => [result.email_log!, ...current])
+        onSent(result.document, result.email_log)
+      } else {
+        onSent(result.document, {
+          id: 0,
+          sales_document_id: doc.id,
+          recipient,
+          recipient_email: recipient,
+          subject,
+          status: result.status || 'sent',
+          sent_at: result.sent_at || new Date().toISOString(),
+          provider: 'server',
+          error_message: '',
+        } as DocumentEmailLog)
+      }
       idempotencyRef.current = `send-${doc.id}-${Date.now()}`
-      window.location.href = buildMailtoUrl({
-        to: recipient.trim(),
-        subject: subject.trim() || result.email_log.subject,
-        body: message.trim(),
-        cc: cc.trim() || undefined,
-        bcc: bcc.trim() || undefined,
-      })
-      setHint(
-        `PDF téléchargé et messagerie ouverte. Joignez le fichier, vérifiez l’expéditeur (${effectiveFrom}), puis envoyez.`,
-      )
+
+      if (result.status === 'email_failed' || result.email_status === 'failed') {
+        setHint(
+          result.message ||
+            'Le document a été archivé, mais l’e-mail n’a pas pu être envoyé. Vous pourrez réessayer sans recréer la facture.',
+        )
+      } else if (result.already_processed || result.status === 'already_sent') {
+        setHint(result.message || 'Cet envoi a déjà été traité.')
+      } else {
+        setHint(
+          result.vault_document_id
+            ? `E-mail envoyé avec le PDF en pièce jointe. Archivé dans ELFIS Vault (${result.vault_document_id}).`
+            : 'E-mail envoyé avec le PDF en pièce jointe.',
+        )
+      }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Impossible d’ouvrir la messagerie')
+      window.clearTimeout(prepareTimer)
+      window.clearTimeout(archiveTimer)
+      setPhase('idle')
+      const msg = reason instanceof Error ? reason.message : 'Envoi impossible'
+      if (msg.toLowerCase().includes('archivé') || msg.toLowerCase().includes('archive')) {
+        setError(msg)
+      } else if (msg.toLowerCase().includes('stockage') || msg.toLowerCase().includes('503')) {
+        setError('Le document n’a pas pu être archivé. L’e-mail n’a pas été envoyé.')
+      } else {
+        setError(msg)
+      }
     } finally {
       setSending(false)
       sendingLock.current = false
@@ -179,7 +209,7 @@ export default function SalesDocPreviewModal({
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    void openMailbox()
+    void sendServer()
   }
 
   const label = doc.doc_type === 'devis' ? 'Devis' : doc.doc_type === 'avoir' ? 'Avoir' : 'Facture'
@@ -224,36 +254,17 @@ export default function SalesDocPreviewModal({
               <header className="mailto-send-head">
                 <h4>Envoyer au client</h4>
                 <p>
-                  L’e-mail part depuis <strong>votre messagerie</strong> (Gmail, Outlook, Mail…). Vous
-                  restez l’expéditeur réel — aucune boîte interne ELFIS.
+                  Le PDF est archivé dans ELFIS Vault puis joint automatiquement à l’e-mail — sans
+                  téléchargement manuel.
                 </p>
               </header>
 
-              <ol className="mailto-steps" aria-label="Étapes d’envoi">
-                <li>
-                  <span className="mailto-step-num">1</span>
-                  <span>On prépare le message et télécharge le PDF</span>
-                </li>
-                <li>
-                  <span className="mailto-step-num">2</span>
-                  <span>Votre messagerie s’ouvre avec destinataire, objet et texte</span>
-                </li>
-                <li>
-                  <span className="mailto-step-num">3</span>
-                  <span>Vous joignez le PDF et cliquez Envoyer</span>
-                </li>
-              </ol>
-
-              <div className="field">
-                <label>Vous envoyez depuis</label>
-                <input
-                  type="email"
-                  required
-                  value={fromEmail}
-                  onChange={(e) => setFromEmail(e.target.value)}
-                  placeholder="contact@entreprise.fr"
-                />
-              </div>
+              {!canSendDirect && (
+                <p className="form-error">
+                  L’envoi serveur n’est pas configuré (SMTP / Brevo). Contactez l’administrateur
+                  plateforme.
+                </p>
+              )}
 
               <div className="field">
                 <label>Destinataire</label>
@@ -263,14 +274,11 @@ export default function SalesDocPreviewModal({
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
                   placeholder="client@exemple.fr"
+                  disabled={sending}
                 />
               </div>
 
               <div className="mailto-recap" aria-label="Récapitulatif">
-                <div>
-                  <span>De</span>
-                  <strong>{effectiveFrom || '—'}</strong>
-                </div>
                 <div>
                   <span>À</span>
                   <strong>{recipient || '—'}</strong>
@@ -278,6 +286,10 @@ export default function SalesDocPreviewModal({
                 <div>
                   <span>Pièce jointe</span>
                   <strong>{pdfName}</strong>
+                </div>
+                <div>
+                  <span>Coffre</span>
+                  <strong>ELFIS Vault</strong>
                 </div>
               </div>
 
@@ -288,23 +300,40 @@ export default function SalesDocPreviewModal({
                   value={cc}
                   onChange={(e) => setCc(e.target.value)}
                   placeholder="optionnel"
+                  disabled={sending}
                 />
               </div>
               <div className="field">
                 <label>Objet</label>
-                <input value={subject} onChange={(e) => setSubject(e.target.value)} required />
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  required
+                  disabled={sending}
+                />
               </div>
               <div className="field">
                 <label>Message</label>
-                <textarea rows={6} value={message} onChange={(e) => setMessage(e.target.value)} />
+                <textarea
+                  rows={6}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  disabled={sending}
+                />
               </div>
+
+              {sending && phase !== 'idle' && (
+                <p className="muted" role="status">
+                  {phaseLabel(phase)}
+                </p>
+              )}
 
               <div className="actions" style={{ flexWrap: 'wrap' }}>
                 <button className="btn secondary" type="button" onClick={onClose} disabled={sending}>
                   Annuler
                 </button>
-                <button className="btn" type="submit" disabled={sending || !effectiveFrom}>
-                  {sending ? 'Préparation…' : 'Ouvrir ma messagerie'}
+                <button className="btn" type="submit" disabled={sending || !canSendDirect || !recipient.trim()}>
+                  {sending ? phaseLabel(phase) || 'Envoi…' : 'Envoyer maintenant'}
                 </button>
               </div>
             </form>
@@ -329,7 +358,7 @@ export default function SalesDocPreviewModal({
                         <span>
                           {log.sender_email ? `De ${log.sender_email} · ` : ''}
                           {new Date(log.sent_at).toLocaleString('fr-FR')}
-                          {log.provider === 'mailto' ? ' · Messagerie' : log.provider ? ` · ${log.provider}` : ''}
+                          {log.provider ? ` · ${log.provider}` : ''}
                         </span>
                       </div>
                       <span

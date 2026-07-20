@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -34,6 +34,8 @@ from app.services.billing import (
 )
 from app.services.sales_email import send_sales_document_email, smtp_configured
 from app.services.sales_pdf import sales_document_to_pdf
+from app.services.mailer import email_configured
+from app.services.document_delivery import DocumentDeliveryError, DocumentDeliveryService
 
 router = APIRouter(
     prefix="/billing",
@@ -132,12 +134,14 @@ class EmailSendIn(BaseModel):
     is_test: bool = False
     idempotency_key: str | None = None
     connection_id: int | None = None
-    # mailto = ouverture messagerie utilisateur (PDF à joindre à la main) ; server = Brevo
-    send_mode: str = "mailto"
+    # mailto = messagerie perso ; server = archivage Vault + envoi avec PDF joint
+    send_mode: str = "server"
     sender_acknowledged: bool = False
     # Expéditeur choisi (ELFIS pro / perso) — utilisé pour Reply-To et journal
     preferred_from_email: str | None = None
     preferred_from_label: str | None = None
+    # Alias body pour compat DocumentDeliveryService
+    body: str | None = None
 
 
 def _org_id(auth: AuthContext) -> int:
@@ -719,6 +723,7 @@ def document_pdf(doc_id: int, auth: AuthContext = Depends(get_auth_context), db:
 def email_document(
     doc_id: int,
     payload: EmailSendIn,
+    request: Request,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
@@ -731,7 +736,13 @@ def email_document(
         db.commit()
         db.refresh(doc)
 
-    mode = (payload.send_mode or "mailto").strip().lower()
+    idempotency_key = (
+        (payload.idempotency_key or "").strip()
+        or (request.headers.get("Idempotency-Key") or "").strip()
+        or None
+    )
+
+    mode = (payload.send_mode or "server").strip().lower()
     if mode == "mailto":
         from app.services.sales_email import log_mailto_document_send
 
@@ -744,44 +755,87 @@ def email_document(
             db,
             doc,
             recipient=recipient,
-            message=payload.message,
+            message=payload.message or payload.body or "",
             subject=payload.subject,
             sent_by_user=auth.user,
-            idempotency_key=payload.idempotency_key,
+            idempotency_key=idempotency_key,
             preferred_from_email=payload.preferred_from_email,
             preferred_from_label=payload.preferred_from_label,
         )
-    else:
-        log = send_sales_document_email(
+        write_audit(
             db,
-            doc,
-            recipient=recipient,
-            message=payload.message,
-            subject=payload.subject,
+            user_id=auth.user.id if auth.user else None,
+            organization_id=_org_id(auth),
+            action=f"email_{doc.doc_type}:{doc.number}:{log.status}:{mode}",
+            module="facturation",
+        )
+        return {
+            "document": _serialize(doc),
+            "email_log": _serialize_email_log(log, db),
+            "smtp_configured": smtp_configured(),
+            "email_configured": email_configured(),
+            "send_mode": mode,
+            "sender_email": log.sender_email,
+            "can_send_direct": False,
+            "status": log.status,
+        }
+
+    if not auth.user:
+        raise HTTPException(401, detail="Authentification requise")
+
+    try:
+        delivery = DocumentDeliveryService(db).send_document(
+            document_type=doc.doc_type,
+            document_id=doc.id,
+            organization_id=_org_id(auth),
+            authenticated_user_id=auth.user.id,
+            recipient_email=recipient,
             cc=payload.cc,
             bcc=payload.bcc,
-            sent_by_user_id=auth.user.id if auth.user else None,
-            is_test=payload.is_test,
-            idempotency_key=payload.idempotency_key,
+            subject=payload.subject,
+            body=payload.body if payload.body is not None else payload.message,
+            idempotency_key=idempotency_key,
             connection_id=payload.connection_id,
             preferred_from_email=payload.preferred_from_email,
             preferred_from_label=payload.preferred_from_label,
+            is_test=payload.is_test,
         )
+    except DocumentDeliveryError as exc:
+        status = 409 if exc.code == "in_progress" else 403 if exc.code == "forbidden" else 400
+        if exc.code == "not_found":
+            status = 404
+        if exc.code == "archive_failed":
+            status = 503
+        raise HTTPException(status, detail={"code": exc.code, "message": exc.message}) from exc
+
+    db.refresh(doc)
+    log = delivery.email_log
     write_audit(
         db,
-        user_id=auth.user.id if auth.user else None,
+        user_id=auth.user.id,
         organization_id=_org_id(auth),
-        action=f"email_{doc.doc_type}:{doc.number}:{log.status}:{mode}",
+        action=f"email_{doc.doc_type}:{doc.number}:{delivery.status}:server",
         module="facturation",
     )
     return {
+        "status": delivery.status,
+        "business_document_id": str(delivery.business_document_id),
+        "business_document_type": delivery.business_document_type,
+        "vault_document_id": delivery.vault_document_id,
+        "vault_archive_status": delivery.vault_archive_status,
+        "email_status": delivery.email_status,
+        "recipient": delivery.recipient,
+        "sent_at": delivery.sent_at.isoformat() if delivery.sent_at else None,
+        "reused_existing_archive": delivery.reused_existing_archive,
+        "already_processed": delivery.already_processed,
+        "message": delivery.message,
         "document": _serialize(doc),
-        "email_log": _serialize_email_log(log, db),
+        "email_log": _serialize_email_log(log, db) if log else None,
         "smtp_configured": smtp_configured(),
-        "email_configured": True,
-        "send_mode": mode,
-        "sender_email": log.sender_email,
-        "can_send_direct": False,
+        "email_configured": email_configured(),
+        "send_mode": "server",
+        "sender_email": log.sender_email if log else "",
+        "can_send_direct": email_configured(),
     }
 
 
@@ -844,7 +898,7 @@ def document_emails(
             "connection_id": default_connection_id,
             "user_email": (auth.user.email if auth.user else "") or "",
             "org_email": (org.email or "").strip(),
-            "preferred_send_mode": "mailto",
+            "preferred_send_mode": "server" if email_configured() else "mailto",
         }
     return {
         "email_logs": [
@@ -852,11 +906,11 @@ def document_emails(
             for log in list_email_logs(db, doc.id, organization_id=doc.organization_id)
         ],
         "smtp_configured": smtp_configured(),
-        "email_configured": smtp_configured(),
+        "email_configured": email_configured(),
         "preview": preview,
         "connections": connections,
         "default_connection_id": default_connection_id,
-        "can_send_direct": False,
+        "can_send_direct": email_configured(),
     }
 
 

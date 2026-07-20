@@ -32,7 +32,7 @@ def _patch_brevo(monkeypatch):
     from app import config
     from app.services import mailer as mailer_mod
 
-    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-" + ("a" * 40))
     monkeypatch.setattr(config.settings, "platform_email_from", "documents@elfiscore.com")
     monkeypatch.setattr(config.settings, "platform_email_from_name", "ComptaPilot")
 

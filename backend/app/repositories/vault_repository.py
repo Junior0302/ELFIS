@@ -68,6 +68,7 @@ class VaultRepository:
         customer_id: int | None = None,
         supplier_id: int | None = None,
         archived_by_user_id: int | None = None,
+        email_status: str = "not_sent",
     ) -> VaultDocument:
         now = datetime.utcnow()
         doc = VaultDocument(
@@ -89,7 +90,7 @@ class VaultRepository:
             supplier_id=supplier_id,
             archive_status=VaultArchiveStatus.archived.value,
             accounting_status="not_processed",
-            email_status="not_sent",
+            email_status=email_status,
             version=1,
             archived_by_user_id=archived_by_user_id,
             archived_at=now,
@@ -169,6 +170,26 @@ class VaultRepository:
             )
             .first()
         )
+
+    def update_email_status(
+        self, *, document_id: str, organization_id: int, email_status: str
+    ) -> VaultDocument | None:
+        doc = self.get_document_for_tenant(
+            document_id=document_id, organization_id=organization_id
+        )
+        if not doc:
+            return None
+        doc.email_status = email_status
+        doc.updated_at = datetime.utcnow()
+        try:
+            self._db.add(doc)
+            self._db.commit()
+            self._db.refresh(doc)
+        except Exception as exc:
+            self._db.rollback()
+            logger.exception("vault_update_email_status_failed")
+            raise VaultDatabaseError("Échec de mise à jour du statut e-mail") from exc
+        return doc
 
     def _list_filters(
         self,

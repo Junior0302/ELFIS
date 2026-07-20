@@ -29,6 +29,7 @@ class VaultArchiveStatus(str, Enum):
 
 class VaultEmailStatus(str, Enum):
     not_sent = "not_sent"
+    pending = "pending"
     sent = "sent"
     failed = "failed"
 
@@ -44,6 +45,10 @@ class VaultActivityAction(str, Enum):
     document_deleted = "document_deleted"
     document_downloaded = "document_downloaded"
     document_viewed = "document_viewed"
+    document_reused = "document_reused"
+    email_send_started = "email_send_started"
+    email_sent = "email_sent"
+    email_failed = "email_failed"
 
 
 class VaultSortBy(str, Enum):

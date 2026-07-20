@@ -364,3 +364,106 @@ def create_download_url(
         expires_in=ttl,
         expires_at=expires_at,
     )
+
+
+def archive_or_reuse_pdf(
+    db: Session,
+    *,
+    user_id: int,
+    organization_id: int,
+    document_type: VaultDocumentType,
+    document_number: str | None,
+    filename: str,
+    content: bytes,
+    invoice_date=None,
+    due_date=None,
+    amount_ht=None,
+    amount_vat=None,
+    amount_ttc=None,
+    currency: str = "EUR",
+    customer_id: int | None = None,
+    email_status: str = "pending",
+    storage: VaultStorageService | None = None,
+    skip_access_check: bool = False,
+) -> tuple[VaultDocument, bool]:
+    """Archive un PDF ou réutilise un doublon checksum (réutilisé=True)."""
+    if not skip_access_check:
+        from app.services.vault.vault_access_service import assert_can_deliver
+
+        assert_can_deliver(db, user_id=user_id, organization_id=organization_id)
+
+    _validate_pdf(filename=filename, content_type="application/pdf", content=content)
+    checksum = calculate_sha256(content)
+    repo = VaultRepository(db)
+    existing = repo.find_duplicate(organization_id=organization_id, checksum_sha256=checksum)
+    if existing:
+        if existing.email_status != email_status and email_status == "pending":
+            repo.update_email_status(
+                document_id=existing.id,
+                organization_id=organization_id,
+                email_status=email_status,
+            )
+            db.refresh(existing)
+        try:
+            repo.create_activity_log(
+                organization_id=organization_id,
+                document_id=existing.id,
+                user_id=user_id,
+                action=VaultActivityAction.document_reused,
+                metadata={
+                    "vault_document_id": existing.id,
+                    "source": "document_delivery",
+                },
+            )
+        except Exception:
+            logger.exception("vault_reuse_log_failed", extra={"document_id": existing.id})
+        return existing, True
+
+    original_filename = Path(filename or "document.pdf").name
+    storage_path = build_storage_path(
+        organization_id=organization_id,
+        document_type=document_type,
+        original_filename=original_filename,
+    )
+    storage_svc = storage or VaultStorageService()
+    storage_svc.upload_pdf(storage_path=storage_path, content=content)
+    try:
+        doc = repo.create_document(
+            organization_id=organization_id,
+            document_type=document_type,
+            document_number=document_number,
+            original_filename=original_filename,
+            storage_path=storage_path,
+            mime_type="application/pdf",
+            file_size=len(content),
+            checksum_sha256=checksum,
+            invoice_date=invoice_date,
+            due_date=due_date,
+            amount_ht=amount_ht,
+            amount_vat=amount_vat,
+            amount_ttc=amount_ttc,
+            currency=currency,
+            customer_id=customer_id,
+            archived_by_user_id=user_id,
+            email_status=email_status,
+        )
+    except VaultDatabaseError:
+        storage_svc.delete_file(storage_path=storage_path)
+        raise
+    try:
+        repo.create_activity_log(
+            organization_id=organization_id,
+            document_id=doc.id,
+            user_id=user_id,
+            action=VaultActivityAction.document_archived,
+            metadata={
+                "original_filename": original_filename,
+                "file_size": len(content),
+                "checksum_sha256": checksum,
+                "document_type": document_type.value,
+                "source": "document_delivery",
+            },
+        )
+    except Exception:
+        logger.exception("vault_delivery_archive_log_failed", extra={"document_id": doc.id})
+    return doc, False

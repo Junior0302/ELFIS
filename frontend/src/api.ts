@@ -261,7 +261,10 @@ function apiRoot(): string {
 async function parseError(res: Response): Promise<string> {
   const text = await res.text()
   try {
-    const data = JSON.parse(text) as { detail?: unknown; existing_document_id?: string }
+    const data = JSON.parse(text) as {
+      detail?: unknown
+      existing_document_id?: string
+    }
     if (typeof data.detail === 'string') {
       if (data.existing_document_id) {
         return `${data.detail} (réf. ${data.existing_document_id})`
@@ -272,9 +275,9 @@ async function parseError(res: Response): Promise<string> {
       typeof data.detail === 'object' &&
       data.detail &&
       'message' in data.detail &&
-      typeof data.detail.message === 'string'
+      typeof (data.detail as { message?: unknown }).message === 'string'
     ) {
-      return data.detail.message
+      return (data.detail as { message: string }).message
     }
     if (Array.isArray(data.detail)) {
       return data.detail
@@ -941,12 +944,23 @@ export const api = {
   ) =>
     request<{
       document: SalesDoc
-      email_log: DocumentEmailLog
+      email_log: DocumentEmailLog | null
       smtp_configured: boolean
       email_configured?: boolean
       send_mode?: string
       sender_email?: string
       can_send_direct?: boolean
+      status?: string
+      business_document_id?: string
+      business_document_type?: string
+      vault_document_id?: string | null
+      vault_archive_status?: string | null
+      email_status?: string
+      recipient?: string
+      sent_at?: string | null
+      reused_existing_archive?: boolean
+      already_processed?: boolean
+      message?: string
     }>(
       `/billing/documents/${docId}/email`,
       {
