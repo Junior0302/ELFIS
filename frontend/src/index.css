@@ -5316,3 +5316,77 @@ a.platform-action {
 .mailto-history h4 {
   margin-bottom: 0.5rem;
 }
+
+/* ELFIS Notifications V1 */
+.notif-bell {
+  position: relative;
+}
+.notif-bell-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(11, 61, 46, 0.12);
+  background: rgba(255, 253, 248, 0.95);
+  color: #0b3d2e;
+  cursor: pointer;
+}
+.notif-bell-btn:hover {
+  border-color: rgba(123, 196, 160, 0.55);
+}
+.notif-bell-badge {
+  position: absolute;
+  top: -0.2rem;
+  right: -0.2rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: #b42318;
+  color: #fff;
+  font-size: 0.65rem;
+  line-height: 1.15rem;
+  text-align: center;
+  font-weight: 600;
+}
+.notif-bell-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  width: min(22rem, 90vw);
+  max-height: 24rem;
+  overflow: auto;
+  z-index: 40;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(11, 61, 46, 0.12);
+  background: #fffdf8;
+  box-shadow: 0 16px 40px rgba(7, 40, 30, 0.12);
+}
+.notif-bell-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+.notif-bell-item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid rgba(11, 61, 46, 0.08);
+}
+.notif-bell-item strong {
+  font-size: 0.92rem;
+}
+.notif-bell-item span,
+.notif-bell-item em {
+  font-size: 0.82rem;
+  color: rgba(11, 61, 46, 0.72);
+  font-style: normal;
+}
+.notif-list-item {
+  align-items: flex-start;
+}

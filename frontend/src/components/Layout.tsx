@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { navSections } from '../navConfig'
 import { SubscriptionProvider } from '../subscriptionContext'
 import { navIcons } from './NavIcons'
+import NotificationBell from './notifications/NotificationBell'
 import PageGuide from './PageGuide'
 import SubscriptionBanner from './SubscriptionBanner'
 
@@ -64,6 +65,7 @@ function LayoutInner() {
           <span>ComptaPilot IA</span>
         </Link>
         <div className="mobile-topbar-actions">
+          {user && <NotificationBell compact />}
           {user && (
             <Link to="/compte" className="shell-avatar" title="Mon compte" aria-label="Mon compte">
               {avatar ? <img src={avatar} alt="" /> : <span>{initials}</span>}
@@ -202,6 +204,7 @@ function LayoutInner() {
                 ))}
               </select>
             )}
+            {user && <NotificationBell />}
             {user && (
               <Link to="/compte" className="shell-user-chip" title="Mon compte">
                 <span className="shell-user-chip-text">

@@ -19,12 +19,19 @@ def bootstrap_handlers(registry: EventHandlerRegistry | None = None) -> None:
     if registry is None and _handlers_bootstrapped:
         return
     from app.events.handlers.document_handlers import DocumentArchivedAuditHandler
+    from app.notifications import register_notification_handlers
 
     handler = DocumentArchivedAuditHandler()
-    # Évite double register sur le registry global
-    existing = [h for h in reg.get_handlers(EventNames.VAULT_DOCUMENT_ARCHIVED) if h.handler_name == handler.handler_name]
+    existing = [
+        h
+        for h in reg.get_handlers(EventNames.VAULT_DOCUMENT_ARCHIVED)
+        if h.handler_name == handler.handler_name
+    ]
     if not existing:
         reg.register(EventNames.VAULT_DOCUMENT_ARCHIVED, handler)
+
+    register_notification_handlers(reg)
+
     if registry is None:
         _handlers_bootstrapped = True
 

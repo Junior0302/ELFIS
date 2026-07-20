@@ -1374,6 +1374,47 @@ export const api = {
       },
       { token },
     ),
+  listNotifications: (
+    params: {
+      page?: number
+      page_size?: number
+      status?: string
+      category?: string
+      severity?: string
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) => {
+    const q = new URLSearchParams()
+    if (params.page) q.set('page', String(params.page))
+    if (params.page_size) q.set('page_size', String(params.page_size))
+    if (params.status) q.set('status', params.status)
+    if (params.category) q.set('category', params.category)
+    if (params.severity) q.set('severity', params.severity)
+    const qs = q.toString()
+    return request<{
+      total: number
+      page: number
+      page_size: number
+      notifications: import('./notificationFormat').AppNotification[]
+    }>(`/notifications${qs ? `?${qs}` : ''}`, undefined, { token, orgId })
+  },
+  notificationsUnreadCount: (token?: string | null, orgId?: number | null) =>
+    request<{ count: number }>('/notifications/unread-count', undefined, { token, orgId }),
+  markElfisNotificationRead: (notificationId: string, token?: string | null, orgId?: number | null) =>
+    request<{ notification: import('./notificationFormat').AppNotification }>(
+      `/notifications/${notificationId}/read`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  markAllElfisNotificationsRead: (token?: string | null, orgId?: number | null) =>
+    request<{ updated: number }>('/notifications/read-all', { method: 'POST' }, { token, orgId }),
+  archiveElfisNotification: (notificationId: string, token?: string | null, orgId?: number | null) =>
+    request<{ notification: import('./notificationFormat').AppNotification }>(
+      `/notifications/${notificationId}/archive`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
 }
 
 

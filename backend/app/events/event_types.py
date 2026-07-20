@@ -19,6 +19,12 @@ class EventNames:
     BILLING_QUOTE_SENT = "billing.quote.sent.v1"
     BILLING_CREDIT_NOTE_SENT = "billing.credit_note.sent.v1"
 
+    NOTIFICATION_CREATED = "notification.created.v1"
+    NOTIFICATION_EMAIL_REQUESTED = "notification.email.requested.v1"
+    NOTIFICATION_EMAIL_SENT = "notification.email.sent.v1"
+    NOTIFICATION_EMAIL_FAILED = "notification.email.failed.v1"
+    NOTIFICATION_READ = "notification.read.v1"
+
 
 ALL_KNOWN_EVENT_NAMES: frozenset[str] = frozenset(
     getattr(EventNames, name)

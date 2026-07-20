@@ -45,6 +45,20 @@ export const navSections: NavSection[] = [
         ],
       },
       {
+        to: '/notifications',
+        label: 'Notifications',
+        hint: 'Alertes & envois',
+        spokenIntro:
+          'Voici vos notifications. Retrouvez les alertes d’envoi et d’archivage.',
+        permission: 'invoice.read',
+        guide: [
+          'Le centre de notifications regroupe les succès et échecs d’envoi, sans bruit inutile.',
+          'Marquez comme lu, archivez, ou ouvrez le document concerné.',
+          'Exemple : un échec d’e-mail après archivage Vault apparaît ici pour réessayer.',
+          'Le compteur de la cloche se met à jour automatiquement environ chaque minute.',
+        ],
+      },
+      {
         to: '/copilote',
         label: 'Copilote IA',
         hint: 'Chat & conseils',

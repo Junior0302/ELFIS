@@ -22,6 +22,7 @@ from app.routers import (
     email_connections,
     exports,
     modules,
+    notifications,
     org,
     org_email,
     platform,
@@ -201,6 +202,7 @@ app.include_router(settings_router.router, prefix="/api")
 app.include_router(exports.router, prefix="/api")
 app.include_router(modules.router, prefix="/api")
 app.include_router(vault.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 
 
 @app.get("/api/health")

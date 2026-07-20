@@ -498,3 +498,92 @@ def platform_get_event(event_id: str, db: Session = Depends(get_db)):
         "payload": _filter(row.payload if isinstance(row.payload, dict) else {}),
         "metadata": _filter(row.metadata_json if isinstance(row.metadata_json, dict) else {}),
     }
+
+
+@router.get("/notifications")
+def platform_list_notifications(
+    organization_id: int | None = None,
+    user_id: int | None = None,
+    notification_type: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    """Liste admin notifications — sans message/data complets."""
+    from app.notifications.notification_repository import NotificationRepository
+
+    rows, total = NotificationRepository(db).list_platform(
+        organization_id=organization_id,
+        user_id=user_id,
+        notification_type=notification_type,
+        status=status,
+        page=page,
+        page_size=page_size,
+    )
+    return {
+        "total": total,
+        "page": max(1, page),
+        "page_size": min(100, max(1, page_size)),
+        "notifications": [
+            {
+                "notification_id": r.notification_id,
+                "organization_id": r.organization_id,
+                "user_id": r.user_id,
+                "notification_type": r.notification_type,
+                "category": r.category,
+                "severity": r.severity,
+                "status": r.status,
+                "title": r.title,
+                "created_at": r.created_at,
+                "source_event_id": r.source_event_id,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/notifications/{notification_id}")
+def platform_get_notification(notification_id: str, db: Session = Depends(get_db)):
+    from app.notifications.notification_repository import NotificationRepository
+    from app.notifications.notification_schemas import FORBIDDEN_DATA_KEYS
+
+    repo = NotificationRepository(db)
+    row = repo.find_by_notification_id(notification_id)
+    if not row:
+        raise HTTPException(404, detail="Notification introuvable")
+    data = {
+        k: v
+        for k, v in (row.data or {}).items()
+        if str(k).lower() not in FORBIDDEN_DATA_KEYS
+    }
+    deliveries = repo.list_deliveries(notification_id)
+    return {
+        "notification_id": row.notification_id,
+        "organization_id": row.organization_id,
+        "user_id": row.user_id,
+        "notification_type": row.notification_type,
+        "category": row.category,
+        "title": row.title,
+        "message": row.message,
+        "severity": row.severity,
+        "status": row.status,
+        "action_url": row.action_url,
+        "data": data,
+        "source_event_id": row.source_event_id,
+        "correlation_id": row.correlation_id,
+        "created_at": row.created_at,
+        "deliveries": [
+            {
+                "channel": d.channel,
+                "status": d.status,
+                "recipient": d.recipient,
+                "attempt_count": d.attempt_count,
+                "provider": d.provider,
+                "sent_at": d.sent_at,
+                "failed_at": d.failed_at,
+                "last_error": d.last_error,
+            }
+            for d in deliveries
+        ],
+    }

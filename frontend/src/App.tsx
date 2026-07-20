@@ -23,6 +23,7 @@ import HomePage from './pages/HomePage'
 import IntelligencePage from './pages/IntelligencePage'
 import LoginPage from './pages/LoginPage'
 import ModulesPage from './pages/ModulesPage'
+import NotificationsPage from './pages/NotificationsPage'
 import OrganisationPage from './pages/OrganisationPage'
 import RegisterPage from './pages/RegisterPage'
 import ResultPage from './pages/ResultPage'
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="admin/equipe" element={<AdminEquipePage />} />
               <Route path="compte" element={<ComptePage />} />
               <Route path="modules" element={<ModulesPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Route>

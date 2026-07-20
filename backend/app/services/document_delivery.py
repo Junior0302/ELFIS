@@ -376,6 +376,7 @@ class DocumentDeliveryService:
             "business_document_id": str(doc.id),
             "business_document_type": BUSINESS_TYPE_LABEL[doc_type],
             "document_type": vault_type.value,
+            "document_number": doc.number,
             "recipient_domain": _recipient_domain(to_email),
         }
         self._publish(
