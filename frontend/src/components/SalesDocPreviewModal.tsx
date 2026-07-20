@@ -159,14 +159,10 @@ export default function SalesDocPreviewModal({
       setLogs((current) => [result.email_log, ...current])
       onSent(result.document, result.email_log)
       idempotencyRef.current = `send-${doc.id}-${Date.now()}`
-      const pdfName = preview?.pdf_filename || `${doc.number}.pdf`
-      const bodyWithAttachmentHint =
-        `${message.trim()}\n\n` +
-        `—\nJoignez le fichier PDF téléchargé : ${pdfName}\n`
       window.location.href = buildMailtoUrl({
         to: recipient.trim(),
         subject: subject.trim() || result.email_log.subject,
-        body: bodyWithAttachmentHint,
+        body: message.trim(),
         cc: cc.trim() || undefined,
         bcc: bcc.trim() || undefined,
       })
