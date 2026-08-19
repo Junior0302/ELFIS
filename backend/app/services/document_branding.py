@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from app.config import settings
-from app.models_saas import Organization
+from app.models_saas import Organization, SalesDocument
+
+PREMIUM_TEMPLATE = "premium_v1"
 
 
 @dataclass(frozen=True)
@@ -32,14 +36,19 @@ class DocumentBrandProfile:
     logo_path: Path | None
     primary_color: str
     secondary_color: str
+    documents_show_logo: bool | None = None
 
     @property
     def has_logo(self) -> bool:
         return self.logo_path is not None and self.logo_path.is_file()
 
+    @property
+    def org_name_strong(self) -> str:
+        return (self.legal_name or self.display_name or "").strip()
+
     def address_block_lines(self) -> list[str]:
         lines: list[str] = []
-        name = (self.legal_name or self.display_name or "").strip()
+        name = self.org_name_strong
         if name:
             lines.append(name)
         if self.legal_form.strip():
@@ -84,7 +93,7 @@ class DocumentBrandProfile:
 
     def footer_parts(self) -> list[str]:
         parts: list[str] = []
-        name = (self.legal_name or self.display_name or "").strip()
+        name = self.org_name_strong
         if name:
             parts.append(name)
         city_line = " ".join(part for part in [self.postal_code.strip(), self.city.strip()] if part)
@@ -101,6 +110,31 @@ class DocumentBrandProfile:
         if self.legal_mentions.strip():
             parts.append(self.legal_mentions.strip())
         return parts
+
+
+@dataclass(frozen=True)
+class DocumentRenderConfig:
+    """Source unique de config documentaire (preview / PDF / email / Vault)."""
+
+    brand: DocumentBrandProfile
+    show_logo: bool
+    template: str = PREMIUM_TEMPLATE
+
+    @property
+    def render_logo(self) -> bool:
+        return self.show_logo and self.brand.has_logo
+
+    def to_public_dict(self) -> dict[str, Any]:
+        return {
+            "showLogo": self.show_logo,
+            "template": self.template,
+            "hasLogoFile": self.brand.has_logo,
+            "logoUrl": self.brand.logo_url or "",
+            "primaryColor": self.brand.primary_color,
+            "secondaryColor": self.brand.secondary_color,
+            "displayName": self.brand.display_name,
+            "legalName": self.brand.legal_name,
+        }
 
 
 def _resolve_logo_path(logo_url: str) -> Path | None:
@@ -151,11 +185,13 @@ def brand_from_organization(organization: Organization | None) -> DocumentBrandP
             logo_path=None,
             primary_color="#0B3D2E",
             secondary_color="#E7F2EC",
+            documents_show_logo=None,
         )
 
     logo_url = (organization.logo or "").strip()
     primary = (getattr(organization, "primary_color", None) or "").strip() or "#0B3D2E"
     secondary = (getattr(organization, "secondary_color", None) or "").strip() or "#E7F2EC"
+    pref = getattr(organization, "documents_show_logo", None)
     return DocumentBrandProfile(
         display_name=(organization.name or "").strip(),
         legal_name=(organization.legal_name or "").strip(),
@@ -177,4 +213,59 @@ def brand_from_organization(organization: Organization | None) -> DocumentBrandP
         logo_path=_resolve_logo_path(logo_url),
         primary_color=primary if primary.startswith("#") else "#0B3D2E",
         secondary_color=secondary if secondary.startswith("#") else "#E7F2EC",
+        documents_show_logo=pref if isinstance(pref, bool) else None,
     )
+
+
+def parse_document_branding(raw: str | dict | None) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        data = raw
+    else:
+        try:
+            data = json.loads(raw or "{}")
+        except Exception:
+            data = {}
+    if not isinstance(data, dict):
+        data = {}
+    out: dict[str, Any] = {}
+    if "showLogo" in data:
+        out["showLogo"] = bool(data["showLogo"])
+    elif "show_logo" in data:
+        out["showLogo"] = bool(data["show_logo"])
+    template = (data.get("template") or PREMIUM_TEMPLATE)
+    if isinstance(template, str) and template.strip():
+        out["template"] = template.strip()
+    else:
+        out["template"] = PREMIUM_TEMPLATE
+    return out
+
+
+def dump_document_branding(*, show_logo: bool, template: str = PREMIUM_TEMPLATE) -> str:
+    return json.dumps(
+        {"showLogo": bool(show_logo), "template": template or PREMIUM_TEMPLATE},
+        ensure_ascii=False,
+    )
+
+
+def resolve_show_logo(
+    *,
+    document_branding: dict[str, Any] | None,
+    brand: DocumentBrandProfile,
+) -> bool:
+    """Default : préférence org si existe, sinon Avec si logo PDF-safe, sinon Sans."""
+    if document_branding and "showLogo" in document_branding:
+        return bool(document_branding["showLogo"])
+    if brand.documents_show_logo is not None:
+        return bool(brand.documents_show_logo)
+    return bool(brand.has_logo)
+
+
+def render_config_for_document(
+    doc: SalesDocument | None,
+    organization: Organization | None,
+) -> DocumentRenderConfig:
+    brand = brand_from_organization(organization)
+    parsed = parse_document_branding(getattr(doc, "branding_json", None) if doc else None)
+    show = resolve_show_logo(document_branding=parsed, brand=brand)
+    template = str(parsed.get("template") or PREMIUM_TEMPLATE)
+    return DocumentRenderConfig(brand=brand, show_logo=show, template=template)

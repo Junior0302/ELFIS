@@ -20,7 +20,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (user && !registering.current) {
-      navigate(inviteToken ? `/compte?invite=${encodeURIComponent(inviteToken)}` : '/dashboard')
+      navigate(inviteToken ? `/compte?invite=${encodeURIComponent(inviteToken)}` : '/home')
     }
   }, [user, navigate, inviteToken])
 

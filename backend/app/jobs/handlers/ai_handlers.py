@@ -46,6 +46,30 @@ def _session(context: JobContext):
     return context._session_factory(), True
 
 
+def _resolve_extracted_text(db, payload: dict) -> tuple[str, str | None]:
+    """Préfère extraction_id ; conserve extracted_text pour compat tests/usages internes."""
+    text = str(payload.get("extracted_text") or "").strip()
+    extraction_id = str(payload.get("extraction_id") or "").strip() or None
+    if text:
+        return text, extraction_id
+    if not extraction_id:
+        return "", None
+    from app.document_intelligence.document_exceptions import DocumentNotFoundError
+    from app.document_intelligence.document_service import DocumentIntelligenceService
+
+    try:
+        extraction = DocumentIntelligenceService(db).get_extraction(extraction_id)
+    except DocumentNotFoundError as exc:
+        raise PermanentJobError(exc.message) from None
+    if job_org := payload.get("organization_id"):
+        try:
+            if int(extraction.organization_id) != int(job_org):
+                raise PermanentJobError("extraction organization mismatch")
+        except (TypeError, ValueError):
+            raise PermanentJobError("extraction organization mismatch") from None
+    return (extraction.text_content or "").strip(), extraction_id
+
+
 class DocumentClassificationJobHandler(JobHandler):
     handler_name = "vault_document_ai_classification_v1"
     job_name = JobNames.VAULT_DOCUMENT_AI_CLASSIFICATION
@@ -59,14 +83,25 @@ class DocumentClassificationJobHandler(JobHandler):
         context.update_progress(10, "loading_document")
         _load_vault_doc(context, vault_document_id)
 
-        text = str(payload.get("extracted_text") or "").strip()
         filename = str(payload.get("filename") or "document.pdf")
         mime_type = str(payload.get("mime_type") or "application/pdf")
         analysis_id = str(payload.get("analysis_id") or "").strip() or None
         version = int(payload.get("document_version") or 1)
+        extraction_id = str(payload.get("extraction_id") or "").strip() or None
 
         db, own = _session(context)
         try:
+            text, extraction_id = _resolve_extracted_text(
+                db,
+                {
+                    **payload,
+                    "organization_id": job.organization_id,
+                    "extraction_id": extraction_id,
+                },
+            )
+            if not text:
+                raise PermanentJobError("extracted_text indisponible")
+
             context.update_progress(40, "classifying")
             result = AIService(db).execute(
                 AIExecutionRequest(
@@ -106,20 +141,24 @@ class DocumentClassificationJobHandler(JobHandler):
                         analysis.current_stage = "extraction"
                         # Enqueue extraction si facture
                         doc_type = (result.result or {}).get("document_type")
+                        child_payload = {
+                            "vault_document_id": vault_document_id,
+                            "analysis_id": analysis_id,
+                            "filename": filename,
+                            "document_type": doc_type,
+                            "document_version": version,
+                        }
+                        if extraction_id:
+                            child_payload["extraction_id"] = extraction_id
+                        else:
+                            child_payload["extracted_text"] = text[:40_000]
                         if doc_type in ("customer_invoice", "supplier_invoice") and text:
                             JobService(db).enqueue(
                                 JobRequest(
                                     job_name=JobNames.VAULT_DOCUMENT_AI_EXTRACTION,
                                     organization_id=job.organization_id,
                                     user_id=job.user_id,
-                                    payload={
-                                        "vault_document_id": vault_document_id,
-                                        "analysis_id": analysis_id,
-                                        "extracted_text": text[:40_000],
-                                        "filename": filename,
-                                        "document_type": doc_type,
-                                        "document_version": version,
-                                    },
+                                    payload=child_payload,
                                     idempotency_key=(
                                         f"ai-extract-invoice:{job.organization_id}:"
                                         f"{vault_document_id}:{version}"
@@ -130,18 +169,22 @@ class DocumentClassificationJobHandler(JobHandler):
                             )
                         else:
                             # quality check sans extraction facture
+                            q_payload = {
+                                "vault_document_id": vault_document_id,
+                                "analysis_id": analysis_id,
+                                "filename": filename,
+                                "document_version": version,
+                            }
+                            if extraction_id:
+                                q_payload["extraction_id"] = extraction_id
+                            else:
+                                q_payload["extracted_text"] = text[:40_000]
                             JobService(db).enqueue(
                                 JobRequest(
                                     job_name=JobNames.VAULT_DOCUMENT_QUALITY_CHECK,
                                     organization_id=job.organization_id,
                                     user_id=job.user_id,
-                                    payload={
-                                        "vault_document_id": vault_document_id,
-                                        "analysis_id": analysis_id,
-                                        "extracted_text": text[:40_000],
-                                        "filename": filename,
-                                        "document_version": version,
-                                    },
+                                    payload=q_payload,
                                     idempotency_key=(
                                         f"ai-quality:{job.organization_id}:"
                                         f"{vault_document_id}:{version}"
@@ -184,7 +227,6 @@ class DocumentInvoiceExtractionJobHandler(JobHandler):
             raise PermanentJobError("vault_document_id requis")
         context.update_progress(15, "loading")
         _load_vault_doc(context, vault_document_id)
-        text = str(payload.get("extracted_text") or "").strip()
         filename = str(payload.get("filename") or "invoice.pdf")
         analysis_id = str(payload.get("analysis_id") or "").strip() or None
         version = int(payload.get("document_version") or 1)
@@ -192,6 +234,12 @@ class DocumentInvoiceExtractionJobHandler(JobHandler):
 
         db, own = _session(context)
         try:
+            text, _ = _resolve_extracted_text(
+                db,
+                {**payload, "organization_id": job.organization_id},
+            )
+            if not text:
+                raise PermanentJobError("extracted_text indisponible")
             context.update_progress(50, "extracting")
             result = AIService(db).execute(
                 AIExecutionRequest(

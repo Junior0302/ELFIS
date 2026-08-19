@@ -1,0 +1,156 @@
+/**
+ * BRAND.ELFIS.2 — tokens ELFIS + scope surfaces plateforme.
+ * Accents Finance/Commercial interdits sous .ps-shell--platform / [data-product="elfis-core"] contenu.
+ */
+
+:root {
+  --elfis-navy-950: #071629;
+  --elfis-navy-900: #102746;
+  --elfis-navy-signature: #0b1f3a;
+  --elfis-blue-600: #2764e7;
+  --elfis-blue-100: #eaf1ff;
+
+  --elfis-page: #f5f7fa;
+  --elfis-surface: #ffffff;
+  --elfis-surface-muted: #f8fafc;
+  --elfis-border: #dde4ee;
+
+  --elfis-text-primary: #101828;
+  --elfis-text-secondary: #58657a;
+  --elfis-text-muted: #8893a5;
+
+  --elfis-success: #16845b;
+  --elfis-warning: #c97816;
+  --elfis-danger: #c83f49;
+  --elfis-info: #2764e7;
+}
+
+/* Contenu plateforme — alias pilot vers ELFIS (sans toucher ComptaPilot). */
+.ps-shell--platform,
+[data-product='elfis-core'] .ps-main,
+.elfis-members-page {
+  --pilot-primary: var(--elfis-navy-950);
+  --pilot-primary-hover: var(--elfis-navy-900);
+  --pilot-primary-active: var(--elfis-navy-950);
+  --pilot-primary-contrast: #ffffff;
+  --pilot-secondary: var(--elfis-blue-100);
+  --pilot-accent: var(--elfis-blue-600);
+  --pilot-accent-soft: var(--elfis-blue-100);
+  --pilot-surface: var(--elfis-surface);
+  --pilot-surface-elevated: var(--elfis-surface);
+  --pilot-surface-muted: var(--elfis-surface-muted);
+  --pilot-surface-hover: var(--elfis-blue-100);
+  --pilot-border: var(--elfis-border);
+  --pilot-border-strong: color-mix(in srgb, var(--elfis-navy-900) 28%, var(--elfis-border));
+  --pilot-text: var(--elfis-text-primary);
+  --pilot-text-muted: var(--elfis-text-secondary);
+  --pilot-focus: var(--elfis-blue-600);
+  --pilot-success: var(--elfis-success);
+  --pilot-warning: var(--elfis-warning);
+  --pilot-danger: var(--elfis-danger);
+  --pilot-info: var(--elfis-info);
+  --line: var(--elfis-border);
+  --muted: var(--elfis-text-muted);
+  --danger: var(--elfis-danger);
+  --ink: var(--elfis-text-primary);
+}
+
+.ps-shell--platform .ps-main,
+.ps-shell--platform .platform-page,
+.elfis-members-page {
+  background: var(--elfis-page);
+  color: var(--elfis-text-primary);
+}
+
+.ps-shell--platform .panel,
+.elfis-members-page .panel {
+  background: var(--elfis-surface);
+  border-color: var(--elfis-border);
+}
+
+.ps-shell--platform .btn:focus-visible,
+.elfis-members-page .btn:focus-visible,
+.ps-shell--platform input:focus-visible,
+.ps-shell--platform select:focus-visible,
+.elfis-members-page input:focus-visible,
+.elfis-members-page select:focus-visible {
+  outline: 2px solid var(--elfis-blue-600);
+  outline-offset: 2px;
+}
+
+.ps-shell--platform .btn.secondary,
+.elfis-members-page .btn.secondary {
+  background: var(--elfis-surface);
+  color: var(--elfis-navy-950);
+  border: 1px solid var(--elfis-border);
+}
+
+.ps-shell--platform .btn.secondary:hover,
+.elfis-members-page .btn.secondary:hover {
+  background: var(--elfis-surface-muted);
+}
+
+.ps-shell--platform .badge,
+.elfis-members-page .badge {
+  background: var(--elfis-blue-100);
+  color: var(--elfis-navy-900);
+  border: 1px solid var(--elfis-border);
+}
+
+.ps-shell--platform .badge.warn,
+.elfis-members-page .badge.warn {
+  background: color-mix(in srgb, var(--elfis-warning) 14%, white);
+  color: color-mix(in srgb, var(--elfis-warning) 85%, black);
+  border-color: color-mix(in srgb, var(--elfis-warning) 35%, white);
+}
+
+/* Invitation / membres — neutre ELFIS (aucun vert Finance). */
+.ps-shell--platform .member-invite,
+.elfis-members-page .member-invite,
+.ps-shell--platform .admin-invite,
+.elfis-members-page .admin-invite {
+  border: 1px solid var(--elfis-border);
+  background: var(--elfis-surface);
+  border-radius: 12px;
+}
+
+.ps-shell--platform .member-avatar,
+.elfis-members-page .member-avatar {
+  background: linear-gradient(145deg, var(--elfis-navy-950), var(--elfis-navy-900));
+  color: #fff;
+}
+
+.ps-shell--platform .admin-role-grid article,
+.elfis-members-page .admin-role-grid article,
+.elfis-members-page .elfis-role-card {
+  background: var(--elfis-surface);
+  border: 1px solid var(--elfis-border);
+  border-radius: 12px;
+}
+
+.ps-shell--platform .admin-member-table th,
+.elfis-members-page .admin-member-table th {
+  color: var(--elfis-text-muted);
+}
+
+.ps-shell--platform .field input,
+.ps-shell--platform .field select,
+.elfis-members-page .field input,
+.elfis-members-page .field select,
+.elfis-members-page .ds-form-field input,
+.elfis-members-page .ds-form-field select {
+  background: var(--elfis-surface);
+  border-color: var(--elfis-border);
+  color: var(--elfis-text-primary);
+}
+
+.ps-shell--platform .field input:focus,
+.ps-shell--platform .field select:focus,
+.elfis-members-page .field input:focus,
+.elfis-members-page .field select:focus,
+.elfis-members-page .ds-form-field input:focus,
+.elfis-members-page .ds-form-field select:focus {
+  border-color: var(--elfis-blue-600);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--elfis-blue-600) 22%, transparent);
+  outline: none;
+}

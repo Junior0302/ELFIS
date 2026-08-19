@@ -1,68 +1,43 @@
-import { useEffect, useRef } from 'react'
 import { Link, Outlet } from 'react-router-dom'
-import gsap from 'gsap'
 import './auth.css'
 
 const bullets = [
   {
-    title: 'Connexion sécurisée',
-    text: 'Email et mot de passe protégés de bout en bout.',
+    title: 'Une identité unique',
+    text: 'Un compte pour toute la plateforme ELFIS Core.',
   },
   {
-    title: 'Données réelles',
-    text: 'Votre organisation, vos chiffres — pas de démo fictive.',
+    title: 'Vos applications réunies',
+    text: 'ComptaPilot, SalesPilot et les prochains Pilot.',
   },
   {
-    title: 'Copilote financier',
-    text: 'Comprenez, décidez et pilotez avec l’IA.',
+    title: 'Vos données protégées',
+    text: 'Organisation, droits et continuité sécurisées.',
   },
 ]
 
+/**
+ * Layout auth pour register / forgot-password (identité ELFIS Core).
+ * Login a son propre module `src/login/`.
+ */
 export default function AuthLayout() {
-  const rootRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const root = rootRef.current
-    if (!root) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-    const ctx = gsap.context(() => {
-      gsap.from('.auth-aside-inner > *', {
-        y: 22,
-        opacity: 0,
-        duration: 0.65,
-        stagger: 0.08,
-        ease: 'power3.out',
-      })
-      gsap.from('.auth-main .auth-card', {
-        y: 28,
-        opacity: 0,
-        duration: 0.7,
-        delay: 0.12,
-        ease: 'power3.out',
-      })
-    }, root)
-
-    return () => ctx.revert()
-  }, [])
-
   return (
-    <div className="auth-shell" ref={rootRef}>
+    <div className="auth-shell auth-shell--elfis" data-product="elfis-core">
       <aside className="auth-aside">
         <div className="auth-aside-glow" aria-hidden="true" />
         <div className="auth-aside-inner">
           <Link to="/" className="auth-brand">
             <img src="/favicon.svg" alt="" className="auth-logo" width={48} height={48} />
             <span>
-              <strong>ComptaPilot IA</strong>
-              <small>ELFIS Core</small>
+              <strong>ELFIS Core</strong>
+              <small>Plateforme professionnelle</small>
             </span>
           </Link>
           <p className="auth-kicker">Espace sécurisé</p>
-          <h1 className="auth-title">Pilotez vos chiffres avec clarté.</h1>
+          <h1 className="auth-title">Une connexion. Tout votre écosystème.</h1>
           <p className="auth-lead">
-            Comptabilité, facturation et décisions assistées par l’IA — pour les dirigeants qui
-            veulent y voir clair.
+            Accédez à ComptaPilot, SalesPilot et aux prochaines applications ELFIS depuis un espace
+            unique et sécurisé.
           </p>
           <ul className="auth-bullets">
             {bullets.map((item) => (

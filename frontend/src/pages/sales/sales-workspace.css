@@ -1,0 +1,133 @@
+/* SalesPilot Relationship Workspace V1 */
+
+.sales-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 1.25rem);
+  padding-block: var(--space-4, 1rem);
+}
+
+.sales-workspace__layout {
+  display: grid;
+  gap: var(--space-5, 1.25rem);
+  align-items: start;
+}
+
+@media (min-width: 901px) {
+  .sales-workspace__layout {
+    grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
+  }
+}
+
+.sales-workspace__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+  position: sticky;
+  top: var(--space-4, 1rem);
+}
+
+.sales-workspace__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.sales-workspace__header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  margin-top: var(--space-2, 0.5rem);
+}
+
+.sales-workspace__meta-row {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.sales-workspace__meta-row dt {
+  margin: 0;
+  color: var(--pilot-muted, #64748b);
+  font-weight: 500;
+}
+
+.sales-workspace__meta-row dd {
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .sales-workspace__meta-row {
+    grid-template-columns: auto 1fr;
+    column-gap: var(--space-3, 0.75rem);
+  }
+}
+
+.sales-workspace__score-block p {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+}
+
+.sales-workspace__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.sales-workspace__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+.sales-workspace__list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-block: var(--space-2, 0.5rem);
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.sales-workspace__list-item:last-child {
+  border-bottom: 0;
+}
+
+.sales-workspace__list-item header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.sales-workspace__note {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.sales-workspace__two-col {
+  display: grid;
+  gap: var(--space-4, 1rem);
+}
+
+@media (min-width: 901px) {
+  .sales-workspace__two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sales-deal__header-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  align-items: center;
+}

@@ -137,6 +137,20 @@ def _issue_session(db: Session, user: User, request: Request | None = None, acti
         module="auth",
         ip=request.client.host if request and request.client else "",
     )
+    try:
+        from app.audit.audit_logger import AuditLogger
+
+        ua = request.headers.get("user-agent") if request else None
+        AuditLogger(isolated_writes=True).record_login_success(
+            user_id=user.id,
+            email=user.email,
+            organization_id=org_id,
+            ip_address=request.client.host if request and request.client else None,
+            user_agent=ua,
+            metadata={"auth_action": action},
+        )
+    except Exception:  # noqa: BLE001
+        pass
     return TokenOut(access_token=token, user=_user_public(user), memberships=memberships)
 
 
@@ -149,6 +163,16 @@ async def firebase_session(
     try:
         fb = await verify_id_token(payload.id_token)
     except FirebaseAuthError as exc:
+        try:
+            from app.audit.audit_logger import AuditLogger
+
+            AuditLogger(isolated_writes=True).record_login_failure(
+                reason=type(exc).__name__,
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            )
+        except Exception:  # noqa: BLE001
+            pass
         raise HTTPException(401, detail=exc.message) from exc
 
     user = upsert_firebase_user(
@@ -168,6 +192,27 @@ def login(_: LoginIn):
         400,
         detail="Utilisez l’application web pour vous connecter.",
     )
+
+
+@router.post("/logout")
+def logout(
+    request: Request,
+    auth: AuthContext = Depends(get_auth_context),
+):
+    """Journalise la déconnexion (JWT stateless — invalidation côté client)."""
+    try:
+        from app.audit.audit_logger import AuditLogger
+
+        user = auth.user
+        AuditLogger(isolated_writes=True).record_logout(
+            user_id=user.id if user else None,
+            email=user.email if user else None,
+            organization_id=auth.organization_id,
+            ip_address=request.client.host if request.client else None,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok": True}
 
 
 @router.post("/register", response_model=TokenOut)

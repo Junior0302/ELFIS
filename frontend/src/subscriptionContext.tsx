@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -25,17 +26,25 @@ const SubscriptionContext = createContext<SubscriptionContextValue | null>(null)
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { token, orgId } = useAuth()
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
-  const [loading, setLoading] = useState(false)
+  // F1.3.2.3 — loading=true dès le 1er rendu si session org connue.
+  // Sinon phase=no_entitlement flash → /welcome → /home (perte de route au F5).
+  const [loading, setLoading] = useState(() => Boolean(token && orgId))
   const [error, setError] = useState('')
   const [checkoutReturnPending, setCheckoutReturnPending] = useState(false)
+  const subscriptionRef = useRef(subscription)
+  subscriptionRef.current = subscription
 
   const refresh = useCallback(
     async (opts?: { syncSessionId?: string | null }) => {
       if (!token || !orgId) {
         setSubscription(null)
+        setLoading(false)
         return null
       }
-      setLoading(true)
+      // Silent refresh when we already know the subscription — avoids ProductAccessLayout
+      // phase=loading remount that closed invoice email composers / wiped local drafts.
+      const gateLoading = subscriptionRef.current == null
+      if (gateLoading) setLoading(true)
       setError('')
       try {
         let current =
@@ -51,13 +60,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         try {
           const fallback = await api.currentSubscription(token, orgId)
           setSubscription(fallback)
+          setError('')
           return fallback
         } catch {
           setSubscription(null)
           return null
         }
       } finally {
-        setLoading(false)
+        if (gateLoading) setLoading(false)
       }
     },
     [token, orgId],

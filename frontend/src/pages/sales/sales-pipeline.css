@@ -1,0 +1,162 @@
+/* SalesPilot Pipeline Engine V1 */
+
+.sales-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 1.25rem);
+  padding-block: var(--space-4, 1rem);
+}
+
+.sales-pipeline__banner {
+  margin: 0;
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid color-mix(in srgb, var(--pilot-accent, #0d9488) 40%, var(--line));
+  background: color-mix(in srgb, var(--pilot-accent, #0d9488) 8%, transparent);
+}
+
+.sales-pipe-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(16rem, 1fr);
+  gap: var(--space-3, 0.75rem);
+  overflow-x: auto;
+  padding-bottom: var(--space-3, 0.75rem);
+  align-items: start;
+}
+
+.sales-pipe-column {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: var(--radius-lg, 16px);
+  background: color-mix(in srgb, var(--pilot-surface, #fff) 96%, transparent);
+  padding: var(--space-3, 0.75rem);
+  min-height: 12rem;
+}
+
+.sales-pipe-column__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.sales-pipe-column__head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sales-pipe-column__stats {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+}
+
+.sales-pipe-column__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.sales-pipe-card {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: var(--radius-md, 12px);
+  background: var(--pilot-surface, #fff);
+}
+
+.sales-pipe-card__hit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: var(--space-3, 0.75rem);
+  cursor: pointer;
+  color: inherit;
+}
+
+.sales-pipe-card__hit:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pilot-focus, var(--mint)) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.sales-pipe-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sales-pipe-card__name,
+.sales-pipe-card__line {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.sales-pipe-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.sales-pipe-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.sales-pipe-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.sales-pipe-mobile__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: var(--space-3, 0.75rem);
+}
+
+.sales-pipe-mobile__move,
+.sales-pipe-drawer__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.sales-pipe-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.sales-pipe-drawer__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sales-pipe-drawer__note {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.sales-pipe-drawer__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .sales-pipe-board {
+    display: none;
+  }
+}

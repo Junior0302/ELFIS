@@ -81,6 +81,10 @@ class BankAccount(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(Integer, index=True, default=0)
+    # Banking Platform V1 : rattachement à une connexion fournisseur
+    connection_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    provider: Mapped[str] = mapped_column(String(32), default="manual")
+    external_id: Mapped[str] = mapped_column(String(128), default="")
     label: Mapped[str] = mapped_column(String(255), default="Compte courant")
     bank_name: Mapped[str] = mapped_column(String(255), default="")
     iban: Mapped[str] = mapped_column(String(64), default="")
@@ -102,6 +106,9 @@ class BankTransaction(Base):
     amount: Mapped[float] = mapped_column(Float)  # + crédit / - débit
     currency: Mapped[str] = mapped_column(String(8), default="EUR")
     category: Mapped[str] = mapped_column(String(64), default="autre")
+    # Banking Platform V1 : statut normalisé + fournisseur d'origine
+    status: Mapped[str] = mapped_column(String(16), default="booked")
+    source: Mapped[str] = mapped_column(String(32), default="manual")
     is_duplicate: Mapped[bool] = mapped_column(Boolean, default=False)
     is_anomaly: Mapped[bool] = mapped_column(Boolean, default=False)
     anomaly_reason: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 _SECRET_PATTERNS = (
     re.compile(r"xkeysib-[a-zA-Z0-9_-]+", re.I),
     re.compile(r"xsmtpsib-[a-zA-Z0-9_-]+", re.I),
+    re.compile(r"sk_(?:live|test)_[a-zA-Z0-9_-]+", re.I),
+    re.compile(r"(?i)(api[_-]?key|token|password|secret|authorization|bearer|jwt)[=:\s]+[^\s,;]+"),
     re.compile(r"Bearer\s+[A-Za-z0-9._\-]+", re.I),
     re.compile(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"),
 )

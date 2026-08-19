@@ -91,7 +91,20 @@ def get_subscription_access(
     user: User | None = None,
     now: datetime | None = None,
 ) -> SubscriptionAccess:
+    """Accès produit.
+
+    Billing System V2 : synchronise d'abord le miroir elfis_* (Entitlement Engine).
+    La décision has_access reste compatible legacy pour ne pas casser l'UX ;
+    les features/quotas runtime passent par EntitlementService / QuotaService.
+    """
     now = now or datetime.utcnow()
+    try:
+        from app.billing.subscription_service import SubscriptionService
+
+        SubscriptionService(db).sync_from_legacy(organization_id, rebuild=False)
+    except Exception:  # noqa: BLE001
+        pass
+
     bypass = _platform_bypass(user)
     configured = bool(settings.stripe_secret_key and settings.stripe_price_pro)
     row = _latest_subscription(db, organization_id)
@@ -186,8 +199,14 @@ def get_subscription_access(
         has_access = True
         access_reason = f"stripe_{raw}"
     elif raw == "past_due":
+        # Politique unique : grâce Billing V1 (7 j), fallback legacy stripe_* puis 7
+        grace_days = int(
+            getattr(settings, "elfis_billing_past_due_grace_days", None)
+            or getattr(settings, "stripe_past_due_grace_days", None)
+            or 7
+        )
         grace_until = (
-            row.past_due_since + timedelta(days=settings.stripe_past_due_grace_days)
+            row.past_due_since + timedelta(days=grace_days)
             if row.past_due_since
             else None
         )

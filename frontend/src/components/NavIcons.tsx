@@ -159,17 +159,36 @@ export const NavIconNotifications = ({ className }: IconProps) => (
   </Svg>
 )
 
+export const NavIconMigration = ({ className }: IconProps) => (
+  <Svg className={className}>
+    <path d="M12 3v12" />
+    <path d="m8 11 4 4 4-4" />
+    <path d="M5 19h14" />
+  </Svg>
+)
+
 export const navIcons: Record<string, (props: IconProps) => ReactNode> = {
   '/dashboard': NavIconDashboard,
+  '/finance': NavIconBilling,
+  '/banque': NavIconSubscription,
   '/intelligence': NavIconIntelligence,
   '/notifications': NavIconNotifications,
   '/copilote': NavIconCopilote,
   '/deposit': NavIconDeposit,
   '/documents': NavIconVault,
   '/history': NavIconHistory,
+  '/migration': NavIconMigration,
+  '/accounting': NavIconHistory,
+  '/accounting/proposals': NavIconHistory,
+  '/accounting/engine': NavIconIntelligence,
+  '/accounting/intelligence': NavIconIntelligence,
+  '/search': NavIconCatalog,
+  '/reports': NavIconBilling,
+  '/cockpit': NavIconDashboard,
   '/facturation': NavIconBilling,
   '/devis': NavIconQuotes,
   '/clients': NavIconClients,
+  '/fournisseurs': NavIconClients,
   '/catalogue': NavIconCatalog,
   '/activites': NavIconActivities,
   '/abonnement': NavIconSubscription,
@@ -177,4 +196,14 @@ export const navIcons: Record<string, (props: IconProps) => ReactNode> = {
   '/admin/equipe': NavIconTeam,
   '/settings': NavIconSettings,
   '/compte': NavIconAccount,
+  '/modules': NavIconCatalog,
+  '/tva': NavIconBilling,
+  '/cloture': NavIconHistory,
+  '/sales': NavIconDashboard,
+  '/sales/leads': NavIconClients,
+  '/sales/pipeline': NavIconQuotes,
+  '/sales/activities': NavIconActivities,
+  '/sales/reports': NavIconBilling,
+  '/sales/companies': NavIconClients,
+  '/sales/settings': NavIconSettings,
 }

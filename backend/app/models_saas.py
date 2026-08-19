@@ -43,6 +43,13 @@ class Organization(Base):
     currency: Mapped[str] = mapped_column(String(8), default="EUR")
     logo: Mapped[str] = mapped_column(String(512), default="")
     industry: Mapped[str] = mapped_column(String(128), default="")
+    industry_other: Mapped[str] = mapped_column(String(100), default="")
+    vat_status: Mapped[str] = mapped_column(String(32), default="")
+    locale: Mapped[str] = mapped_column(String(16), default="")
+    timezone: Mapped[str] = mapped_column(String(64), default="")
+    setup_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    setup_version: Mapped[int] = mapped_column(Integer, default=0)
     address: Mapped[str] = mapped_column(Text, default="")
     postal_code: Mapped[str] = mapped_column(String(32), default="")
     city: Mapped[str] = mapped_column(String(128), default="")
@@ -56,7 +63,14 @@ class Organization(Base):
     legal_mentions: Mapped[str] = mapped_column(Text, default="")
     primary_color: Mapped[str] = mapped_column(String(16), default="#0B3D2E")
     secondary_color: Mapped[str] = mapped_column(String(16), default="#E7F2EC")
+    # Préférence documents : None = pas de défaut org ; True/False = Avec/Sans logo
+    documents_show_logo: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=None)
     subscription_plan: Mapped[str] = mapped_column(String(64), default="starter")
+    platform_status: Mapped[str] = mapped_column(String(32), default="active")
+    # active | suspended | restricted | closed
+    platform_suspended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    platform_suspended_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    platform_suspend_reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -93,6 +107,7 @@ class OrganizationMember(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    accounting_hub_visited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class OrganizationInvitation(Base):
@@ -358,9 +373,16 @@ class SalesDocument(Base):
     vat_rate: Mapped[float] = mapped_column(Float, default=20.0)
     lines_json: Mapped[str] = mapped_column(Text, default="[]")
     notes: Mapped[str] = mapped_column(Text, default="")
+    # Branding documentaire (showLogo, template) — JSON ; source unique PDF/email/Vault
+    branding_json: Mapped[str] = mapped_column(Text, default="{}")
     paid_amount: Mapped[float] = mapped_column(Float, default=0.0)
     signature_status: Mapped[str] = mapped_column(String(32), default="none")  # none|pending|signed
     converted_from_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Provenance SalesPilot proposal (S1.6.1)
+    source_type: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    source_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    source_version_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

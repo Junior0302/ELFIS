@@ -1,31 +1,36 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api, type OrgInvitation, type OrgMember } from '../api'
 import { useAuth } from '../auth'
 import { deleteFirestoreOrganizationMember, saveFirestoreOrganizationMember } from '../firebase'
-import { ROLE_LABELS_FR } from '../planFeatures'
-
-const ROLE_HELP: Record<string, string> = {
-  admin: 'Gère l’équipe, les paramètres et l’abonnement',
-  cfo: 'Lit la finance, la banque et le copilote',
-  comptable: 'Gère factures, documents et fiscalité',
-  employe: 'Crée des devis et consulte les documents',
-  auditeur: 'Consultation seule, sans modification',
-}
+import {
+  ElfisButton,
+  ElfisField,
+  ElfisPageHeader,
+  ElfisTable,
+} from '../unified-platform'
+import {
+  GLOBAL_ROLE_DEFS,
+  GLOBAL_ROLE_ORDER,
+  SPACE_ACCESS_COLUMN_ENABLED,
+  globalRoleHelp,
+  globalRoleLabel,
+  inviteRoleOptions,
+} from '../platform-roles/globalRoles'
+import './elfis-members.css'
 
 export default function AdminEquipePage() {
   const { token, orgId, memberships, user } = useAuth()
   const [members, setMembers] = useState<OrgMember[]>([])
   const [invitations, setInvitations] = useState<OrgInvitation[]>([])
   const [roles, setRoles] = useState<string[]>([])
-  const [roleLabels, setRoleLabels] = useState<Record<string, string>>(ROLE_LABELS_FR)
   const [canManage, setCanManage] = useState(false)
   const [canInvite, setCanInvite] = useState(true)
   const [seatMessage, setSeatMessage] = useState('')
   const [seats, setSeats] = useState({ active: 0, pending_invites: 0, used: 0 })
   const [plan, setPlan] = useState('starter')
   const [loading, setLoading] = useState(true)
-  const [memberForm, setMemberForm] = useState({ email: '', role: 'comptable' })
+  const [memberForm, setMemberForm] = useState({ email: '', role: 'employe' })
   const [saving, setSaving] = useState(false)
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [lastInviteLink, setLastInviteLink] = useState('')
@@ -36,6 +41,8 @@ export default function AdminEquipePage() {
   const allowed =
     Boolean(activeMembership?.permissions.includes('*')) ||
     Boolean(activeMembership?.permissions.includes('users.manage'))
+
+  const inviteOptions = useMemo(() => inviteRoleOptions(roles), [roles])
 
   const load = async () => {
     if (!token || !orgId) return
@@ -53,10 +60,10 @@ export default function AdminEquipePage() {
       setSeatMessage(data.seat_limit_message || '')
       setSeats(data.seats || { active: 0, pending_invites: 0, used: 0 })
       setPlan(data.plan || 'starter')
-      if (data.role_labels) setRoleLabels(data.role_labels)
       setInvitations(invites.invitations.filter((item) => item.status === 'pending'))
-      if (data.roles.length && !data.roles.includes(memberForm.role)) {
-        setMemberForm((current) => ({ ...current, role: data.roles[0] }))
+      const options = inviteRoleOptions(data.roles)
+      if (options.length && !options.some((o) => o.value === memberForm.role)) {
+        setMemberForm((current) => ({ ...current, role: options[0].value }))
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Chargement impossible')
@@ -71,7 +78,7 @@ export default function AdminEquipePage() {
   }, [token, orgId])
 
   if (!allowed) {
-    return <Navigate to="/organisation" replace />
+    return <Navigate to="/platform/organization" replace />
   }
 
   const syncMember = async (member: OrgMember) => {
@@ -193,29 +200,36 @@ export default function AdminEquipePage() {
     }
   }
 
-  const labelFor = (role: string) => roleLabels[role] || ROLE_LABELS_FR[role] || role
+  const roleSelectOptions = inviteOptions.length
+    ? inviteOptions
+    : roles.map((role) => ({
+        value: role,
+        label: globalRoleLabel(role),
+        help: globalRoleHelp(role),
+      }))
+
+  const selectedHelp =
+    roleSelectOptions.find((o) => o.value === memberForm.role)?.help ||
+    globalRoleHelp(memberForm.role)
 
   return (
-    <>
-      <div className="page-head">
-        <div>
-          <h2>Admin · Équipe</h2>
-          <p>
-            Invitez des collaborateurs : ils utilisent l’abonnement de l’organisation, sans
-            souscription individuelle. Les droits restent limités par leur rôle.
-          </p>
-        </div>
-        <Link className="btn secondary" to="/organisation">
-          Retour organisation
-        </Link>
-      </div>
+    <div className="elfis-members-page" data-elfis-brand="members">
+      <ElfisPageHeader
+        eyebrow="ENTREPRISE"
+        title="Membres et équipes"
+        description="Invitez des collaborateurs et gérez leurs accès à ELFIS."
+        actions={
+          <Link className="btn secondary" to="/platform/organization">
+            Retour organisation
+          </Link>
+        }
+      />
 
       {error && <div className="auth-alert auth-alert-error">{error}</div>}
       {message && <div className="auth-alert auth-alert-ok">{message}</div>}
       {lastInviteLink && (
         <div className="auth-alert">
-          Lien d’invitation à transmettre :{' '}
-          <a href={lastInviteLink}>{lastInviteLink}</a>
+          Lien d’invitation à transmettre : <a href={lastInviteLink}>{lastInviteLink}</a>
         </div>
       )}
 
@@ -233,8 +247,7 @@ export default function AdminEquipePage() {
 
         {canManage ? (
           <form className="member-invite admin-invite" onSubmit={inviteMember}>
-            <div className="field">
-              <label htmlFor="admin_member_email">Email</label>
+            <ElfisField label="Email" htmlFor="admin_member_email" required>
               <input
                 id="admin_member_email"
                 type="email"
@@ -243,25 +256,28 @@ export default function AdminEquipePage() {
                 value={memberForm.email}
                 onChange={(event) => setMemberForm({ ...memberForm, email: event.target.value })}
               />
-            </div>
-            <div className="field">
-              <label htmlFor="admin_member_role">Rôle</label>
+            </ElfisField>
+            <ElfisField
+              label="Rôle ELFIS"
+              htmlFor="admin_member_role"
+              hint={selectedHelp}
+              required
+            >
               <select
                 id="admin_member_role"
                 value={memberForm.role}
                 onChange={(event) => setMemberForm({ ...memberForm, role: event.target.value })}
               >
-                {roles.map((role) => (
-                  <option key={role} value={role}>
-                    {labelFor(role)}
+                {roleSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
-              <small className="muted">{ROLE_HELP[memberForm.role] || ''}</small>
-            </div>
-            <button className="btn" type="submit" disabled={saving || !canInvite}>
+            </ElfisField>
+            <ElfisButton type="submit" disabled={saving || !canInvite}>
               {saving ? 'Envoi…' : 'Envoyer l’invitation'}
-            </button>
+            </ElfisButton>
           </form>
         ) : (
           <p className="muted">Vous n’avez pas la permission users.manage.</p>
@@ -271,53 +287,51 @@ export default function AdminEquipePage() {
       {!!invitations.length && (
         <section className="panel" style={{ marginTop: '1rem' }}>
           <h3>Invitations en attente</h3>
-          <div className="admin-member-table-wrap">
-            <table className="admin-member-table">
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Rôle</th>
-                  <th>Expire</th>
-                  <th>Actions</th>
+          <ElfisTable className="admin-member-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Rôle ELFIS</th>
+                <th>Expire</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invitations.map((invite) => (
+                <tr key={invite.id}>
+                  <td>{invite.email}</td>
+                  <td>
+                    <span className="badge">{globalRoleLabel(invite.role)}</span>
+                  </td>
+                  <td className="muted">
+                    {invite.expires_at
+                      ? new Date(invite.expires_at).toLocaleDateString('fr-FR')
+                      : '—'}
+                  </td>
+                  <td>
+                    <div className="admin-actions">
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        disabled={pendingId === invite.id}
+                        onClick={() => void resendInvite(invite)}
+                      >
+                        Renvoyer
+                      </button>
+                      <button
+                        className="btn danger-outline"
+                        type="button"
+                        disabled={pendingId === invite.id}
+                        onClick={() => void cancelInvite(invite)}
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {invitations.map((invite) => (
-                  <tr key={invite.id}>
-                    <td>{invite.email}</td>
-                    <td>
-                      <span className="badge">{labelFor(invite.role)}</span>
-                    </td>
-                    <td className="muted">
-                      {invite.expires_at
-                        ? new Date(invite.expires_at).toLocaleDateString('fr-FR')
-                        : '—'}
-                    </td>
-                    <td>
-                      <div className="admin-actions">
-                        <button
-                          className="btn secondary"
-                          type="button"
-                          disabled={pendingId === invite.id}
-                          onClick={() => void resendInvite(invite)}
-                        >
-                          Renvoyer
-                        </button>
-                        <button
-                          className="btn danger-outline"
-                          type="button"
-                          disabled={pendingId === invite.id}
-                          onClick={() => void cancelInvite(invite)}
-                        >
-                          Annuler
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </ElfisTable>
         </section>
       )}
 
@@ -334,14 +348,15 @@ export default function AdminEquipePage() {
         {loading ? (
           <div className="loading">Chargement de l’équipe…</div>
         ) : (
-          <div className="admin-member-table-wrap">
-            <table className="admin-member-table">
+          <>
+            <ElfisTable className="admin-member-table">
               <thead>
                 <tr>
-                  <th>Utilisateur</th>
-                  <th>Rôle</th>
+                  <th>Membre</th>
+                  <th>Rôle ELFIS</th>
+                  {SPACE_ACCESS_COLUMN_ENABLED ? <th>Accès aux espaces</th> : null}
                   <th>Statut</th>
-                  <th>Adhésion</th>
+                  <th>Date d’adhésion</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -354,7 +369,7 @@ export default function AdminEquipePage() {
                     <tr key={member.membership_id}>
                       <td>
                         <div className="member-identity">
-                          <div className="member-avatar">
+                          <div className="member-avatar" aria-hidden>
                             {member.avatar ? (
                               <img src={member.avatar} alt="" />
                             ) : (
@@ -375,24 +390,33 @@ export default function AdminEquipePage() {
                           <select
                             value={member.role}
                             disabled={busy}
-                            aria-label={`Rôle de ${member.display_name}`}
+                            aria-label={`Rôle ELFIS de ${member.display_name}`}
                             onChange={(event) =>
                               void updateMember(member, { role: event.target.value })
                             }
                           >
-                            {roles.map((role) => (
-                              <option key={role} value={role}>
-                                {labelFor(role)}
+                            {/* Inclure le rôle actuel s’il n’est pas dans les options d’invite (ex. comptable legacy). */}
+                            {!roleSelectOptions.some((o) => o.value === member.role) ? (
+                              <option value={member.role}>{globalRoleLabel(member.role)}</option>
+                            ) : null}
+                            {roleSelectOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
                               </option>
                             ))}
                           </select>
                         ) : (
-                          <span className="badge">{labelFor(member.role)}</span>
+                          <span className="badge">{globalRoleLabel(member.role)}</span>
                         )}
-                        {!isOwner && ROLE_HELP[member.role] && (
-                          <small className="muted admin-role-help">{ROLE_HELP[member.role]}</small>
-                        )}
+                        {!isOwner && globalRoleHelp(member.role) ? (
+                          <small className="muted admin-role-help">
+                            {globalRoleHelp(member.role)}
+                          </small>
+                        ) : null}
                       </td>
+                      {SPACE_ACCESS_COLUMN_ENABLED ? (
+                        <td className="muted">—</td>
+                      ) : null}
                       <td>
                         <span className={`badge ${member.status === 'active' ? '' : 'warn'}`}>
                           {member.status === 'active' ? 'Actif' : 'Suspendu'}
@@ -437,23 +461,32 @@ export default function AdminEquipePage() {
                   )
                 })}
               </tbody>
-            </table>
+            </ElfisTable>
             {!members.length && <p className="platform-empty">Aucun membre.</p>}
-          </div>
+          </>
         )}
       </section>
 
-      <section className="panel admin-roles-legend" style={{ marginTop: '1rem' }}>
+      <section id="roles" className="panel admin-roles-legend" style={{ marginTop: '1rem' }}>
         <h3>Signification des rôles</h3>
-        <div className="admin-role-grid">
-          {Object.entries(ROLE_HELP).map(([role, help]) => (
-            <article key={role}>
-              <strong>{labelFor(role)}</strong>
-              <p>{help}</p>
-            </article>
-          ))}
+        <div className="admin-role-grid elfis-role-grid">
+          {GLOBAL_ROLE_ORDER.map((id) => {
+            const def = GLOBAL_ROLE_DEFS[id]
+            return (
+              <article key={id} className="elfis-role-card" data-role={id}>
+                <div className="elfis-role-card__icon" aria-hidden>
+                  {id === 'owner' ? '◆' : id === 'admin' ? '▣' : id === 'manager' ? '▤' : id === 'member' ? '○' : '◌'}
+                </div>
+                <strong>{def.label}</strong>
+                {def.protected ? (
+                  <span className="elfis-role-card__protected">Rôle protégé</span>
+                ) : null}
+                <p>{def.description}</p>
+              </article>
+            )
+          })}
         </div>
       </section>
-    </>
+    </div>
   )
 }

@@ -1,0 +1,47 @@
+{
+  "certified": true,
+  "module": "accounting_intelligence_v2",
+  "scenarios": [
+    {
+      "scenario": "A_apply",
+      "ok": true,
+      "tables": [
+        "elfis_ai_audit",
+        "elfis_ai_context_profiles",
+        "elfis_ai_executions",
+        "elfis_ai_feedback",
+        "elfis_ai_learning_memory",
+        "elfis_ai_recommendation_history",
+        "elfis_ai_similarity_cache",
+        "elfis_ai_usage"
+      ],
+      "missing": []
+    },
+    {
+      "scenario": "B_idempotent",
+      "ok": true,
+      "tables": [
+        "elfis_ai_audit",
+        "elfis_ai_context_profiles",
+        "elfis_ai_executions",
+        "elfis_ai_feedback",
+        "elfis_ai_learning_memory",
+        "elfis_ai_recommendation_history",
+        "elfis_ai_similarity_cache",
+        "elfis_ai_usage"
+      ],
+      "missing": []
+    },
+    {
+      "scenario": "C_constraints",
+      "ok": true,
+      "constraints": [
+        "uq_elfis_ai_ctx_org",
+        "uq_elfis_ai_lm_org_key_ver",
+        "uq_elfis_ai_sim_keys"
+      ]
+    }
+  ],
+  "timestamp": "2026-07-24T17:09:59.412807+00:00",
+  "environment": "staging"
+}

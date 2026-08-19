@@ -34,8 +34,21 @@ from app.services.billing import (
 )
 from app.services.sales_email import send_sales_document_email, smtp_configured
 from app.services.sales_pdf import sales_document_to_pdf
-from app.services.mailer import email_configured
+from app.services.mailer import email_configured, mailer_diagnostic
 from app.services.document_delivery import DocumentDeliveryError, DocumentDeliveryService
+
+
+def _mailer_public_flags(*, can_send_direct: bool | None = None) -> dict:
+    diag = mailer_diagnostic()
+    ready = email_configured() if can_send_direct is None else can_send_direct
+    return {
+        "smtp_configured": smtp_configured(),
+        "email_configured": email_configured(),
+        "can_send_direct": ready,
+        "mailer_provider": diag.get("provider"),
+        "mailer_reason_code": diag.get("reason_code") if not email_configured() else "ok",
+        "mailer_sender_configured": diag.get("sender_configured"),
+    }
 
 router = APIRouter(
     prefix="/billing",
@@ -106,6 +119,7 @@ class SalesDocIn(BaseModel):
     notes: str = ""
     lines: list[dict] = Field(default_factory=list)
     due_days: int = 30
+    branding: dict | None = None
 
 
 class SalesDocUpdateIn(BaseModel):
@@ -117,12 +131,14 @@ class SalesDocUpdateIn(BaseModel):
     notes: str | None = None
     lines: list[dict] | None = None
     due_days: int | None = None
+    branding: dict | None = None
 
 
 class PaymentIn(BaseModel):
     amount: float
     method: str = "virement"
     reference: str = ""
+    paid_at: str | None = None  # DD-MM-YYYY optionnel (sinon aujourd'hui)
 
 
 class EmailSendIn(BaseModel):
@@ -156,6 +172,9 @@ def _get_doc(db: Session, auth: AuthContext, doc_id: int) -> SalesDocument:
 
 
 def _serialize(doc: SalesDocument) -> dict:
+    from app.services.document_branding import parse_document_branding
+
+    branding = parse_document_branding(getattr(doc, "branding_json", None))
     return {
         "id": doc.id,
         "organization_id": doc.organization_id,
@@ -173,6 +192,7 @@ def _serialize(doc: SalesDocument) -> dict:
         "vat_rate": doc.vat_rate,
         "lines": json.loads(doc.lines_json or "[]"),
         "notes": doc.notes,
+        "branding": branding,
         "paid_amount": doc.paid_amount,
         "signature_status": doc.signature_status,
         "converted_from_id": doc.converted_from_id,
@@ -302,14 +322,15 @@ def _get_activity(db: Session, auth: AuthContext, activity_id: int) -> Commercia
     return act
 
 
-@router.get("/overview")
-def billing_overview(
+@router.get("/sales-overview")
+def billing_sales_overview(
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
     doc_type: str | None = None,
     q: str | None = None,
     status: str | None = None,
 ):
+    """Facturation commerciale (devis/factures clients) — distinct du Billing SaaS V2."""
     auth.require("invoice.read")
     org_id = _org_id(auth)
     query = db.query(SalesDocument).filter(SalesDocument.organization_id == org_id)
@@ -629,6 +650,9 @@ def create_document(
     auth.require(perm)
     if payload.doc_type not in ("devis", "facture", "avoir"):
         raise HTTPException(400, detail="Type invalide")
+    # Isolation multi-tenant : un customer_id hors organisation est refusé.
+    if payload.customer_id is not None:
+        _get_customer(db, auth, payload.customer_id)
     doc = create_sales_document(
         db,
         organization_id=_org_id(auth),
@@ -641,6 +665,7 @@ def create_document(
         lines=payload.lines,
         notes=payload.notes,
         due_days=payload.due_days,
+        branding=payload.branding,
     )
     write_audit(
         db,
@@ -772,11 +797,9 @@ def email_document(
         return {
             "document": _serialize(doc),
             "email_log": _serialize_email_log(log, db),
-            "smtp_configured": smtp_configured(),
-            "email_configured": email_configured(),
+            **_mailer_public_flags(can_send_direct=False),
             "send_mode": mode,
             "sender_email": log.sender_email,
-            "can_send_direct": False,
             "status": log.status,
         }
 
@@ -806,6 +829,10 @@ def email_document(
             status = 404
         if exc.code == "archive_failed":
             status = 503
+        if exc.code == "feature_not_available":
+            status = 403
+        if exc.code == "quota_exceeded":
+            status = 429
         raise HTTPException(status, detail={"code": exc.code, "message": exc.message}) from exc
 
     db.refresh(doc)
@@ -831,11 +858,9 @@ def email_document(
         "message": delivery.message,
         "document": _serialize(doc),
         "email_log": _serialize_email_log(log, db) if log else None,
-        "smtp_configured": smtp_configured(),
-        "email_configured": email_configured(),
+        **_mailer_public_flags(),
         "send_mode": "server",
         "sender_email": log.sender_email if log else "",
-        "can_send_direct": email_configured(),
     }
 
 
@@ -898,19 +923,18 @@ def document_emails(
             "connection_id": default_connection_id,
             "user_email": (auth.user.email if auth.user else "") or "",
             "org_email": (org.email or "").strip(),
-            "preferred_send_mode": "server" if email_configured() else "mailto",
+            "preferred_send_mode": "server" if (email_configured() or bool(sendable)) else "mailto",
         }
+    can_direct = bool(email_configured() or connections)
     return {
         "email_logs": [
             _serialize_email_log(log, db)
             for log in list_email_logs(db, doc.id, organization_id=doc.organization_id)
         ],
-        "smtp_configured": smtp_configured(),
-        "email_configured": email_configured(),
+        **_mailer_public_flags(can_send_direct=can_direct),
         "preview": preview,
         "connections": connections,
         "default_connection_id": default_connection_id,
-        "can_send_direct": email_configured(),
     }
 
 
@@ -953,7 +977,12 @@ def pay_doc(
     auth.require("invoice.create")
     doc = _get_doc(db, auth, doc_id)
     payment = register_payment(
-        db, doc, amount=payload.amount, method=payload.method, reference=payload.reference
+        db,
+        doc,
+        amount=payload.amount,
+        method=payload.method,
+        reference=payload.reference,
+        paid_at=payload.paid_at,
     )
     return {"payment_id": payment.id, "document": _serialize(doc)}
 

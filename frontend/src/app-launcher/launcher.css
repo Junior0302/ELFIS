@@ -1,0 +1,802 @@
+/* ELFIS App Launcher Premium V1 — signature plateforme */
+
+.app-launcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+  border-radius: 12px;
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+
+.app-launcher-trigger:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  border-color: color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.app-launcher-trigger:focus-visible {
+  outline: 2px solid #3d7eff;
+  outline-offset: 2px;
+}
+
+.app-launcher-trigger[aria-expanded='true'] {
+  border-color: color-mix(in srgb, #3d7eff 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #3d7eff 25%, transparent);
+}
+
+.app-launcher-trigger__icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.app-launcher-trigger--compact .app-launcher-trigger__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.app-launcher-trigger--compact {
+  padding: 0.45rem;
+  position: relative;
+}
+
+/* ——— Premium Dialog ——— */
+.ds-overlay-backdrop:has(.app-launcher-dialog) {
+  background: rgba(11, 31, 58, 0.52);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: app-launcher-backdrop-in 200ms ease both;
+}
+
+.app-launcher-dialog {
+  width: min(100%, 1040px) !important;
+  min-width: min(960px, 100%);
+  max-height: min(84vh, 760px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(11, 31, 58, 0.08);
+  border-radius: 22px;
+  box-shadow: 0 32px 90px rgba(11, 31, 58, 0.28);
+  background: #fff;
+  animation: app-launcher-dialog-in 210ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-launcher-dialog .ds-dialog__header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 6;
+  border: 0;
+  padding: 0;
+  pointer-events: none;
+  background: transparent;
+}
+
+.app-launcher-dialog .ds-dialog__title,
+.app-launcher-dialog .ds-dialog__description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.app-launcher-dialog .ds-dialog__close {
+  pointer-events: auto;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f4f7fb;
+  box-shadow: none;
+  z-index: 8;
+}
+
+.app-launcher-dialog .ds-dialog__close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.app-launcher-dialog .ds-dialog__content {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: min(84vh, 760px);
+}
+
+/* ——— Panel ——— */
+.app-launcher-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  background: #fff;
+  color: #0b1f3a;
+}
+
+.app-launcher-panel--signature {
+  --launcher-navy: #0b1f3a;
+  --launcher-accent: #3d7eff;
+  max-height: inherit;
+  background: #fff;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Header — navy gradient */
+.launcher-header {
+  padding: 1.25rem 3.5rem 1.1rem 1.5rem;
+  background:
+    radial-gradient(80% 120% at 100% 0%, rgba(61, 126, 255, 0.28), transparent 55%),
+    linear-gradient(135deg, #0b1f3a 0%, #132a4a 55%, #0f2744 100%);
+  color: #f4f7fb;
+}
+
+.launcher-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.launcher-header__home {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(173, 201, 255, 0.95);
+  text-decoration: none;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  white-space: nowrap;
+}
+
+.launcher-header__home:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.launcher-header__home:focus-visible {
+  outline: 2px solid #3d7eff;
+  outline-offset: 2px;
+}
+
+.launcher-header__eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(173, 201, 255, 0.9);
+  font-weight: 700;
+}
+
+.launcher-header__title {
+  margin: 0.12rem 0 0;
+  font-size: 1.4rem;
+  letter-spacing: -0.03em;
+  font-family: var(--font-display, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif);
+  font-weight: 600;
+  color: #fff;
+}
+
+.launcher-header__subtitle {
+  margin: 0.65rem 0 0;
+  color: rgba(244, 247, 251, 0.78);
+  font-size: 0.92rem;
+  max-width: 34rem;
+  line-height: 1.4;
+}
+
+.launcher-header--embedded {
+  padding: 0.85rem 1rem 0.75rem;
+}
+
+.launcher-header--embedded .launcher-header__title {
+  font-size: 1.15rem;
+}
+
+/* Search toolbar — light body */
+.launcher-toolbar {
+  padding: 1rem 1.35rem 0.35rem;
+  background: #fff;
+}
+
+.launcher-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.launcher-search__field {
+  flex: 1;
+  display: block;
+  position: relative;
+}
+
+.launcher-search__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.launcher-search input {
+  width: 100%;
+  border: 1px solid rgba(11, 31, 58, 0.1);
+  border-radius: 14px;
+  padding: 0.78rem 1rem;
+  font: inherit;
+  font-size: 0.95rem;
+  background: #f7f9fc;
+  color: var(--launcher-navy, #0b1f3a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.launcher-search input:focus-visible {
+  outline: 2px solid var(--launcher-accent, #3d7eff);
+  outline-offset: 2px;
+  background: #fff;
+}
+
+.launcher-search__clear {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: #5a6b82;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+}
+
+.launcher-search__clear:hover {
+  background: rgba(11, 31, 58, 0.05);
+  color: var(--launcher-navy, #0b1f3a);
+}
+
+.launcher-search__clear:focus-visible {
+  outline: 2px solid var(--launcher-accent, #3d7eff);
+  outline-offset: 2px;
+}
+
+.app-launcher-panel__scroll {
+  overflow: auto;
+  padding: 0.75rem 1.25rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  background: #fff;
+}
+
+.app-launcher-panel__error {
+  margin: 0.65rem 1.25rem 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, #b42318 10%, transparent);
+  color: #b42318;
+  font-size: 0.88rem;
+}
+
+.app-launcher-panel__empty {
+  margin: 0;
+  padding: 1rem;
+  color: #5a6b82;
+  font-size: 0.92rem;
+}
+
+.app-launcher-section__title {
+  margin: 0 0 0.65rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5a6b82;
+}
+
+/* Continuer */
+.launcher-continue {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 35%, rgba(11, 31, 58, 0.08));
+  border-radius: 16px;
+  padding: 0.95rem 1.1rem;
+  background:
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 10%, #fff),
+      #fff 55%
+    );
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(11, 31, 58, 0.06);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.launcher-continue:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(11, 31, 58, 0.1);
+}
+
+.launcher-continue:focus-visible {
+  outline: 2px solid var(--launcher-card-accent, #3d7eff);
+  outline-offset: 2px;
+}
+
+.launcher-continue:disabled,
+.launcher-continue--disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.launcher-continue__eyebrow {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--launcher-card-accent, #3d7eff);
+}
+
+.launcher-continue__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.launcher-continue__title {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--launcher-navy, #0b1f3a);
+}
+
+.launcher-continue__desc {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+  color: #5a6b82;
+  line-height: 1.35;
+}
+
+.launcher-continue__cta {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--launcher-card-accent, #3d7eff);
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 12%, transparent);
+}
+
+/* Product grid / cards */
+.launcher-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.launcher-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+  width: 100%;
+  height: 100%;
+  min-height: 168px;
+  text-align: left;
+  border: 1px solid rgba(11, 31, 58, 0.08);
+  border-radius: 18px;
+  background: #fff;
+  padding: 1.05rem 1.1rem 0.95rem;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(11, 31, 58, 0.045);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+  animation: app-launcher-card-in 200ms ease both;
+}
+
+.launcher-card:hover:not(.launcher-card--disabled) {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 40%, rgba(11, 31, 58, 0.08));
+  box-shadow:
+    0 18px 40px rgba(11, 31, 58, 0.1),
+    0 0 0 1px color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 18%, transparent);
+}
+
+.launcher-card:focus-visible {
+  outline: 2px solid var(--launcher-card-accent, #3d7eff);
+  outline-offset: 2px;
+}
+
+.launcher-card--active {
+  border-color: color-mix(in srgb, var(--launcher-card-accent, #0b3d2e) 45%, rgba(11, 31, 58, 0.08));
+  box-shadow: inset 3px 0 0 var(--launcher-card-accent, #0b3d2e);
+}
+
+.launcher-card--disabled,
+.launcher-card--soon {
+  cursor: default;
+  opacity: 0.88;
+  background: #f7f9fc;
+}
+
+.launcher-card--soon:hover {
+  transform: none;
+  box-shadow: 0 10px 28px rgba(11, 31, 58, 0.045);
+}
+
+.launcher-grid > li:nth-child(2) .launcher-card {
+  animation-delay: 40ms;
+}
+.launcher-grid > li:nth-child(3) .launcher-card {
+  animation-delay: 80ms;
+}
+.launcher-grid > li:nth-child(4) .launcher-card {
+  animation-delay: 120ms;
+}
+
+.launcher-card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.launcher-card__identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.launcher-card__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.launcher-card__title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--launcher-navy, #0b1f3a);
+}
+
+.launcher-card__by {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #7a8aa0;
+}
+
+.launcher-card__engine {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #7a8aa0;
+}
+
+.launcher-card__mark,
+.launcher-continue__mark {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.launcher-continue__mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+}
+
+.launcher-card__shortcut {
+  color: inherit;
+  text-decoration: none;
+}
+
+.launcher-card__shortcut:hover {
+  text-decoration: underline;
+}
+
+.launcher-card__category {
+  font-size: 0.75rem;
+  color: #5a6b82;
+}
+
+.launcher-card__badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 14%, transparent);
+  color: var(--launcher-card-accent, #3d7eff);
+}
+
+.launcher-card__badge--coming_soon,
+.launcher-card__badge--locked,
+.launcher-card__badge--unavailable {
+  background: rgba(11, 31, 58, 0.07);
+  color: #5a6b82;
+}
+
+.launcher-card__badge--last {
+  background: rgba(11, 31, 58, 0.06);
+  color: #3d4f66;
+}
+
+.launcher-card__desc,
+.launcher-card__reason {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: #5a6b82;
+}
+
+.launcher-card__caps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.launcher-card__caps li {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.22rem 0.5rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 10%, #f4f7fb);
+  color: color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 70%, #0b1f3a);
+}
+
+.launcher-card__action {
+  margin-top: auto;
+  align-self: flex-start;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--launcher-card-accent, #3d7eff);
+}
+
+.launcher-card__action--muted {
+  color: #7a8aa0;
+  font-weight: 600;
+}
+
+/* Chips */
+.app-launcher-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.app-launcher-chip {
+  display: inline-block;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(11, 31, 58, 0.1);
+  font-size: 0.78rem;
+  color: #5a6b82;
+  background: #f7f9fc;
+}
+
+/* Footer */
+.launcher-footer {
+  padding: 0.75rem 1.15rem 1rem;
+  border-top: 1px solid rgba(11, 31, 58, 0.07);
+  background: #f7f9fc;
+}
+
+.launcher-footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.15rem;
+}
+
+.launcher-footer__link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--launcher-navy, #0b1f3a);
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.launcher-footer__link:hover {
+  background: #fff;
+  border-color: rgba(11, 31, 58, 0.08);
+}
+
+.launcher-footer__link:focus-visible {
+  outline: 2px solid var(--launcher-accent, #3d7eff);
+  outline-offset: 2px;
+}
+
+/* Mark */
+.app-launcher-mark {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--launcher-mark-accent, #3d7eff) 16%, transparent);
+  color: var(--launcher-mark-accent, #3d7eff);
+  font-weight: 800;
+}
+
+.app-launcher-mark--sm {
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.85rem;
+}
+.app-launcher-mark--md {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+}
+.app-launcher-mark--lg {
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.15rem;
+}
+
+.app-launcher-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.app-launcher-mark__fallback {
+  line-height: 1;
+}
+
+/* Header mark on navy */
+.launcher-header .app-launcher-mark {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+@keyframes app-launcher-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes app-launcher-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes app-launcher-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-launcher-dialog,
+  .ds-overlay-backdrop:has(.app-launcher-dialog),
+  .launcher-card {
+    animation: none;
+  }
+
+  .launcher-card,
+  .launcher-continue,
+  .app-launcher-trigger {
+    transition: none;
+  }
+}
+
+/* Tablet */
+@media (max-width: 1100px) {
+  .app-launcher-dialog {
+    min-width: 0;
+    width: min(100%, 96vw) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .launcher-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .launcher-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .launcher-header {
+    padding: 1rem 3rem 0.9rem 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .launcher-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #fff;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(11, 31, 58, 0.06);
+  }
+
+  .app-launcher-panel--embedded .launcher-header .app-launcher-mark {
+    display: none;
+  }
+
+  .launcher-footer {
+    position: sticky;
+    bottom: 0;
+  }
+}

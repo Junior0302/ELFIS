@@ -37,6 +37,20 @@ class AuthContext:
                 },
             )
 
+    def require_any(self, permissions: list[str]) -> None:
+        if self.user is None:
+            raise HTTPException(401, detail="Authentification requise")
+        if any(user_has_permission(self.permissions, p) for p in permissions):
+            return
+        raise HTTPException(
+            403,
+            detail={
+                "code": "permission_denied",
+                "message": "Permission refusée",
+                "permission": permissions[0] if permissions else None,
+            },
+        )
+
     def require_organization_id(self) -> int:
         if self.organization_id is None:
             raise HTTPException(
@@ -47,6 +61,10 @@ class AuthContext:
                 },
             )
         return self.organization_id
+
+    @property
+    def user_id(self) -> int | None:
+        return self.user.id if self.user is not None else None
 
 
 def get_auth_context(
@@ -106,7 +124,8 @@ def require_active_subscription(
     db: Session = Depends(get_db),
 ) -> AuthContext:
     organization_id = auth.require_organization_id()
-    if not db.get(Organization, organization_id):
+    org = db.get(Organization, organization_id)
+    if not org:
         raise HTTPException(
             403,
             detail={"code": "organization_not_found", "message": "Organisation introuvable"},
@@ -121,6 +140,16 @@ def require_active_subscription(
             db.commit()
             db.refresh(auth.user)
         return auth
+
+    platform_status = getattr(org, "platform_status", None) or "active"
+    if platform_status == "suspended" and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
+        raise HTTPException(
+            403,
+            detail={
+                "code": "organization_suspended",
+                "message": "Organisation suspendue par la plateforme. Consultation seule autorisée.",
+            },
+        )
 
     from app.subscriptions.access import get_subscription_access
     from app.subscriptions.permissions import subscription_error
@@ -189,3 +218,59 @@ def require_platform_admin(
         db.commit()
         db.refresh(user)
     return user
+
+
+DEVELOPER_COCKPIT_PERMISSIONS = frozenset(
+    {
+        "platform.developer",
+        "platform.engineer",
+        "platform.sre",
+        "platform.cto",
+        "platform.admin",
+    }
+)
+
+
+def require_developer_cockpit(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> User:
+    """Accès Cockpit Développeur : platform admin (flag) OU permission technique explicite.
+
+    Les permissions developer/engineer/sre/cto ne sont PAS auto-attribuées
+    via PLATFORM_ADMIN_PERMISSIONS.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(401, detail="Authentification requise")
+    payload = decode_token(authorization.split(" ", 1)[1].strip())
+    if not payload or "sub" not in payload:
+        raise HTTPException(401, detail="Token invalide")
+    user = db.get(User, int(payload["sub"]))
+    if not user or user.status != "active":
+        raise HTTPException(401, detail="Utilisateur inactif")
+
+    if _is_platform_admin_user(user):
+        if not user.is_platform_admin:
+            user.is_platform_admin = True
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+
+    try:
+        from app.iam.permission_resolver import PermissionResolver
+
+        ctx = PermissionResolver().resolve(user=user, db=db, is_platform_admin=False)
+        codes = set(ctx.permissions or [])
+        if codes & DEVELOPER_COCKPIT_PERMISSIONS:
+            return user
+    except Exception:  # noqa: BLE001
+        pass
+
+    raise HTTPException(
+        403,
+        detail={
+            "code": "developer_cockpit_forbidden",
+            "message": "Accès Cockpit Développeur requis (platform.admin ou platform.developer|engineer|sre|cto)",
+        },
+    )

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, downloadApiFile, formatEuro, type Invoice } from '../api'
 import StatusBadge from '../components/StatusBadge'
+import { ConfirmDialog } from '../design-system'
 import { useAuth } from '../auth'
 
 export default function HistoryPage() {
@@ -12,6 +13,8 @@ export default function HistoryPage() {
   const [reviewOnly, setReviewOnly] = useState(false)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<number | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const load = () => {
     if (!token) return
@@ -30,17 +33,24 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, orgId])
 
-  const onDelete = async (id: number) => {
-    if (!window.confirm('Supprimer ce document ?')) return
-    setBusyId(id)
+  const onDelete = (id: number) => {
+    setDeleteTargetId(id)
+  }
+
+  const confirmDelete = async () => {
+    if (deleteTargetId == null) return
+    setBusyId(deleteTargetId)
+    setDeleteLoading(true)
     try {
       if (!token) throw new Error('Authentification requise')
-      await api.deleteDocument(id, token, orgId)
-      setItems((prev) => prev.filter((item) => item.id !== id))
+      await api.deleteDocument(deleteTargetId, token, orgId)
+      setItems((prev) => prev.filter((item) => item.id !== deleteTargetId))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Suppression impossible')
+      throw e
     } finally {
       setBusyId(null)
+      setDeleteLoading(false)
     }
   }
 
@@ -149,7 +159,7 @@ export default function HistoryPage() {
                     className="btn secondary"
                     type="button"
                     disabled={busyId === inv.id}
-                    onClick={() => void onDelete(inv.id)}
+                    onClick={() => onDelete(inv.id)}
                   >
                     Supprimer
                   </button>
@@ -159,6 +169,21 @@ export default function HistoryPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={deleteTargetId != null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null)
+        }}
+        title="Supprimer ce document ?"
+        description="Le document sera retiré de l’historique comptable affiché."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        tone="danger"
+        irreversible
+        loading={deleteLoading}
+        onConfirm={confirmDelete}
+      />
     </>
   )
 }

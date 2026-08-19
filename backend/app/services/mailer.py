@@ -129,13 +129,58 @@ def email_configured() -> bool:
 
 
 def email_transport() -> str:
-    # SMTP prioritaire si configuré (souvent OK même quand la clé API est refusée).
-    # API Brevo en secours / si SMTP absent.
-    if _smtp_ready():
-        return "smtp"
+    # API Brevo prioritaire quand BREVO_API_KEY (xkeysib-) + PLATFORM_EMAIL_FROM sont prêts.
+    # SMTP en secours (ou seul canal si la clé API est absente / inutilisable).
     if _brevo_api_key_usable():
         return "brevo"
+    if _smtp_ready():
+        return "smtp"
     return "none"
+
+
+def mailer_reason_code() -> str:
+    """Code machine stable pour UI / health (jamais de secret)."""
+    from_email = settings.effective_platform_from
+    if not from_email:
+        return "sender_not_configured"
+    smtp_host = settings.smtp_host.strip()
+    smtp_user = settings.smtp_user.strip()
+    smtp_password = settings.smtp_password.strip()
+    key = _brevo_api_key()
+    if smtp_host or smtp_user or smtp_password:
+        missing_smtp = not (smtp_host and smtp_user and smtp_password)
+        if missing_smtp and not _brevo_api_key_usable():
+            return "missing_smtp_credentials"
+    if key:
+        if key.lower().startswith("xsmtpsib-"):
+            return "missing_api_key"
+        if not (key.startswith("xkeysib-") and len(key) > 40):
+            return "missing_api_key"
+    if email_configured():
+        return "ok"
+    if not key and not (smtp_host and smtp_user and smtp_password):
+        return "provider_not_configured"
+    return "provider_not_configured"
+
+
+def mailer_diagnostic() -> dict:
+    """Diagnostic admin/dev sécurisé — pas de secrets en clair."""
+    transport = email_transport()
+    provider = {
+        "smtp": "smtp",
+        "brevo": "brevo_api",
+        "none": "disabled",
+    }.get(transport, "disabled")
+    reason = mailer_reason_code()
+    configured = email_configured()
+    return {
+        "mailer_enabled": configured,
+        "provider": provider,
+        "configuration_valid": configured and reason == "ok",
+        "sender_configured": bool(settings.effective_platform_from),
+        "provider_reachable": None,
+        "reason_code": reason if not configured else "ok",
+    }
 
 
 def email_status_public() -> dict:
@@ -148,6 +193,7 @@ def email_status_public() -> dict:
         key_prefix = key[:10]
         key_suffix = key[-4:] if len(key) > 4 else ""
     looks_smtp_key = key.lower().startswith("xsmtpsib-")
+    diagnostic = mailer_diagnostic()
     return {
         "configured": email_configured(),
         "transport": email_transport(),
@@ -165,6 +211,7 @@ def email_status_public() -> dict:
         "has_platform_from": bool(from_email),
         "platform_from": from_email,
         "platform_from_name": settings.effective_platform_from_name,
+        **diagnostic,
     }
 
 
@@ -178,6 +225,8 @@ def probe_brevo_account() -> dict:
                 **status,
                 "brevo_ok": True,
                 "brevo_error": "",
+                "provider_reachable": True,
+                "reason_code": "ok",
                 "hint": (
                     "Auth SMTP Brevo validée "
                     f"({settings.smtp_host.strip()} → {status['platform_from']})."
@@ -187,21 +236,28 @@ def probe_brevo_account() -> dict:
         status = {
             **status,
             "smtp_probe_error": error,
+            "provider_reachable": False,
+            "reason_code": "authentication_failed",
         }
     key = _brevo_api_key()
     if not key:
         return {
             **status,
             "brevo_ok": False,
+            "provider_reachable": False,
+            "reason_code": status.get("reason_code") or "provider_not_configured",
             "brevo_error": (
-                "Ni SMTP ni clé API. Sur Render ajoutez SMTP_HOST / SMTP_USER / "
-                "SMTP_PASSWORD (clé SMTP Brevo) ou BREVO_API_KEY."
+                "Ni SMTP ni clé API. Sur le serveur (Render / backend .env) ajoutez "
+                "SMTP_HOST / SMTP_USER / SMTP_PASSWORD (clé SMTP Brevo xsmtpsib-…) "
+                "ou BREVO_API_KEY (xkeysib-…)."
             ),
         }
     if key.lower().startswith("xsmtpsib-"):
         return {
             **status,
             "brevo_ok": False,
+            "provider_reachable": False,
+            "reason_code": "missing_api_key",
             "brevo_error": "BREVO_API_KEY contient une clé SMTP (xsmtpsib-).",
             "hint": (
                 "Dans Brevo → SMTP & API → Clés API, créez une clé API (xkeysib-…) "
@@ -218,7 +274,13 @@ def probe_brevo_account() -> dict:
             timeout=20.0,
         )
     except Exception as exc:  # noqa: BLE001
-        return {**status, "brevo_ok": False, "brevo_error": f"Réseau Brevo: {exc}"}
+        return {
+            **status,
+            "brevo_ok": False,
+            "provider_reachable": False,
+            "reason_code": "provider_unreachable",
+            "brevo_error": f"Réseau Brevo: {exc}",
+        }
 
     if response.status_code >= 400:
         detail = ""
@@ -227,14 +289,17 @@ def probe_brevo_account() -> dict:
             detail = str(data.get("message") or data.get("code") or response.text[:200])
         except Exception:  # noqa: BLE001
             detail = (response.text or "")[:200]
+        reason = "authentication_failed" if response.status_code in (401, 403) else "provider_unreachable"
         return {
             **status,
             "brevo_ok": False,
             "brevo_http": response.status_code,
+            "provider_reachable": False,
+            "reason_code": reason,
             "brevo_error": detail or f"HTTP {response.status_code}",
             "hint": (
                 "Regénérez une clé API dans Brevo (SMTP & API → API Keys), "
-                "collez-la dans Render BREVO_API_KEY sans guillemets, puis Manual Deploy."
+                "collez-la dans BREVO_API_KEY sans guillemets, puis redémarrez le backend."
             ),
         }
 
@@ -249,7 +314,9 @@ def probe_brevo_account() -> dict:
         "brevo_ok": True,
         "brevo_http": response.status_code,
         "brevo_account_email": email,
-        "hint": "Clé Brevo acceptée. Si l’envoi échoue encore, validez contact@ comme expéditeur.",
+        "provider_reachable": True,
+        "reason_code": "ok",
+        "hint": "Clé Brevo acceptée. Si l’envoi échoue encore, validez l’expéditeur PLATFORM_EMAIL_FROM.",
     }
 
 
@@ -272,9 +339,11 @@ def send_email(
     if not recipient:
         raise RuntimeError("Adresse e-mail destinataire manquante")
     if not email_configured():
+        reason = mailer_reason_code()
         raise RuntimeError(
-            "Le service d’envoi est temporairement indisponible. "
-            "Contactez le support ComptaPilot."
+            f"provider_not_configured:{reason}: "
+            "Le service d’envoi plateforme n’est pas configuré "
+            "(SMTP_* ou BREVO_API_KEY + PLATFORM_EMAIL_FROM sur le serveur)."
         )
 
     from_email = (sender_email or settings.effective_platform_from).strip()
@@ -318,18 +387,18 @@ def send_email(
             sender_name=from_name,
         )
 
-    # SMTP d’abord (souvent OK même si la clé API est refusée), puis API en secours.
+    # API Brevo d’abord si clé utilisable ; SMTP uniquement en secours.
     errors: list[str] = []
-    if _smtp_ready():
-        try:
-            return _via_smtp()
-        except RuntimeError as smtp_exc:
-            errors.append(str(smtp_exc))
     if _brevo_api_key_usable():
         try:
             return _via_brevo()
         except RuntimeError as api_exc:
             errors.append(str(api_exc))
+    if _smtp_ready():
+        try:
+            return _via_smtp()
+        except RuntimeError as smtp_exc:
+            errors.append(str(smtp_exc))
     if errors:
         raise RuntimeError(" | ".join(errors[:2]))
     raise RuntimeError(

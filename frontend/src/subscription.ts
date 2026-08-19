@@ -135,6 +135,77 @@ export function hasProductAccess(subscription: SubscriptionInfo | null | undefin
   return false
 }
 
+/**
+ * Statut commercial dérivé de SubscriptionInfo (Billing / EntitlementEngine).
+ * Ne pas déduire depuis un message d’erreur HTTP.
+ */
+export type CommercialStatus =
+  | 'none'
+  | 'trial_available'
+  | 'trialing'
+  | 'active'
+  | 'grace'
+  | 'expired'
+  | 'suspended'
+  | 'checkout_pending'
+  | 'blocked'
+
+export function resolveCommercialStatus(
+  subscription: SubscriptionInfo | null | undefined,
+): CommercialStatus {
+  if (!subscription) return 'none'
+  if (subscription.platform_bypass) return 'active'
+  switch (subscription.status) {
+    case 'trialing':
+      return 'trialing'
+    case 'active':
+    case 'cancel_scheduled':
+      return 'active'
+    case 'past_due':
+      return 'grace'
+    case 'expired':
+    case 'incomplete_expired':
+      return 'expired'
+    case 'admin_revoked':
+    case 'paused':
+      return 'suspended'
+    case 'checkout_pending':
+    case 'incomplete':
+      return 'checkout_pending'
+    case 'none':
+      return subscription.trial_used ? 'none' : 'trial_available'
+    case 'canceled':
+    case 'unpaid':
+      return subscription.access_granted ? 'active' : 'blocked'
+    default:
+      return hasProductAccess(subscription) ? 'active' : 'blocked'
+  }
+}
+
+/** Accès aux APIs financières protégées (Financial Engine, etc.). */
+export function hasFinancialEntitlement(
+  subscription: SubscriptionInfo | null | undefined,
+  opts?: { isPlatformAdmin?: boolean },
+): boolean {
+  if (opts?.isPlatformAdmin) return true
+  return hasProductAccess(subscription)
+}
+
+/**
+ * Mode onboarding essai : nav verrouillée + surface Accueil premium.
+ * Statuts : aucun abo / essai non activé / checkout incomplet.
+ * Exclu : essai actif, abo, grâce (si access), admin exempté.
+ */
+export function isTrialOnboardingMode(
+  subscription: SubscriptionInfo | null | undefined,
+  opts?: { isPlatformAdmin?: boolean },
+): boolean {
+  if (opts?.isPlatformAdmin) return false
+  if (hasFinancialEntitlement(subscription, opts)) return false
+  const status = resolveCommercialStatus(subscription)
+  return status === 'none' || status === 'trial_available' || status === 'checkout_pending'
+}
+
 export function statusMessage(subscription: SubscriptionInfo): string {
   if (subscription.label) return subscription.label
   return subscriptionLabels[subscription.status] || subscription.status

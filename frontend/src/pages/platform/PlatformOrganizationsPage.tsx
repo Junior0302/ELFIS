@@ -50,9 +50,14 @@ export default function PlatformOrganizationsPage() {
             <article key={item.id} className="platform-request-card">
               <header className="platform-request-head">
                 <div>
-                  <h2>{item.legal_name || item.name}</h2>
+                  <h2>
+                    <Link to={`/elfadmin/organisations/${item.id}`}>
+                      {item.legal_name || item.name}
+                    </Link>
+                  </h2>
                   <p>
-                    #{item.id} · {item.country || '—'}
+                    #{item.id} · {item.country || '—'} · plateforme:{' '}
+                    {item.platform_status || 'active'}
                   </p>
                 </div>
                 <span className={pillClass(item.subscription.status)}>

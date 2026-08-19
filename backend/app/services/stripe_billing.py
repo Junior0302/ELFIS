@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
-import stripe
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,6 +12,12 @@ from app.config import settings
 from app.models_saas import Organization, Subscription
 
 logger = logging.getLogger(__name__)
+
+try:
+    import stripe
+except ImportError:  # pragma: no cover — environnement sans package stripe
+    stripe = None  # type: ignore
+
 
 STRIPE_SUBSCRIPTION_STATUSES = {
     "incomplete",
@@ -29,6 +34,14 @@ ACCESS_STATUSES = {"active", "trialing"}
 
 
 def _require_stripe(*, webhook: bool = False) -> None:
+    if stripe is None:
+        raise HTTPException(
+            503,
+            detail={
+                "code": "stripe_not_configured",
+                "message": "Paiement sécurisé indisponible pour le moment",
+            },
+        )
     missing = []
     if not settings.stripe_secret_key:
         missing.append("STRIPE_SECRET_KEY")
@@ -954,7 +967,18 @@ def apply_webhook_event(db: Session, event: dict[str, Any]) -> None:
                 suffix=f"invoice:{obj.get('id')}",
                 template_kwargs={
                     "grace_until": (
-                        (row.past_due_since.isoformat() if row.past_due_since else None)
+                        (
+                            row.past_due_since
+                            + timedelta(
+                                days=int(
+                                    getattr(settings, "elfis_billing_past_due_grace_days", None)
+                                    or getattr(settings, "stripe_past_due_grace_days", None)
+                                    or 7
+                                )
+                            )
+                        ).isoformat()
+                        if row.past_due_since
+                        else None
                     )
                 },
             )

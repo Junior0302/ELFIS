@@ -1,0 +1,107 @@
+/* SalesPilot Dashboard V1 — layout only (tokens via Design System) */
+
+.sales-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6, 1.5rem);
+}
+
+.sales-dashboard.up-sales-dash--unified {
+  padding-block: 0;
+}
+
+.sales-dashboard__metric-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  height: 100%;
+}
+
+.sales-dashboard__metric-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pilot-focus, var(--mint)) 45%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md, 12px);
+}
+
+.sales-dashboard__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5, 1.25rem);
+  align-items: start;
+}
+
+.sales-dash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.sales-dash-list__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--line, #e2e8f0);
+  text-decoration: none;
+  color: inherit;
+  background: color-mix(in srgb, var(--pilot-surface, #fff) 92%, transparent);
+}
+
+.sales-dash-list__link:hover {
+  border-color: color-mix(in srgb, var(--pilot-accent, var(--mint)) 35%, var(--line, #e2e8f0));
+}
+
+.sales-dash-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.sales-dash-pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.sales-dash-pipeline__stage {
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--line, #e2e8f0);
+}
+
+.sales-dash-pipeline__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sales-dash-buckets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.sales-dash-buckets__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.sales-dashboard__generated {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 900px) {
+  .sales-dashboard__columns {
+    grid-template-columns: 1fr;
+  }
+}

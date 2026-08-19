@@ -82,6 +82,7 @@ class OrganizationUpdateIn(BaseModel):
     currency: str | None = None
     primary_color: str | None = None
     secondary_color: str | None = None
+    documents_show_logo: bool | None = None
 
 
 def _org_public(org: Organization) -> dict:
@@ -108,6 +109,7 @@ def _org_public(org: Organization) -> dict:
         "logo": org.logo or "",
         "primary_color": getattr(org, "primary_color", None) or "#0B3D2E",
         "secondary_color": getattr(org, "secondary_color", None) or "#E7F2EC",
+        "documents_show_logo": getattr(org, "documents_show_logo", None),
         "subscription_plan": org.subscription_plan,
     }
 

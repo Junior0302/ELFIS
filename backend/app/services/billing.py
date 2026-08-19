@@ -36,6 +36,12 @@ def create_sales_document(
     lines: list[dict] | None = None,
     notes: str = "",
     due_days: int = 30,
+    commit: bool = True,
+    source_type: str | None = None,
+    source_id: str | None = None,
+    source_version_id: str | None = None,
+    source_number: str | None = None,
+    branding: dict | None = None,
 ) -> SalesDocument:
     email = (customer_email or "").strip()
     if customer_id and not email:
@@ -46,6 +52,17 @@ def create_sales_document(
     ttc = round(amount_ht + tva, 2)
     today = datetime.utcnow().date()
     due = today + timedelta(days=due_days)
+    from app.services.document_branding import dump_document_branding, parse_document_branding
+
+    branding_parsed = parse_document_branding(branding)
+    show_logo = branding_parsed.get("showLogo")
+    if show_logo is None:
+        branding_json = "{}"
+    else:
+        branding_json = dump_document_branding(
+            show_logo=bool(show_logo),
+            template=str(branding_parsed.get("template") or "premium_v1"),
+        )
     doc = SalesDocument(
         organization_id=organization_id,
         customer_id=customer_id,
@@ -62,10 +79,17 @@ def create_sales_document(
         vat_rate=vat_rate,
         lines_json=json.dumps(lines or [], ensure_ascii=False),
         notes=notes,
+        branding_json=branding_json,
+        source_type=source_type,
+        source_id=source_id,
+        source_version_id=source_version_id,
+        source_number=source_number,
     )
     db.add(doc)
-    db.commit()
-    db.refresh(doc)
+    db.flush()
+    if commit:
+        db.commit()
+        db.refresh(doc)
     return doc
 
 
@@ -81,6 +105,7 @@ def update_sales_document(
     notes: str | None = None,
     lines: list[dict] | None = None,
     due_days: int | None = None,
+    branding: dict | None = None,
 ) -> SalesDocument:
     if customer_name is not None:
         doc.customer_name = customer_name.strip()
@@ -106,6 +131,15 @@ def update_sales_document(
     if due_days is not None:
         today = datetime.utcnow().date()
         doc.due_date = (today + timedelta(days=due_days)).strftime("%d-%m-%Y")
+    if branding is not None:
+        from app.services.document_branding import dump_document_branding, parse_document_branding
+
+        parsed = parse_document_branding(branding)
+        if "showLogo" in parsed:
+            doc.branding_json = dump_document_branding(
+                show_logo=bool(parsed["showLogo"]),
+                template=str(parsed.get("template") or "premium_v1"),
+            )
     doc.updated_at = datetime.utcnow()
     db.add(doc)
     db.commit()
@@ -145,6 +179,7 @@ def convert_quote_to_invoice(db: Session, quote: SalesDocument) -> SalesDocument
         customer_email=quote.customer_email,
         lines=json.loads(quote.lines_json or "[]"),
         notes=f"Converti depuis {quote.number}",
+        branding=json.loads(getattr(quote, "branding_json", None) or "{}") or None,
     )
     invoice.converted_from_id = quote.id
     invoice.status = "sent"
@@ -185,12 +220,14 @@ def register_payment(
     amount: float,
     method: str = "virement",
     reference: str = "",
+    paid_at: str | None = None,
 ) -> Payment:
+    paid_label = (paid_at or "").strip() or datetime.utcnow().strftime("%d-%m-%Y")
     payment = Payment(
         sales_document_id=doc.id,
         amount=amount,
         method=method,
-        paid_at=datetime.utcnow().strftime("%d-%m-%Y"),
+        paid_at=paid_label,
         reference=reference,
     )
     doc.paid_amount = round((doc.paid_amount or 0) + amount, 2)

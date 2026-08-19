@@ -1,0 +1,123 @@
+/**
+ * Styles Smart Search / Universal Pickers — tokens Pilot.
+ */
+
+.ps-search {
+  --ps-search-accent: var(--pilot-accent, #3d7eff);
+  --ps-search-border: var(--pilot-border, rgba(15, 23, 42, 0.12));
+  --ps-search-bg: var(--pilot-surface, #fff);
+  --ps-search-muted: var(--pilot-muted, #64748b);
+  --ps-search-focus: var(--pilot-focus, #3d7eff);
+  position: relative;
+  width: 100%;
+}
+
+.ps-search__input-wrap {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ps-search__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--ps-search-border);
+  border-radius: 8px;
+  background: var(--ps-search-bg);
+  font: inherit;
+}
+
+.ps-search__input:focus {
+  outline: 2px solid var(--ps-search-focus);
+  outline-offset: 1px;
+}
+
+.ps-search__panel {
+  margin-top: 0.4rem;
+  border: 1px solid var(--ps-search-border);
+  border-radius: 10px;
+  background: var(--ps-search-bg);
+  max-height: 320px;
+  overflow: auto;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.ps-search__group-label {
+  padding: 0.45rem 0.75rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ps-search-muted);
+}
+
+.ps-search__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.ps-search__item:hover,
+.ps-search__item[aria-selected='true'] {
+  background: color-mix(in srgb, var(--ps-search-accent) 12%, transparent);
+}
+
+.ps-search__item-title {
+  font-weight: 600;
+}
+
+.ps-search__item-sub {
+  font-size: 0.85rem;
+  color: var(--ps-search-muted);
+}
+
+.ps-search__status {
+  padding: 0.75rem;
+  color: var(--ps-search-muted);
+  font-size: 0.9rem;
+}
+
+.ps-search__status--error {
+  color: var(--pilot-danger, #b42318);
+}
+
+.ps-picker {
+  width: 100%;
+}
+
+.ps-picker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.ps-picker__selected {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--ps-search-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ps-search-accent) 6%, transparent);
+}
+
+.ps-picker__selected strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.ps-picker__meta {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--ps-search-muted);
+  font-size: 0.85rem;
+}

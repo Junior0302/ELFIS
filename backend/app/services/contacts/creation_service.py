@@ -44,6 +44,73 @@ def serialize_contact(contact: Contact) -> dict:
     }
 
 
+def create_manual_contact(
+    db: Session,
+    *,
+    organization_id: int,
+    user_id: int | None,
+    contact_type: str,
+    confirmed_data: dict,
+) -> Contact:
+    """Création manuelle (CRUD fournisseurs / contacts hors document)."""
+    data = validate_optional_identifiers(confirmed_data)
+    require_minimal_identity(data)
+    ctype = (contact_type or "supplier").strip()
+    if ctype not in {"customer", "supplier", "prospect", "customer_and_supplier"}:
+        raise InvalidContactDataError("Type de contact invalide")
+
+    duplicates = find_duplicates(db, organization_id=organization_id, extracted=data)
+    hard = [
+        d
+        for d in duplicates
+        if d["match_score"] >= 95 and d["match_type"] in {"siret", "vat_number", "siren"}
+    ]
+    if hard:
+        raise DuplicateContactError(
+            f"Contact déjà existant : {hard[0]['company_name']} (id {hard[0]['contact_id']})"
+        )
+
+    contact = Contact(
+        organization_id=organization_id,
+        user_id=user_id,
+        contact_type=ctype,
+        status="active",
+        company_name=data.get("company_name") or "",
+        trade_name=data.get("trade_name") or "",
+        first_name=data.get("first_name") or "",
+        last_name=data.get("last_name") or "",
+        siren=data.get("siren") or "",
+        siret=data.get("siret") or "",
+        vat_number=data.get("vat_number") or "",
+        email=data.get("email") or "",
+        phone=data.get("phone") or "",
+        address_line_1=data.get("address_line_1") or "",
+        address_line_2=data.get("address_line_2") or "",
+        postal_code=data.get("postal_code") or "",
+        city=data.get("city") or "",
+        country=data.get("country") or "France",
+        iban=data.get("iban") or "",
+        bic=data.get("bic") or "",
+        payment_terms=data.get("payment_terms") or "",
+        payment_method=data.get("payment_method") or "",
+        source="manual",
+        source_document_id=None,
+        extraction_confidence=None,
+        created_by=user_id,
+    )
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    write_audit(
+        db,
+        user_id=user_id,
+        organization_id=organization_id,
+        action=f"contact_created_manual:{contact.id}:{ctype}",
+        module="contacts",
+    )
+    return contact
+
+
 def create_contact_from_document(
     db: Session,
     *,

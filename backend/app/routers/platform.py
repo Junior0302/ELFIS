@@ -27,11 +27,21 @@ def platform_email_status():
     return {
         **probed,
         "notify_to": ADMIN_NOTIFY_TO,
+        "mailer_enabled": probed.get("mailer_enabled"),
+        "provider": probed.get("provider"),
+        "configuration_valid": probed.get("configuration_valid"),
+        "sender_configured": probed.get("sender_configured"),
+        "provider_reachable": probed.get("provider_reachable"),
+        "reason_code": probed.get("reason_code"),
         "hint": probed.get("hint")
         or (
             "OK pour envoyer les demandes vers urequest@"
             if probed.get("brevo_ok")
-            else "Sur Render : BREVO_API_KEY (clé xkeysib-…) + PLATFORM_EMAIL_FROM=contact@elfis-core.com"
+            else (
+                "Sur le serveur : SMTP_HOST=smtp-relay.brevo.com + SMTP_USER + SMTP_PASSWORD "
+                "(xsmtpsib-…) OU BREVO_API_KEY (xkeysib-…) + PLATFORM_EMAIL_FROM. "
+                "Ne pas dupliquer SMTP_* vides dans .env. Redémarrer uvicorn après modification."
+            )
         ),
     }
 
@@ -56,8 +66,14 @@ def platform_overview(db: Session = Depends(get_db)):
         .group_by(Subscription.status)
         .all()
     )
+    suspended = (
+        db.query(Organization)
+        .filter(Organization.platform_status == "suspended")
+        .count()
+    )
     return {
         "organizations": db.query(Organization).count(),
+        "organizations_suspended": suspended,
         "users": db.query(User).count(),
         "active_memberships": db.query(OrganizationMember)
         .filter(OrganizationMember.status == "active")
@@ -76,6 +92,7 @@ def platform_organizations(db: Session = Depends(get_db)):
                 "name": organization.name,
                 "legal_name": organization.legal_name,
                 "country": organization.country,
+                "platform_status": getattr(organization, "platform_status", None) or "active",
                 "created_at": organization.created_at,
                 "member_count": db.query(OrganizationMember)
                 .filter(OrganizationMember.organization_id == organization.id)
@@ -461,6 +478,7 @@ def platform_list_events(
 @router.get("/events/{event_id}")
 def platform_get_event(event_id: str, db: Session = Depends(get_db)):
     """Détail admin — payload filtré (sans secrets)."""
+    from app.events.event_context import sanitize_error_message
     from app.events.event_repository import EventRepository
     from app.events.event_schemas import FORBIDDEN_PAYLOAD_KEYS
 
@@ -471,7 +489,15 @@ def platform_get_event(event_id: str, db: Session = Depends(get_db)):
     def _filter(data: dict | None) -> dict:
         out = {}
         for key, value in (data or {}).items():
-            if str(key).lower() in FORBIDDEN_PAYLOAD_KEYS:
+            lk = str(key).lower()
+            if lk in FORBIDDEN_PAYLOAD_KEYS or any(
+                frag in lk for frag in ("password", "api_key", "secret", "token", "jwt")
+            ):
+                continue
+            if isinstance(value, str) and any(
+                frag in value.lower() for frag in ("sk_live", "sk_test", "xkeysib-", "xsmtpsib-")
+            ):
+                out[key] = "[REDACTED]"
                 continue
             out[key] = value
         return out
@@ -490,7 +516,7 @@ def platform_get_event(event_id: str, db: Session = Depends(get_db)):
         "available_at": row.available_at,
         "processed_at": row.processed_at,
         "failed_at": row.failed_at,
-        "last_error": row.last_error,
+        "last_error": sanitize_error_message(row.last_error) if row.last_error else None,
         "idempotency_key": row.idempotency_key,
         "correlation_id": row.correlation_id,
         "causation_id": row.causation_id,
@@ -973,4 +999,177 @@ def platform_document_analyses(
             }
             for r in rows
         ],
+    }
+
+# --- ELFIS Billing platform admin ---
+
+@router.get("/billing/overview")
+def platform_billing_overview(db: Session = Depends(get_db)):
+    """Cockpit finance V2 — MRR/ARR depuis Billing Engine (pas Stripe live)."""
+    from app.billing.billing_service import BillingService
+
+    return BillingService(db).platform_revenue_overview()
+
+
+@router.get("/billing/plans")
+def platform_billing_plans(db: Session = Depends(get_db)):
+    from app.billing.plan_registry import list_plans, plan_to_public_dict
+
+    return {
+        "plans": [plan_to_public_dict(p, include_stripe=True) for p in list_plans(public_only=False)]
+    }
+
+
+@router.get("/billing/subscriptions")
+def platform_billing_subscriptions(
+    status: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    from app.billing.billing_repository import BillingRepository
+
+    rows = BillingRepository(db).list_subscriptions(status=status, limit=limit, offset=offset)
+    return {
+        "subscriptions": [
+            {
+                "subscription_id": r.subscription_id,
+                "organization_id": r.organization_id,
+                "plan_id": r.plan_id,
+                "status": r.status,
+                "trial_ends_at": r.trial_ends_at,
+                "current_period_ends_at": r.current_period_ends_at,
+                "cancel_at_period_end": r.cancel_at_period_end,
+                "grace_period_ends_at": r.grace_period_ends_at,
+                "stripe_subscription_id": r.stripe_subscription_id,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/billing/subscriptions/{subscription_id}")
+def platform_billing_subscription_detail(subscription_id: str, db: Session = Depends(get_db)):
+    from app.billing.billing_repository import BillingRepository
+    from app.billing.billing_service import BillingService
+
+    row = BillingRepository(db).get_subscription_by_id(subscription_id)
+    if not row:
+        raise HTTPException(404, detail="Abonnement introuvable")
+    payload = BillingService(db).get_subscription(row.organization_id)
+    return {"subscription": payload}
+
+
+@router.post("/billing/subscriptions/{subscription_id}/suspend")
+def platform_billing_suspend(
+    subscription_id: str,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.billing.subscription_service import SubscriptionService
+
+    row = SubscriptionService(db).suspend(subscription_id, user_id=admin.id)
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=row.organization_id,
+        action=f"elfadmin.billing.suspend:{subscription_id}",
+        module="platform",
+    )
+    db.commit()
+    return {"ok": True, "status": row.status}
+
+
+@router.post("/billing/subscriptions/{subscription_id}/restore")
+def platform_billing_restore(
+    subscription_id: str,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.billing.subscription_service import SubscriptionService
+
+    row = SubscriptionService(db).restore(subscription_id, user_id=admin.id)
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=row.organization_id,
+        action=f"elfadmin.billing.restore:{subscription_id}",
+        module="platform",
+    )
+    db.commit()
+    return {"ok": True, "status": row.status}
+
+
+@router.post("/billing/organizations/{organization_id}/entitlements")
+def platform_set_entitlement(
+    organization_id: int,
+    payload: dict,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.billing.entitlement_service import EntitlementService
+
+    feature_code = str(payload.get("feature_code") or "").strip()
+    if not feature_code:
+        raise HTTPException(400, detail="feature_code requis")
+    is_enabled = bool(payload.get("is_enabled", True))
+    EntitlementService(db).set_override(organization_id, feature_code, is_enabled)
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=organization_id,
+        action=f"elfadmin.billing.entitlement.set:{feature_code}:{is_enabled}",
+        module="platform",
+    )
+    db.commit()
+    return {"ok": True, "feature_code": feature_code, "is_enabled": is_enabled}
+
+
+@router.delete("/billing/organizations/{organization_id}/entitlements/{feature_code}")
+def platform_delete_entitlement(
+    organization_id: int,
+    feature_code: str,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    from app.billing.entitlement_service import EntitlementService
+
+    ok = EntitlementService(db).remove_override(organization_id, feature_code)
+    write_audit(
+        db,
+        user_id=admin.id,
+        organization_id=organization_id,
+        action=f"elfadmin.billing.entitlement.remove:{feature_code}",
+        module="platform",
+    )
+    db.commit()
+    return {"ok": ok}
+
+
+@router.get("/billing/events")
+def platform_billing_events(
+    organization_id: int | None = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    from app.billing.billing_models import ElfisBillingEvent
+
+    q = db.query(ElfisBillingEvent).order_by(ElfisBillingEvent.received_at.desc())
+    if organization_id:
+        q = q.filter(ElfisBillingEvent.organization_id == organization_id)
+    rows = q.limit(limit).all()
+    return {
+        "events": [
+            {
+                "billing_event_id": r.billing_event_id,
+                "event_type": r.event_type,
+                "status": r.status,
+                "organization_id": r.organization_id,
+                "received_at": r.received_at,
+                "processed_at": r.processed_at,
+                "payload_summary": r.payload_summary,
+            }
+            for r in rows
+        ]
     }

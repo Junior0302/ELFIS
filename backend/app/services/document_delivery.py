@@ -31,6 +31,12 @@ from app.services.vault.vault_service import archive_or_reuse_pdf
 logger = logging.getLogger(__name__)
 
 
+def _trace_delivery_step(step: str, **extra: object) -> None:
+    """Trace ordonnée PDF → Vault → e-mail — jamais de secrets ni de contenu PDF."""
+    safe = {k: v for k, v in extra.items() if k not in {"pdf_bytes", "content", "password", "api_key"}}
+    logger.info("document_delivery_step:%s", step, extra={"delivery_step": step, **safe})
+
+
 def _parse_doc_date(value: str | None) -> date | None:
     raw = (value or "").strip()
     if not raw:
@@ -195,6 +201,17 @@ class DocumentDeliveryService:
         except VaultAccessDeniedError as exc:
             raise DocumentDeliveryError("forbidden", str(exc)) from exc
 
+        from app.billing.billing_exceptions import FeatureNotAvailableError, QuotaExceededError
+        from app.billing.billing_types import FeatureCodes, QuotaCodes
+        from app.billing.entitlement_service import EntitlementService
+        from app.billing.quota_service import QuotaService
+        from app.config import settings as _settings
+
+        try:
+            EntitlementService(self._db).require(organization_id, FeatureCodes.EMAIL_SEND)
+        except FeatureNotAvailableError as exc:
+            raise DocumentDeliveryError("feature_not_available", str(exc.message)) from exc
+
         doc = (
             self._db.query(SalesDocument)
             .filter(
@@ -208,10 +225,15 @@ class DocumentDeliveryService:
             raise DocumentDeliveryError("not_found", "Document introuvable")
 
         to_email = (recipient_email or doc.customer_email or "").strip()
-        if not to_email or not is_valid_email(to_email):
+        if not to_email:
             raise DocumentDeliveryError(
-                "missing_recipient",
+                "recipient_missing",
                 "Ajoutez une adresse e-mail au client avant l’envoi.",
+            )
+        if not is_valid_email(to_email):
+            raise DocumentDeliveryError(
+                "recipient_invalid",
+                "L’adresse e-mail du destinataire est invalide.",
             )
         if subject and len(subject) > 200:
             raise DocumentDeliveryError("invalid_subject", "Sujet trop long (max 200 caractères)")
@@ -264,6 +286,13 @@ class DocumentDeliveryService:
                 "Un envoi est déjà en cours pour ce document. Réessayez dans un instant.",
             )
 
+        # Quota après contrôle d'idempotence — évite double consommation sur déjà-envoyé.
+        try:
+            if getattr(_settings, "elfis_billing_enforce_quotas", False):
+                QuotaService(self._db).consume(organization_id, QuotaCodes.EMAILS_SENT_MONTH, 1)
+        except QuotaExceededError as exc:
+            raise DocumentDeliveryError("quota_exceeded", str(exc.message)) from exc
+
         organization = self._db.get(Organization, organization_id)
         if not organization:
             raise DocumentDeliveryError("org_not_found", "Organisation introuvable")
@@ -280,6 +309,14 @@ class DocumentDeliveryService:
                 "pdf_error",
                 "Le document PDF n’a pas pu être généré. Veuillez réessayer.",
             ) from exc
+
+        _trace_delivery_step(
+            "PDF_CREATED",
+            organization_id=organization_id,
+            document_id=doc.id,
+            document_type=doc_type,
+            pdf_size=len(pdf_bytes),
+        )
 
         attachment_name = delivery_attachment_filename(doc)
         vault_type = DOC_TYPE_TO_VAULT[doc_type]
@@ -323,6 +360,16 @@ class DocumentDeliveryService:
                 "archive_failed",
                 "Le document n’a pas pu être archivé. L’e-mail n’a pas été envoyé.",
             ) from exc
+
+        _trace_delivery_step(
+            "VAULT_UPLOAD_SUCCESS",
+            organization_id=organization_id,
+            document_id=doc.id,
+            vault_document_id=vault_doc.id,
+            reused_existing_archive=reused,
+            archive_status=vault_doc.archive_status,
+            checksum_prefix=(vault_doc.checksum_sha256 or "")[:12],
+        )
 
         archive_payload = {
             "vault_document_id": vault_doc.id,
@@ -418,6 +465,23 @@ class DocumentDeliveryService:
                 vault_doc = updated
             else:
                 vault_doc.email_status = VaultEmailStatus.sent.value
+            _trace_delivery_step(
+                "EMAIL_SENT",
+                organization_id=organization_id,
+                document_id=doc.id,
+                vault_document_id=vault_doc.id,
+                email_log_id=email_log.id,
+                email_status=email_log.status,
+                provider=email_log.provider,
+                recipient_domain=_recipient_domain(to_email),
+                attachment_filename=attachment_name,
+            )
+            _trace_delivery_step(
+                "EMAIL_CONFIRMED",
+                organization_id=organization_id,
+                document_id=doc.id,
+                vault_email_status=vault_doc.email_status,
+            )
             _safe_log(
                 repo,
                 organization_id=organization_id,
@@ -463,6 +527,15 @@ class DocumentDeliveryService:
             vault_doc = updated
         else:
             vault_doc.email_status = VaultEmailStatus.failed.value
+        _trace_delivery_step(
+            "EMAIL_FAILED",
+            organization_id=organization_id,
+            document_id=doc.id,
+            vault_document_id=vault_doc.id,
+            email_log_id=email_log.id,
+            error_code=email_log.error_code or "provider_error",
+            recipient_domain=_recipient_domain(to_email),
+        )
         _safe_log(
             repo,
             organization_id=organization_id,

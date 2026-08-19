@@ -17,7 +17,17 @@ FIREBASE_PROJECT_ID=...
 AUTH_REQUIRED=true
 ```
 
-5. Redémarrer backend (port **8001**) et frontend (port **5173**)
+5. Lancer l’environnement local :
+
+```bash
+# depuis la racine du dépôt
+npm run dev:all
+# ou double-clic / terminal :
+start-elfis.bat
+```
+
+Backend **8000** + frontend **5173** + proxy `/api`. Arrêt : `npm run dev:stop` ou `stop-elfis.bat`.  
+Cockpit Admin : http://localhost:5173/elfadmin
 
 Créer un compte : http://127.0.0.1:5173/register  
 Connexion : http://127.0.0.1:5173/login

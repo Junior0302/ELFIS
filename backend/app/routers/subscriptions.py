@@ -197,6 +197,15 @@ async def _handle_stripe_webhook(
 
         marker.processed_at = datetime.utcnow()
         db.add(marker)
+        # Billing V1 — sync entitlements/quotas sans casser le flux legacy
+        try:
+            from app.billing.billing_events import post_process_legacy_webhook
+
+            post_process_legacy_webhook(db, event, payload_hash=payload_hash)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("billing_post_process_failed")
         db.commit()
     except Exception as exc:
         db.rollback()

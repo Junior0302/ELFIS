@@ -37,6 +37,12 @@ class JobContext:
         self._db = db
         self._cancelled_cache: bool | None = None
 
+    @property
+    def db(self) -> "Session":
+        if self._db is None:
+            raise RuntimeError("JobContext.db indisponible hors exécution worker")
+        return self._db
+
     def update_progress(self, progress: int, message: str | None = None) -> None:
         from app.events.event_bus import safe_publish
         from app.events.event_schemas import DomainEvent

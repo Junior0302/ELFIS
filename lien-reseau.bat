@@ -12,13 +12,13 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /i /c:"IPv4"') do (
   set "ip=!ip: =!"
   if not "!ip!"=="" (
     echo   App     : http://!ip!:5173
-    echo   API     : http://!ip!:8001
-    echo   Docs    : http://!ip!:8001/docs
+    echo   API     : http://!ip!:8000
+    echo   Docs    : http://!ip!:8000/docs
     echo.
   )
 )
 
 echo Partage le lien App avec les appareils du meme Wi-Fi / reseau.
-echo Assure-toi que le pare-feu Windows autorise les ports 5173 et 8001.
+echo Assure-toi que le pare-feu Windows autorise les ports 5173 et 8000.
 echo.
 pause

@@ -1,0 +1,96 @@
+/* BRAND.ELFIS.2 — page Membres et équipes (/platform/members) */
+
+.elfis-members-page {
+  color: var(--elfis-text-primary, #101828);
+}
+
+.elfis-members-page .ds-page-header__eyebrow {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--elfis-text-muted, #8893a5);
+}
+
+.elfis-members-page .admin-invite {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.55fr) auto;
+  align-items: end;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+}
+
+.elfis-members-page .admin-invite .up-btn,
+.elfis-members-page .admin-invite .btn {
+  align-self: end;
+  min-height: 2.75rem;
+}
+
+.elfis-role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.elfis-role-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 11.5rem;
+  padding: 0.95rem 1rem;
+  background: var(--elfis-surface, #fff);
+  border: 1px solid var(--elfis-border, #dde4ee);
+  border-radius: 12px;
+}
+
+.elfis-role-card__icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.55rem;
+  border-radius: 8px;
+  background: var(--elfis-blue-100, #eaf1ff);
+  color: var(--elfis-navy-900, #102746);
+  font-size: 0.85rem;
+}
+
+.elfis-role-card strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--elfis-text-primary, #101828);
+  text-transform: none;
+}
+
+.elfis-role-card__protected {
+  display: inline-block;
+  margin-bottom: 0.45rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--elfis-navy-900, #102746);
+  background: var(--elfis-blue-100, #eaf1ff);
+  border: 1px solid var(--elfis-border, #dde4ee);
+  width: fit-content;
+}
+
+.elfis-role-card p {
+  margin: 0;
+  margin-top: auto;
+  color: var(--elfis-text-secondary, #58657a);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.elfis-role-card[data-role='owner'] {
+  border-color: color-mix(in srgb, var(--elfis-blue-600, #2764e7) 35%, var(--elfis-border));
+}
+
+@media (max-width: 720px) {
+  .elfis-members-page .admin-invite {
+    grid-template-columns: 1fr;
+  }
+}

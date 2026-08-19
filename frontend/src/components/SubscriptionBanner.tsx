@@ -3,15 +3,27 @@ import { Link } from 'react-router-dom'
 import type { SubscriptionInfo } from '../api'
 import { useAuth } from '../auth'
 import { useSubscription } from '../subscriptionContext'
-import { formatDate, hasProductAccess, remainingTime, subscriptionDeadline } from '../subscription'
+import {
+  canStartSubscriptionCheckout,
+  formatDate,
+  hasProductAccess,
+  remainingTime,
+  subscriptionDeadline,
+} from '../subscription'
+import { trackProductEvent } from '../productEvents'
 
 function bannerMessage(
   subscription: SubscriptionInfo,
   now: number,
   checkoutReturnPending: boolean,
+  compactTrialOnboarding: boolean,
 ): string | null {
   if (checkoutReturnPending && !hasProductAccess(subscription)) {
     return 'Activation en cours… Votre accès sera confirmé dans un instant.'
+  }
+
+  if (compactTrialOnboarding && (subscription.status === 'none' || subscription.status === 'incomplete')) {
+    return 'Votre essai gratuit n’est pas encore activé'
   }
 
   switch (subscription.status) {
@@ -25,7 +37,9 @@ function bannerMessage(
       return `Paiement en échec — régularisez avant le ${formatDate(subscription.grace_until)}`
     case 'checkout_pending':
     case 'incomplete':
-      return 'Paiement non finalisé. Reprenez la souscription sécurisée pour activer l’accès.'
+      return compactTrialOnboarding
+        ? 'Finalisez votre activation pour débloquer ComptaPilot'
+        : 'Paiement non finalisé. Reprenez la souscription sécurisée pour activer l’accès.'
     case 'unpaid':
       return 'Votre abonnement présente un impayé. Une action est requise.'
     case 'paused':
@@ -37,7 +51,9 @@ function bannerMessage(
     case 'expired':
       return 'Votre abonnement a expiré. Une nouvelle souscription est nécessaire.'
     case 'none':
-      return 'Aucun abonnement associé à ce compte. Démarrez l’essai gratuit.'
+      return compactTrialOnboarding
+        ? 'Votre essai gratuit n’est pas encore activé'
+        : 'Aucun abonnement associé à ce compte. Démarrez l’essai gratuit.'
     case 'active':
       return null
     default:
@@ -46,7 +62,12 @@ function bannerMessage(
   }
 }
 
-export default function SubscriptionBanner() {
+type Props = {
+  /** Mode onboarding : bandeau discret, CTA essai, sans doublon verbeux. */
+  compactTrialOnboarding?: boolean
+}
+
+export default function SubscriptionBanner({ compactTrialOnboarding = false }: Props) {
   const { orgId, memberships } = useAuth()
   const { subscription, checkoutReturnPending } = useSubscription()
   const [now, setNow] = useState(Date.now())
@@ -62,11 +83,12 @@ export default function SubscriptionBanner() {
 
   if (!subscription || subscription.platform_bypass) return null
 
-  const message = bannerMessage(subscription, now, checkoutReturnPending)
+  const message = bannerMessage(subscription, now, checkoutReturnPending, compactTrialOnboarding)
   if (!message) return null
 
   const isTrialingUi =
     subscription.status === 'trialing' || subscription.status === 'cancel_scheduled'
+  const needsTrialStart = canStartSubscriptionCheckout(subscription.status)
   const canManage = Boolean(
     memberships.find((m) => m.organization_id === orgId)?.permissions.includes('*') ||
       memberships
@@ -74,18 +96,40 @@ export default function SubscriptionBanner() {
         ?.permissions.includes('subscription.manage'),
   )
 
-  const toneClass =
-    subscription.status === 'trialing'
+  const toneClass = compactTrialOnboarding
+    ? 'trial-onboarding-banner'
+    : subscription.status === 'trialing'
       ? 'trialing'
       : checkoutReturnPending
         ? 'none'
         : subscription.status
 
+  const ctaLabel = isTrialingUi
+    ? 'Détails'
+    : needsTrialStart
+      ? subscription.status === 'none' || !subscription.trial_used
+        ? 'Démarrer mon essai gratuit'
+        : 'Souscrire'
+      : 'Gérer mon abonnement'
+
   return (
-    <div className={`global-subscription-banner ${toneClass}`} role="status">
+    <div
+      className={`global-subscription-banner ${toneClass}`}
+      role="status"
+    >
       <span>{message}</span>
       {canManage ? (
-        <Link to="/abonnement">{isTrialingUi ? 'Détails' : 'Voir l’abonnement'}</Link>
+        <Link
+          to="/abonnement"
+          onClick={() => {
+            if (needsTrialStart) {
+              trackProductEvent('trial_cta_clicked', { source: 'banner' })
+            }
+          }}
+        >
+          {ctaLabel}
+          {compactTrialOnboarding && needsTrialStart ? ' →' : ''}
+        </Link>
       ) : null}
     </div>
   )

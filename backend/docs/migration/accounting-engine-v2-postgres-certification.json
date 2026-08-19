@@ -1,0 +1,39 @@
+{
+  "certified": true,
+  "module": "accounting_engine_v2",
+  "scenarios": [
+    {
+      "scenario": "A_apply",
+      "ok": true,
+      "tables": [
+        "elfis_accounting_engine_audit",
+        "elfis_accounting_engine_proposals",
+        "elfis_accounting_learning_memory",
+        "elfis_chart_of_accounts"
+      ],
+      "missing": []
+    },
+    {
+      "scenario": "B_idempotent",
+      "ok": true,
+      "tables": [
+        "elfis_accounting_engine_audit",
+        "elfis_accounting_engine_proposals",
+        "elfis_accounting_learning_memory",
+        "elfis_chart_of_accounts"
+      ],
+      "missing": []
+    },
+    {
+      "scenario": "C_constraints",
+      "ok": true,
+      "constraints": [
+        "uq_elfis_aep_doc_ver",
+        "uq_elfis_alm_org_key",
+        "uq_elfis_coa_org_plan_code"
+      ]
+    }
+  ],
+  "timestamp": "2026-07-24T16:52:46.366816+00:00",
+  "environment": "staging"
+}

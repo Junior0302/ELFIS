@@ -11,6 +11,18 @@ function pillClass(status: string) {
   return 'platform-pill'
 }
 
+type RevenueOverview = {
+  mrr_eur: number
+  arr_eur: number
+  subscriptions: Record<string, number>
+  subscriptions_total: number
+  churn_cancelled_ratio_pct: number
+  past_due: number
+  trials: number
+  note?: string
+  source?: string
+}
+
 export default function PlatformSubscriptionsPage() {
   const { token } = useAuth()
   const [items, setItems] = useState<PlatformOrganization[]>([])
@@ -19,19 +31,30 @@ export default function PlatformSubscriptionsPage() {
   const [message, setMessage] = useState('')
   const [busyId, setBusyId] = useState<number | null>(null)
   const [aiSummary, setAiSummary] = useState('')
+  const [revenue, setRevenue] = useState<RevenueOverview | null>(null)
+  const [engineSubs, setEngineSubs] = useState<Array<Record<string, unknown>>>([])
+  const [statusFilter, setStatusFilter] = useState('')
 
   const reload = () => {
     if (!token) return
-    return api
-      .platformOrganizations(token)
-      .then((result) => setItems(result.organizations))
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Liste indisponible'))
+    return Promise.all([
+      api.platformOrganizations(token).then((result) => setItems(result.organizations)),
+      api.platformBillingOverview(token).then(setRevenue).catch(() => setRevenue(null)),
+      api
+        .platformBillingSubscriptionsList(token, {
+          status: statusFilter || undefined,
+          limit: 100,
+        })
+        .then((r) => setEngineSubs(r.subscriptions))
+        .catch(() => setEngineSubs([])),
+    ]).catch((reason) => setError(reason instanceof Error ? reason.message : 'Liste indisponible'))
   }
 
   useEffect(() => {
     if (!token) return
     reload()?.finally(() => setLoading(false))
-  }, [token])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, statusFilter])
 
   const patchLocal = (organizationId: number, subscription: SubscriptionInfo) => {
     setItems((current) =>
@@ -81,10 +104,30 @@ export default function PlatformSubscriptionsPage() {
           `${result.summary}\n\nSuggestions (confirmation humaine requise) :\n- ${result.suggestions.join('\n- ') || 'Aucune'}`,
         )
       }
+      await reload()
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Action impossible')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  const runEngineAction = async (subscriptionId: string, kind: 'suspend' | 'restore') => {
+    if (!token) return
+    setError('')
+    setMessage('')
+    try {
+      if (kind === 'suspend') {
+        if (!window.confirm(`Suspendre l’abonnement ${subscriptionId} ?`)) return
+        await api.platformBillingSuspend(subscriptionId, token)
+        setMessage(`Abonnement ${subscriptionId} suspendu (auditée).`)
+      } else {
+        await api.platformBillingRestore(subscriptionId, token)
+        setMessage(`Abonnement ${subscriptionId} réactivé (auditée).`)
+      }
+      await reload()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Action engine impossible')
     }
   }
 
@@ -95,9 +138,11 @@ export default function PlatformSubscriptionsPage() {
   return (
     <>
       <div className="platform-title">
-        <span>ELF Admin</span>
+        <span>ELF Admin · Billing Cockpit V2</span>
         <h1>Abonnements</h1>
-        <p>Suivi, sync Stripe, essai exceptionnel, révocation et résumé IA.</p>
+        <p>
+          MRR/ARR depuis le Billing Engine · sync Stripe · suspension · essais · historique org.
+        </p>
       </div>
 
       {error && <div className="platform-alert">{error}</div>}
@@ -106,6 +151,36 @@ export default function PlatformSubscriptionsPage() {
         <div className="platform-alert platform-alert-ok platform-alert-pre">{aiSummary}</div>
       )}
 
+      {revenue && (
+        <div className="platform-stats" style={{ marginBottom: '1.25rem' }}>
+          <article>
+            <span>MRR</span>
+            <strong>{formatEuro(revenue.mrr_eur)}</strong>
+          </article>
+          <article>
+            <span>ARR</span>
+            <strong>{formatEuro(revenue.arr_eur)}</strong>
+          </article>
+          <article>
+            <span>Actifs (engine)</span>
+            <strong>{revenue.subscriptions.active ?? 0}</strong>
+          </article>
+          <article>
+            <span>Essais</span>
+            <strong>{revenue.trials}</strong>
+          </article>
+          <article>
+            <span>Impayés</span>
+            <strong>{revenue.past_due}</strong>
+          </article>
+          <article>
+            <span>Churn (proxy)</span>
+            <strong>{revenue.churn_cancelled_ratio_pct} %</strong>
+          </article>
+        </div>
+      )}
+      {revenue?.note && <p className="muted" style={{ marginBottom: '1rem' }}>{revenue.note}</p>}
+
       {!loading && (
         <div className="platform-stats" style={{ marginBottom: '1.25rem' }}>
           <article>
@@ -113,11 +188,11 @@ export default function PlatformSubscriptionsPage() {
             <strong>{items.length}</strong>
           </article>
           <article>
-            <span>Essais</span>
+            <span>Essais (legacy vue)</span>
             <strong>{trialing}</strong>
           </article>
           <article>
-            <span>Actifs</span>
+            <span>Actifs (legacy vue)</span>
             <strong>{active}</strong>
           </article>
           <article>
@@ -125,6 +200,69 @@ export default function PlatformSubscriptionsPage() {
             <strong>{none}</strong>
           </article>
         </div>
+      )}
+
+      <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <label className="muted">
+          Filtre engine{' '}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Filtrer abonnements engine"
+          >
+            <option value="">Tous</option>
+            <option value="active">active</option>
+            <option value="trialing">trialing</option>
+            <option value="past_due">past_due</option>
+            <option value="suspended">suspended</option>
+            <option value="cancelled">cancelled</option>
+            <option value="expired">expired</option>
+          </select>
+        </label>
+      </div>
+
+      {engineSubs.length > 0 && (
+        <section style={{ marginBottom: '1.5rem' }}>
+          <h2 className="platform-section-title">Abonnements Billing Engine</h2>
+          <div className="platform-request-list">
+            {engineSubs.map((row) => {
+              const sid = String(row.subscription_id || '')
+              const st = String(row.status || '')
+              return (
+                <article key={sid} className="platform-request-card">
+                  <header className="platform-request-head">
+                    <div>
+                      <h2>Org #{String(row.organization_id)}</h2>
+                      <p>
+                        {sid} · plan_id {String(row.plan_id || '—')}
+                      </p>
+                    </div>
+                    <span className={pillClass(st)}>{st}</span>
+                  </header>
+                  <footer className="platform-request-actions">
+                    {st === 'suspended' ? (
+                      <button
+                        type="button"
+                        className="platform-action platform-action-primary"
+                        onClick={() => void runEngineAction(sid, 'restore')}
+                      >
+                        Réactiver
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="platform-action platform-action-danger"
+                        onClick={() => void runEngineAction(sid, 'suspend')}
+                      >
+                        Suspendre
+                      </button>
+                    )}
+                  </footer>
+                </article>
+              )
+            })}
+          </div>
+        </section>
       )}
 
       {loading ? (

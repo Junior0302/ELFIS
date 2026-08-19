@@ -1,0 +1,510 @@
+/* ELFIS Core Login V1 — surfaces claires, navy, accents Pilot (pas de vert dominant) */
+
+.elfis-login {
+  --login-navy: var(--pilot-primary, #0b1f3a);
+  --login-accent: var(--pilot-accent, #3d7eff);
+  --login-surface: var(--pilot-secondary, #e8eef6);
+  --login-bg: #f7f9fc;
+  --login-text: #142033;
+  --login-muted: #5a6b82;
+  --login-card: #ffffff;
+  --login-radius: 16px;
+  --login-shadow: 0 12px 40px rgba(11, 31, 58, 0.08);
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 500px at 100% -10%, rgba(61, 126, 255, 0.12), transparent 55%),
+    radial-gradient(800px 400px at -5% 30%, rgba(11, 31, 58, 0.05), transparent 50%),
+    var(--login-bg);
+  color: var(--login-text);
+}
+
+.elfis-login a:focus-visible,
+.elfis-login button:focus-visible,
+.elfis-login input:focus-visible {
+  outline: 2px solid var(--login-accent);
+  outline-offset: 3px;
+}
+
+.elfis-login__top {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.elfis-login__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.elfis-login__brand img {
+  border-radius: 10px;
+  display: block;
+}
+
+.elfis-login__brand span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.elfis-login__brand strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.elfis-login__brand small {
+  font-size: 0.7rem;
+  color: var(--login-muted);
+}
+
+.elfis-login__back {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--login-navy);
+  text-decoration: none;
+}
+
+.elfis-login__back:hover {
+  color: var(--login-accent);
+}
+
+.elfis-login__grid {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0.5rem 1.25rem 2.5rem;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 2rem;
+  align-items: center;
+  min-height: calc(100vh - 5.5rem);
+}
+
+.elfis-login__brand-panel {
+  padding: 1rem 0.5rem 1rem 0;
+  animation: elfis-login-fade 420ms ease both;
+}
+
+.elfis-login__kicker {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--login-accent);
+}
+
+.elfis-login__hero-title {
+  margin: 0;
+  font-size: clamp(1.9rem, 3.4vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: var(--login-navy);
+}
+
+.elfis-login__hero-lead {
+  margin: 1rem 0 1.5rem;
+  color: var(--login-muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  max-width: 34rem;
+}
+
+.elfis-login__benefits {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+  max-width: 28rem;
+}
+
+.elfis-login__benefit {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.9rem;
+  background: var(--login-card);
+  border: 1px solid rgba(11, 31, 58, 0.06);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(11, 31, 58, 0.04);
+}
+
+.elfis-login__benefit-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--login-accent);
+  box-shadow: 0 0 0 4px rgba(61, 126, 255, 0.15);
+}
+
+.elfis-login__benefit strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--login-navy);
+  margin-bottom: 0.1rem;
+}
+
+.elfis-login__benefit span {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--login-muted);
+  line-height: 1.4;
+}
+
+/* Illustration */
+.elfis-login__illu {
+  position: relative;
+  width: min(100%, 320px);
+  height: 200px;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.elfis-login__illu-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 140px;
+  height: 140px;
+  border: 1px dashed rgba(11, 31, 58, 0.15);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: elfis-login-spin 60s linear infinite;
+}
+
+.elfis-login__illu-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+  background: var(--login-card);
+  box-shadow: var(--login-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.elfis-login__illu-core img {
+  border-radius: 10px;
+}
+
+.elfis-login__illu-core span {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--login-navy);
+}
+
+.elfis-login__illu-node {
+  position: absolute;
+  z-index: 3;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(11, 31, 58, 0.12);
+  animation: elfis-login-float 5s ease-in-out infinite;
+}
+
+.elfis-login__illu-node--sales {
+  top: 8%;
+  left: 8%;
+  background: #1d4ed8;
+  animation-delay: 0s;
+}
+
+.elfis-login__illu-node--compta {
+  top: 10%;
+  right: 6%;
+  background: #0b3d2e;
+  animation-delay: 0.6s;
+}
+
+.elfis-login__illu-node--doc {
+  bottom: 12%;
+  left: 10%;
+  background: #c2410c;
+  animation-delay: 1.2s;
+}
+
+.elfis-login__illu-node--hr {
+  bottom: 10%;
+  right: 8%;
+  background: #6d28d9;
+  animation-delay: 1.8s;
+}
+
+.elfis-login__illu-flow {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--login-accent);
+  left: 50%;
+  top: 50%;
+  opacity: 0.45;
+  animation: elfis-login-pulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.elfis-login__illu-flow--b {
+  animation-delay: 1.5s;
+  background: #1d4ed8;
+}
+
+/* Form panel */
+.elfis-login__panel {
+  display: flex;
+  justify-content: center;
+  animation: elfis-login-fade 480ms ease both;
+  animation-delay: 60ms;
+}
+
+.elfis-login__card {
+  width: min(420px, 100%);
+  background: var(--login-card);
+  border: 1px solid rgba(11, 31, 58, 0.08);
+  border-radius: 20px;
+  padding: 2rem 1.75rem;
+  box-shadow: var(--login-shadow);
+}
+
+.elfis-login__card-head {
+  margin-bottom: 1.35rem;
+}
+
+.elfis-login__card-head h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+  color: var(--login-navy);
+}
+
+.elfis-login__card-head p {
+  margin: 0;
+  color: var(--login-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.elfis-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.elfis-login__form .ds-form-field label,
+.elfis-login__password-heading label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(20, 32, 51, 0.78);
+}
+
+.elfis-login__form .ds-input,
+.elfis-login__password-block .ds-input {
+  width: 100%;
+  padding: 0.85rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 31, 58, 0.14);
+  background: #fff;
+  color: var(--login-text);
+}
+
+.elfis-login__form .ds-input:focus,
+.elfis-login__password-block .ds-input:focus {
+  outline: none;
+  border-color: var(--login-accent);
+  box-shadow: 0 0 0 4px rgba(61, 126, 255, 0.18);
+}
+
+.elfis-login__password-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.elfis-login__password-heading a {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--login-accent);
+  text-decoration: none;
+}
+
+.elfis-login__password-heading a:hover {
+  text-decoration: underline;
+}
+
+.elfis-login__alert {
+  padding: 0.8rem 0.95rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  background: rgba(180, 35, 24, 0.08);
+  color: #b42318;
+  border: 1px solid rgba(180, 35, 24, 0.2);
+}
+
+.elfis-login__submit {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.95rem 1rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(61, 126, 255, 0.22);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.elfis-login__submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(61, 126, 255, 0.28);
+}
+
+.elfis-login__switch {
+  margin: 1.25rem 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--login-muted);
+}
+
+.elfis-login__switch a {
+  color: var(--login-navy);
+  font-weight: 700;
+}
+
+.elfis-login__home {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.elfis-login__home a {
+  color: var(--login-muted);
+  text-decoration: none;
+}
+
+.elfis-login__home a:hover {
+  color: var(--login-navy);
+}
+
+@keyframes elfis-login-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes elfis-login-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes elfis-login-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes elfis-login-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  50% {
+    opacity: 0.65;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .elfis-login__brand-panel,
+  .elfis-login__panel,
+  .elfis-login__illu-ring,
+  .elfis-login__illu-node,
+  .elfis-login__illu-flow {
+    animation: none !important;
+  }
+
+  .elfis-login__submit:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .elfis-login__grid {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    gap: 1.25rem;
+  }
+
+  .elfis-login__panel {
+    order: -1;
+  }
+
+  .elfis-login__brand-panel {
+    padding: 0;
+  }
+
+  .elfis-login__illu {
+    height: 140px;
+    width: min(100%, 260px);
+  }
+
+  .elfis-login__illu-core {
+    width: 72px;
+    height: 72px;
+  }
+
+  .elfis-login__illu-core img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .elfis-login__benefits {
+    display: none;
+  }
+
+  .elfis-login__hero-lead {
+    margin-bottom: 0.75rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .elfis-login__card {
+    padding: 1.5rem 1.1rem;
+    border-radius: 16px;
+  }
+
+  .elfis-login__submit {
+    width: 100%;
+  }
+
+  .elfis-login__top {
+    padding: 0.85rem 1rem;
+  }
+}

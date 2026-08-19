@@ -4,10 +4,27 @@ __pycache__/
 .venv/
 venv/
 *.db
+*.sqlite
+*.sqlite3
 storage/
 .env
 **/.env
 **/.env.local
+**/.env.production
+**/.env.staging
+*.pem
+*.key
+credentials.json
+**/service-account*.json
+*.dump
+*.sql.gz
+backups/
+*.bak
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
 
 # Node
 node_modules/
@@ -15,3 +32,6 @@ dist/
 .DS_Store
 *.log
 .firebase/
+
+# ELFIS Developer Launcher runtime
+.elfis-dev/

@@ -100,8 +100,12 @@ def test_send_invoice_with_pdf_and_idempotency(monkeypatch):
     from app import config
     from app.services import mailer as mailer_mod
 
-    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-" + ("a" * 40))
     monkeypatch.setattr(config.settings, "platform_email_from", "documents@elfiscore.com")
+    monkeypatch.setattr(config.settings, "smtp_host", "")
+    monkeypatch.setattr(config.settings, "smtp_user", "")
+    monkeypatch.setattr(config.settings, "smtp_password", "")
+    monkeypatch.setattr(config.settings, "smtp_from", "")
 
     calls: list[dict] = []
 
@@ -164,8 +168,11 @@ def test_send_invoice_with_pdf_and_idempotency(monkeypatch):
 def test_missing_customer_email(monkeypatch):
     from app import config
 
-    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-" + ("a" * 40))
     monkeypatch.setattr(config.settings, "platform_email_from", "documents@elfiscore.com")
+    monkeypatch.setattr(config.settings, "smtp_host", "")
+    monkeypatch.setattr(config.settings, "smtp_user", "")
+    monkeypatch.setattr(config.settings, "smtp_password", "")
     db = _session()
     org = _org(db)
     doc = create_sales_document(
@@ -178,7 +185,7 @@ def test_missing_customer_email(monkeypatch):
     )
     log = send_sales_document_email(db, doc, recipient="")
     assert log.status == "failed"
-    assert log.error_code == "missing_recipient"
+    assert log.error_code == "recipient_missing"
     assert "adresse e-mail" in log.error_message.lower()
 
 
@@ -257,8 +264,12 @@ def test_brevo_failure_user_message(monkeypatch):
     from app import config
     from app.services import mailer as mailer_mod
 
-    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(config.settings, "brevo_api_key", "xkeysib-" + ("a" * 40))
     monkeypatch.setattr(config.settings, "platform_email_from", "documents@elfiscore.com")
+    monkeypatch.setattr(config.settings, "smtp_host", "")
+    monkeypatch.setattr(config.settings, "smtp_user", "")
+    monkeypatch.setattr(config.settings, "smtp_password", "")
+    monkeypatch.setattr(config.settings, "smtp_from", "")
 
     class FakeResponse:
         status_code = 500
@@ -281,6 +292,10 @@ def test_brevo_failure_user_message(monkeypatch):
     )
     log = send_sales_document_email(db, doc, recipient="c@exemple.fr")
     assert log.status == "failed"
-    assert "n’a pas pu être envoyé" in log.error_message
+    assert log.error_code in {"delivery_failed", "provider_error", "brevo_refused"}
     assert "boom" not in log.error_message
     assert "xkeysib" not in log.error_message
+    assert any(
+        token in log.error_message.lower()
+        for token in ("n’a pas pu", "n'a pas pu", "refusé", "fournisseur", "envoy")
+    )

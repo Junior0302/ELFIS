@@ -8,6 +8,8 @@ import {
   isSafeInternalActionUrl,
   type AppNotification,
 } from '../../notificationFormat'
+import { useSync } from '../../sync/SyncProvider'
+import { ELFIS_CLOSE_CHROME_MENUS } from '../../platform-shell/global-nav/chromeMenus'
 
 type Props = {
   compact?: boolean
@@ -15,21 +17,13 @@ type Props = {
 
 export default function NotificationBell({ compact }: Props) {
   const { token, orgId } = useAuth()
+  const { unreadNotifications, refresh } = useSync()
   const [open, setOpen] = useState(false)
-  const [count, setCount] = useState(0)
   const [items, setItems] = useState<AppNotification[]>([])
   const [loading, setLoading] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
-  const refreshCount = async () => {
-    if (!token || !orgId) return
-    try {
-      const data = await api.notificationsUnreadCount(token, orgId)
-      setCount(data.count || 0)
-    } catch {
-      /* ignore */
-    }
-  }
+  const count = unreadNotifications
 
   const refreshPreview = async () => {
     if (!token || !orgId) return
@@ -41,19 +35,13 @@ export default function NotificationBell({ compact }: Props) {
         orgId,
       )
       setItems(data.notifications || [])
-      await refreshCount()
+      await refresh('notifications')
     } catch {
       setItems([])
     } finally {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    void refreshCount()
-    const timer = window.setInterval(() => void refreshCount(), 60_000)
-    return () => window.clearInterval(timer)
-  }, [token, orgId])
 
   useEffect(() => {
     if (!open) return
@@ -65,6 +53,12 @@ export default function NotificationBell({ compact }: Props) {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
+  useEffect(() => {
+    const onCloseChrome = () => setOpen(false)
+    window.addEventListener(ELFIS_CLOSE_CHROME_MENUS, onCloseChrome)
+    return () => window.removeEventListener(ELFIS_CLOSE_CHROME_MENUS, onCloseChrome)
+  }, [])
+
   const badge = formatUnreadBadge(count)
 
   return (
@@ -74,7 +68,15 @@ export default function NotificationBell({ compact }: Props) {
         className="notif-bell-btn"
         aria-label="Notifications"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => {
+            const next = !v
+            if (next) {
+              window.dispatchEvent(new CustomEvent(ELFIS_CLOSE_CHROME_MENUS))
+            }
+            return next
+          })
+        }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
           <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />

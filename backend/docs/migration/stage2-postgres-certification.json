@@ -1,0 +1,633 @@
+{
+  "started_at": "2026-07-23T18:59:21.555473+00:00",
+  "environment": "staging",
+  "pg_version": "17.6",
+  "database_host_redacted": true,
+  "scenarios": {
+    "A_empty_then_sprint1_stage2": {
+      "sprint1_apply": {
+        "file": "elfis_migration_center_postgres.sql",
+        "executed": 6,
+        "errors": [],
+        "path": "C:\\Users\\Black\\Desktop\\elfis core\\backend\\sql\\elfis_migration_center_postgres.sql"
+      },
+      "stage2_apply": {
+        "file": "elfis_migration_center_stage2_postgres.sql",
+        "executed": 1,
+        "errors": [],
+        "path": "C:\\Users\\Black\\Desktop\\elfis core\\backend\\sql\\elfis_migration_center_stage2_postgres.sql"
+      },
+      "verify": {
+        "tables": [
+          "elfis_migration_activities",
+          "elfis_migration_memory_entries",
+          "elfis_migration_sessions",
+          "elfis_migration_timeline_entries"
+        ],
+        "missing_tables": [],
+        "session_columns": [
+          "id",
+          "organization_id",
+          "created_by_user_id",
+          "mode",
+          "status",
+          "current_step",
+          "company_profile",
+          "selected_sources",
+          "configuration",
+          "progress",
+          "answers_metadata",
+          "version",
+          "started_at",
+          "last_activity_at",
+          "completed_at",
+          "cancelled_at",
+          "cancel_reason",
+          "last_error_code",
+          "last_error_message_sanitized",
+          "notes",
+          "created_at",
+          "updated_at",
+          "migration_session_token",
+          "migration_profile",
+          "ai_profile"
+        ],
+        "missing_stage2_columns": [],
+        "constraints": {
+          "elfis_migration_sessions": [
+            "ck_elfis_mig_mode",
+            "ck_elfis_mig_status",
+            "ck_elfis_mig_step",
+            "ck_elfis_mig_version",
+            "elfis_migration_sessions_created_by_user_id_fkey",
+            "elfis_migration_sessions_organization_id_fkey",
+            "elfis_migration_sessions_pkey",
+            "uq_elfis_mig_session_token"
+          ],
+          "elfis_migration_timeline_entries": [
+            "ck_elfis_mig_tl_status",
+            "elfis_migration_timeline_entries_migration_session_id_fkey",
+            "elfis_migration_timeline_entries_organization_id_fkey",
+            "elfis_migration_timeline_entries_pkey",
+            "uq_elfis_mig_tl_session_step"
+          ],
+          "elfis_migration_activities": [
+            "ck_elfis_mig_act_actor",
+            "ck_elfis_mig_act_severity",
+            "elfis_migration_activities_actor_user_id_fkey",
+            "elfis_migration_activities_migration_session_id_fkey",
+            "elfis_migration_activities_organization_id_fkey",
+            "elfis_migration_activities_pkey"
+          ],
+          "elfis_migration_memory_entries": [
+            "ck_elfis_mig_mem_scope",
+            "ck_elfis_mig_mem_source",
+            "ck_elfis_mig_mem_status",
+            "elfis_migration_memory_entries_created_by_user_id_fkey",
+            "elfis_migration_memory_entries_migration_session_id_fkey",
+            "elfis_migration_memory_entries_organization_id_fkey",
+            "elfis_migration_memory_entries_pkey",
+            "elfis_migration_memory_entries_validated_by_user_id_fkey"
+          ]
+        },
+        "indexes": {
+          "elfis_migration_sessions": [
+            "elfis_migration_sessions_pkey",
+            "ix_elfis_mig_created_by",
+            "ix_elfis_mig_last_activity",
+            "ix_elfis_mig_mode_status",
+            "ix_elfis_mig_org_created",
+            "ix_elfis_mig_org_status",
+            "ix_elfis_mig_org_token",
+            "uq_elfis_mig_session_token",
+            "uq_elfis_mig_session_token_idx"
+          ],
+          "elfis_migration_timeline_entries": [
+            "elfis_migration_timeline_entries_pkey",
+            "ix_elfis_mig_tl_created",
+            "ix_elfis_mig_tl_org",
+            "ix_elfis_mig_tl_org_session",
+            "ix_elfis_mig_tl_session",
+            "ix_elfis_mig_tl_status",
+            "ix_elfis_mig_tl_step",
+            "uq_elfis_mig_tl_session_step"
+          ],
+          "elfis_migration_activities": [
+            "elfis_migration_activities_pkey",
+            "ix_elfis_mig_act_occurred",
+            "ix_elfis_mig_act_org",
+            "ix_elfis_mig_act_org_session",
+            "ix_elfis_mig_act_session",
+            "ix_elfis_mig_act_type"
+          ],
+          "elfis_migration_memory_entries": [
+            "elfis_migration_memory_entries_pkey",
+            "ix_elfis_mig_mem_key",
+            "ix_elfis_mig_mem_org",
+            "ix_elfis_mig_mem_org_session",
+            "ix_elfis_mig_mem_scope",
+            "ix_elfis_mig_mem_session",
+            "ix_elfis_mig_mem_status",
+            "ix_elfis_mig_mem_type"
+          ]
+        },
+        "column_defaults": {
+          "migration_profile": "jsonb_build_object('schema_version', 1, 'data', jsonb_build_object())",
+          "ai_profile": "jsonb_build_object('schema_version', 1, 'data', jsonb_build_object())"
+        },
+        "token_unique_present": true,
+        "foreign_keys": [
+          {
+            "table": "elfis_migration_activities",
+            "column": "actor_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_activities",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_activities",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "created_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "validated_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_sessions",
+            "column": "created_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_sessions",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_timeline_entries",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_timeline_entries",
+            "column": "organization_id",
+            "ref": "organizations"
+          }
+        ],
+        "fk_ok": true,
+        "probe": {
+          "ok": true,
+          "defaults": {
+            "migration_profile": {
+              "data": {},
+              "schema_version": 1
+            },
+            "ai_profile": {
+              "data": {},
+              "schema_version": 1
+            },
+            "token": "mig_cert_probe_token_unique_001"
+          },
+          "duplicate_token_rejected": true,
+          "duplicate_error": "IntegrityError"
+        },
+        "schema_ok": true
+      },
+      "pass": true
+    },
+    "B_sprint1_then_stage2": {
+      "stage2_apply": {
+        "file": "elfis_migration_center_stage2_postgres.sql",
+        "executed": 1,
+        "errors": [],
+        "path": "C:\\Users\\Black\\Desktop\\elfis core\\backend\\sql\\elfis_migration_center_stage2_postgres.sql"
+      },
+      "verify": {
+        "tables": [
+          "elfis_migration_activities",
+          "elfis_migration_memory_entries",
+          "elfis_migration_sessions",
+          "elfis_migration_timeline_entries"
+        ],
+        "missing_tables": [],
+        "session_columns": [
+          "id",
+          "organization_id",
+          "created_by_user_id",
+          "mode",
+          "status",
+          "current_step",
+          "company_profile",
+          "selected_sources",
+          "configuration",
+          "progress",
+          "answers_metadata",
+          "version",
+          "started_at",
+          "last_activity_at",
+          "completed_at",
+          "cancelled_at",
+          "cancel_reason",
+          "last_error_code",
+          "last_error_message_sanitized",
+          "notes",
+          "created_at",
+          "updated_at",
+          "migration_session_token",
+          "migration_profile",
+          "ai_profile"
+        ],
+        "missing_stage2_columns": [],
+        "constraints": {
+          "elfis_migration_sessions": [
+            "ck_elfis_mig_mode",
+            "ck_elfis_mig_status",
+            "ck_elfis_mig_step",
+            "ck_elfis_mig_version",
+            "elfis_migration_sessions_created_by_user_id_fkey",
+            "elfis_migration_sessions_organization_id_fkey",
+            "elfis_migration_sessions_pkey",
+            "uq_elfis_mig_session_token"
+          ],
+          "elfis_migration_timeline_entries": [
+            "ck_elfis_mig_tl_status",
+            "elfis_migration_timeline_entries_migration_session_id_fkey",
+            "elfis_migration_timeline_entries_organization_id_fkey",
+            "elfis_migration_timeline_entries_pkey",
+            "uq_elfis_mig_tl_session_step"
+          ],
+          "elfis_migration_activities": [
+            "ck_elfis_mig_act_actor",
+            "ck_elfis_mig_act_severity",
+            "elfis_migration_activities_actor_user_id_fkey",
+            "elfis_migration_activities_migration_session_id_fkey",
+            "elfis_migration_activities_organization_id_fkey",
+            "elfis_migration_activities_pkey"
+          ],
+          "elfis_migration_memory_entries": [
+            "ck_elfis_mig_mem_scope",
+            "ck_elfis_mig_mem_source",
+            "ck_elfis_mig_mem_status",
+            "elfis_migration_memory_entries_created_by_user_id_fkey",
+            "elfis_migration_memory_entries_migration_session_id_fkey",
+            "elfis_migration_memory_entries_organization_id_fkey",
+            "elfis_migration_memory_entries_pkey",
+            "elfis_migration_memory_entries_validated_by_user_id_fkey"
+          ]
+        },
+        "indexes": {
+          "elfis_migration_sessions": [
+            "elfis_migration_sessions_pkey",
+            "ix_elfis_mig_created_by",
+            "ix_elfis_mig_last_activity",
+            "ix_elfis_mig_mode_status",
+            "ix_elfis_mig_org_created",
+            "ix_elfis_mig_org_status",
+            "ix_elfis_mig_org_token",
+            "uq_elfis_mig_session_token",
+            "uq_elfis_mig_session_token_idx"
+          ],
+          "elfis_migration_timeline_entries": [
+            "elfis_migration_timeline_entries_pkey",
+            "ix_elfis_mig_tl_created",
+            "ix_elfis_mig_tl_org",
+            "ix_elfis_mig_tl_org_session",
+            "ix_elfis_mig_tl_session",
+            "ix_elfis_mig_tl_status",
+            "ix_elfis_mig_tl_step",
+            "uq_elfis_mig_tl_session_step"
+          ],
+          "elfis_migration_activities": [
+            "elfis_migration_activities_pkey",
+            "ix_elfis_mig_act_occurred",
+            "ix_elfis_mig_act_org",
+            "ix_elfis_mig_act_org_session",
+            "ix_elfis_mig_act_session",
+            "ix_elfis_mig_act_type"
+          ],
+          "elfis_migration_memory_entries": [
+            "elfis_migration_memory_entries_pkey",
+            "ix_elfis_mig_mem_key",
+            "ix_elfis_mig_mem_org",
+            "ix_elfis_mig_mem_org_session",
+            "ix_elfis_mig_mem_scope",
+            "ix_elfis_mig_mem_session",
+            "ix_elfis_mig_mem_status",
+            "ix_elfis_mig_mem_type"
+          ]
+        },
+        "column_defaults": {
+          "migration_profile": "jsonb_build_object('schema_version', 1, 'data', jsonb_build_object())",
+          "ai_profile": "jsonb_build_object('schema_version', 1, 'data', jsonb_build_object())"
+        },
+        "token_unique_present": true,
+        "foreign_keys": [
+          {
+            "table": "elfis_migration_activities",
+            "column": "actor_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_activities",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_activities",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "created_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "validated_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_sessions",
+            "column": "created_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_sessions",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_timeline_entries",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_timeline_entries",
+            "column": "organization_id",
+            "ref": "organizations"
+          }
+        ],
+        "fk_ok": true,
+        "probe": {
+          "ok": true,
+          "defaults": {
+            "migration_profile": {
+              "data": {},
+              "schema_version": 1
+            },
+            "ai_profile": {
+              "data": {},
+              "schema_version": 1
+            },
+            "token": "mig_cert_probe_token_unique_001"
+          },
+          "duplicate_token_rejected": true,
+          "duplicate_error": "IntegrityError"
+        },
+        "schema_ok": true
+      },
+      "pass": true
+    },
+    "C_stage2_replay_idempotent": {
+      "stage2_apply": {
+        "file": "elfis_migration_center_stage2_postgres.sql",
+        "executed": 1,
+        "errors": [],
+        "path": "C:\\Users\\Black\\Desktop\\elfis core\\backend\\sql\\elfis_migration_center_stage2_postgres.sql"
+      },
+      "verify": {
+        "tables": [
+          "elfis_migration_activities",
+          "elfis_migration_memory_entries",
+          "elfis_migration_sessions",
+          "elfis_migration_timeline_entries"
+        ],
+        "missing_tables": [],
+        "session_columns": [
+          "id",
+          "organization_id",
+          "created_by_user_id",
+          "mode",
+          "status",
+          "current_step",
+          "company_profile",
+          "selected_sources",
+          "configuration",
+          "progress",
+          "answers_metadata",
+          "version",
+          "started_at",
+          "last_activity_at",
+          "completed_at",
+          "cancelled_at",
+          "cancel_reason",
+          "last_error_code",
+          "last_error_message_sanitized",
+          "notes",
+          "created_at",
+          "updated_at",
+          "migration_session_token",
+          "migration_profile",
+          "ai_profile"
+        ],
+        "missing_stage2_columns": [],
+        "constraints": {
+          "elfis_migration_sessions": [
+            "ck_elfis_mig_mode",
+            "ck_elfis_mig_status",
+            "ck_elfis_mig_step",
+            "ck_elfis_mig_version",
+            "elfis_migration_sessions_created_by_user_id_fkey",
+            "elfis_migration_sessions_organization_id_fkey",
+            "elfis_migration_sessions_pkey",
+            "uq_elfis_mig_session_token"
+          ],
+          "elfis_migration_timeline_entries": [
+            "ck_elfis_mig_tl_status",
+            "elfis_migration_timeline_entries_migration_session_id_fkey",
+            "elfis_migration_timeline_entries_organization_id_fkey",
+            "elfis_migration_timeline_entries_pkey",
+            "uq_elfis_mig_tl_session_step"
+          ],
+          "elfis_migration_activities": [
+            "ck_elfis_mig_act_actor",
+            "ck_elfis_mig_act_severity",
+            "elfis_migration_activities_actor_user_id_fkey",
+            "elfis_migration_activities_migration_session_id_fkey",
+            "elfis_migration_activities_organization_id_fkey",
+            "elfis_migration_activities_pkey"
+          ],
+          "elfis_migration_memory_entries": [
+            "ck_elfis_mig_mem_scope",
+            "ck_elfis_mig_mem_source",
+            "ck_elfis_mig_mem_status",
+            "elfis_migration_memory_entries_created_by_user_id_fkey",
+            "elfis_migration_memory_entries_migration_session_id_fkey",
+            "elfis_migration_memory_entries_organization_id_fkey",
+            "elfis_migration_memory_entries_pkey",
+            "elfis_migration_memory_entries_validated_by_user_id_fkey"
+          ]
+        },
+        "indexes": {
+          "elfis_migration_sessions": [
+            "elfis_migration_sessions_pkey",
+            "ix_elfis_mig_created_by",
+            "ix_elfis_mig_last_activity",
+            "ix_elfis_mig_mode_status",
+            "ix_elfis_mig_org_created",
+            "ix_elfis_mig_org_status",
+            "ix_elfis_mig_org_token",
+            "uq_elfis_mig_session_token",
+            "uq_elfis_mig_session_token_idx"
+          ],
+          "elfis_migration_timeline_entries": [
+            "elfis_migration_timeline_entries_pkey",
+            "ix_elfis_mig_tl_created",
+            "ix_elfis_mig_tl_org",
+            "ix_elfis_mig_tl_org_session",
+            "ix_elfis_mig_tl_session",
+            "ix_elfis_mig_tl_status",
+            "ix_elfis_mig_tl_step",
+            "uq_elfis_mig_tl_session_step"
+          ],
+          "elfis_migration_activities": [
+            "elfis_migration_activities_pkey",
+            "ix_elfis_mig_act_occurred",
+            "ix_elfis_mig_act_org",
+            "ix_elfis_mig_act_org_session",
+            "ix_elfis_mig_act_session",
+            "ix_elfis_mig_act_type"
+          ],
+          "elfis_migration_memory_entries": [
+            "elfis_migration_memory_entries_pkey",
+            "ix_elfis_mig_mem_key",
+            "ix_elfis_mig_mem_org",
+            "ix_elfis_mig_mem_org_session",
+            "ix_elfis_mig_mem_scope",
+            "ix_elfis_mig_mem_session",
+            "ix_elfis_mig_mem_status",
+            "ix_elfis_mig_mem_type"
+          ]
+        },
+        "column_defaults": {
+          "migration_profile": "jsonb_build_object('schema_version', 1, 'data', jsonb_build_object())",
+          "ai_profile": "jsonb_build_object('schema_version', 1, 'data', jsonb_build_object())"
+        },
+        "token_unique_present": true,
+        "foreign_keys": [
+          {
+            "table": "elfis_migration_activities",
+            "column": "actor_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_activities",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_activities",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "created_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_memory_entries",
+            "column": "validated_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_sessions",
+            "column": "created_by_user_id",
+            "ref": "users"
+          },
+          {
+            "table": "elfis_migration_sessions",
+            "column": "organization_id",
+            "ref": "organizations"
+          },
+          {
+            "table": "elfis_migration_timeline_entries",
+            "column": "migration_session_id",
+            "ref": "elfis_migration_sessions"
+          },
+          {
+            "table": "elfis_migration_timeline_entries",
+            "column": "organization_id",
+            "ref": "organizations"
+          }
+        ],
+        "fk_ok": true,
+        "probe": {
+          "ok": true,
+          "defaults": {
+            "migration_profile": {
+              "data": {},
+              "schema_version": 1
+            },
+            "ai_profile": {
+              "data": {},
+              "schema_version": 1
+            },
+            "token": "mig_cert_probe_token_unique_001"
+          },
+          "duplicate_token_rejected": true,
+          "duplicate_error": "IntegrityError"
+        },
+        "schema_ok": true
+      },
+      "pass": true
+    }
+  },
+  "api_boot": {
+    "ok": true,
+    "routes": 345,
+    "error": null
+  },
+  "overall_pass": true,
+  "finished_at": "2026-07-23T18:59:29.732319+00:00"
+}

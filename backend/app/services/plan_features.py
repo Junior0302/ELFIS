@@ -72,11 +72,12 @@ PLAN_EMAIL_LIMITS: dict[str, dict[str, int | bool]] = {
     },
 }
 
+# Libellés d’affichage transverses ELFIS (BRAND.ELFIS.2) — clés RBAC inchangées.
 ROLE_LABELS_FR: dict[str, str] = {
     "owner": "Propriétaire",
     "admin": "Administrateur",
-    "cfo": "Directeur financier",
-    "comptable": "Comptable",
+    "cfo": "Gestionnaire",
+    "comptable": "Collaborateur",
     "employe": "Collaborateur",
     "auditeur": "Lecteur",
 }

@@ -157,16 +157,19 @@ export default function OrganisationPage() {
         <div>
           <h2>Entreprise</h2>
           <p>
-            Identité et coordonnées de l’entreprise. TVA, e-mails de documents et préférences sont
-            dans Paramètres.
+            Identité légale ELFIS — partagée entre les espaces. TVA métier et modèles e-mail
+            facture restent dans l’espace Finance.
           </p>
         </div>
         <div className="actions" style={{ margin: 0, flexWrap: 'wrap' }}>
           <Link className="btn secondary" to="/settings">
-            TVA & e-mails
+            TVA & modèles facture
+          </Link>
+          <Link className="btn secondary" to="/platform/communications">
+            Communications
           </Link>
           {canManageTeam && (
-            <Link className="btn secondary" to="/admin/equipe">
+            <Link className="btn secondary" to="/platform/members">
               Équipe
             </Link>
           )}
@@ -499,7 +502,7 @@ export default function OrganisationPage() {
           </p>
           <p style={{ marginTop: '0.75rem' }}>
             Les comptes utilisateurs et les permissions se gèrent uniquement dans{' '}
-            <Link to="/admin/equipe">Admin → Équipe</Link>.
+            <Link to="/platform/members">Membres et équipes</Link>.
           </p>
         </section>
       </div>

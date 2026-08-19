@@ -7,218 +7,340 @@ export type NavItem = {
   spokenIntro: string
   /** Guide détaillé (4 phrases) affiché en tête de page */
   guide: [string, string, string, string]
+  /** Guide alternatif quand l’utilisateur n’a pas d’accès produit (ex. sans abonnement) */
+  guideLocked?: [string, string, string, string]
+  spokenIntroLocked?: string
   permission?: string
 }
 
 export type NavSection = { title: string; items: NavItem[] }
 
+/** Navigation Phase 1 — toutes les pages intégrées accessibles. */
 export const navSections: NavSection[] = [
   {
-    title: 'Pilotage',
+    title: 'Principal',
     items: [
       {
         to: '/dashboard',
-        label: 'Tableau de bord',
-        hint: 'Vue d’ensemble',
-        spokenIntro:
-          'Bienvenue sur votre tableau de bord. Ici, vous voyez l’état de l’activité en un coup d’œil.',
+        label: 'Accueil',
+        hint: 'Tableau de bord',
+        spokenIntro: 'Bienvenue. Voici votre tableau de bord.',
+        spokenIntroLocked:
+          'Bienvenue. Activez d’abord votre essai gratuit pour ouvrir le tableau de bord.',
         permission: 'invoice.read',
         guide: [
-          'C’est votre écran d’accueil : chiffre d’affaires, impayés, documents et priorités.',
-          'Le bouton « Écouter le récap » lit un résumé vocal court (~10 s) — seul endroit où la voix est activée.',
-          'Exemple : vous arrivez le matin, écoutez le récap, puis ouvrez le copilote en chat si besoin.',
-          'Sans abonnement actif, cette vue vous oriente déjà vers l’essai pour débloquer l’analyse et la facturation.',
+          'Vue d’accueil synthétique : KPIs, Health Score, alertes et sync bancaire.',
+          'Les chiffres viennent du Financial Engine (/api/financial/overview).',
+          'Accès rapides vers Finance, Banque, Copilote, Facturation et Dépôt.',
+          'L’analyse détaillée reste sur /finance — ici, synthèse et priorités.',
+        ],
+        guideLocked: [
+          'Commencez par démarrer votre essai gratuit de 14 jours.',
+          'Ensuite, connectez votre banque et créez votre première facture.',
+          'Le Copilote IA et le tableau financier s’ouvrent après activation.',
+          'Ouvrez Abonnement pour lancer l’essai en quelques clics.',
         ],
       },
       {
-        to: '/intelligence',
-        label: 'Intelligence',
-        hint: 'Alertes & ELFIS',
-        spokenIntro:
-          'Voici la page Intelligence. J’y centralise les alertes et signaux qui méritent votre attention.',
-        permission: 'ai.analysis',
-        guide: [
-          'Ici, ComptaPilot regroupe les alertes et signaux utiles pour le dirigeant (écarts, anomalies, priorités).',
-          'Ça sert à anticiper un problème avant qu’il coûte cher : oubli, incohérence, document à traiter.',
-          'Exemple : une facture fournisseur au montant inhabituel, ou un document en attente trop longtemps.',
-          'Avec l’abonnement (ou l’essai), ces analyses deviennent actives ; sans lui, le module reste verrouillé.',
-        ],
-      },
-      {
-        to: '/notifications',
-        label: 'Notifications',
-        hint: 'Alertes & envois',
-        spokenIntro:
-          'Voici vos notifications. Retrouvez les alertes d’envoi et d’archivage.',
+        to: '/work-queue',
+        label: 'À traiter',
+        hint: 'Boîte de travail',
+        spokenIntro: 'Boîte de travail. Voici ce qui demande votre attention.',
         permission: 'invoice.read',
         guide: [
-          'Le centre de notifications regroupe les succès et échecs d’envoi, sans bruit inutile.',
-          'Marquez comme lu, archivez, ou ouvrez le document concerné.',
-          'Exemple : un échec d’e-mail après archivage Vault apparaît ici pour réessayer.',
-          'Le compteur de la cloche se met à jour automatiquement environ chaque minute.',
+          'Organisez les décisions à traiter, en cours, en attente et terminées.',
+          'Les volumes et priorités viennent du Work Queue backend.',
+          'Ouvrez un élément pour comprendre la cause et agir via le Decision Center.',
+          'Le détail reste sur /decisions/{id} pour l’exécution sensible.',
         ],
       },
       {
-        to: '/copilote',
-        label: 'Copilote IA',
-        hint: 'Chat & conseils',
-        spokenIntro:
-          'Vous êtes sur le Copilote IA. Posez vos questions en chat pour piloter vos chiffres.',
-        permission: 'ai.analysis',
+        to: '/finance',
+        label: 'Finance',
+        hint: 'Dashboard financier',
+        spokenIntro: 'Tableau de bord financier. KPIs, alertes et santé.',
+        permission: 'invoice.read',
         guide: [
-          'Posez une question en français dans le chat — réponses basées sur vos données.',
-          'Le copilote aide à décider rapidement sans remplacer votre expert-comptable.',
-          'Exemple : « Quels clients sont en retard ? » ou « Résume mon activité ».',
-          'Réservé à l’offre ComptaPilot IA : démarrez l’essai depuis Abonnement pour l’utiliser.',
-        ],
-      },
-    ],
-  },
-  {
-    title: 'Activité',
-    items: [
-      {
-        to: '/deposit',
-        label: 'Déposer',
-        hint: 'Scan de factures',
-        spokenIntro:
-          'Vous êtes sur Déposer. Envoyez une photo ou un PDF, je m’occupe du reste.',
-        permission: 'invoice.create',
-        guide: [
-          'Déposez une photo ou un PDF de facture / justificatif pour lancer le traitement automatique.',
-          'Ça évite de retaper les montants, dates et fournisseurs à la main.',
-          'Exemple : vous photographiez une facture de fournitures et validez les infos extraites en quelques clics.',
-          'Fonctionnalité premium : l’essai ou l’abonnement ouvre ce flux de dépôt.',
+          'KPIs, tendances, graphiques, alertes et Health Score en temps réel.',
+          'Tous les calculs viennent du Financial Engine — le frontend n’en fait aucun.',
+          'Exemple : suivez trésorerie, CA, dépenses et TVA estimée.',
+          'Actualisation automatique : les indicateurs restent à jour.',
         ],
       },
       {
         to: '/documents',
         label: 'Documents',
-        hint: 'Coffre-fort PDF',
-        spokenIntro:
-          'Voici Documents. Archivez vos PDF dans le coffre sécurisé ELFIS Vault.',
+        hint: 'Centre documentaire',
+        spokenIntro: 'Centre Documents. Liste, filtres et aperçu Vault.',
         permission: 'documents.read',
         guide: [
-          'Archivez un PDF (facture, devis, avoir…) dans le coffre privé de votre entreprise.',
-          'Onglet « Déposer un document » pour archiver, « Mes documents » pour consulter (bientôt).',
-          'Exemple : vous archivez une facture signée pour la conserver hors messagerie.',
-          'Réservé aux rôles autorisés ; un abonnement actif est requis pour archiver.',
+          'Listez, filtrez et consultez vos PDF archivés.',
+          'Accédez ensuite à l’analyse, la validation et la comptabilité.',
+          'Exemple : ouvrez un PDF, vérifiez le statut, lancez une proposition.',
+          'Toutes les actions appellent les API Vault / documents existantes.',
         ],
       },
       {
-        to: '/history',
-        label: 'Comptabilité',
-        hint: 'Documents & exports',
-        spokenIntro:
-          'Bienvenue en Comptabilité. Retrouvez ici tous vos documents et exports.',
-        permission: 'documents.read',
+        to: '/migration',
+        label: 'Centre d’import',
+        hint: 'Wizard & imports',
+        spokenIntro: 'Centre d’import. Sessions, progression et rapports.',
+        permission: 'migration_center.read',
         guide: [
-          'Retrouvez tous les documents déjà traités, leur statut et l’historique de travail.',
-          'Utile pour retrouver une pièce, préparer un export ou suivre ce qui reste à valider.',
-          'Exemple : votre comptable demande les factures de mars — vous filtrez et exportez la période.',
-          'Accessible avec un abonnement actif ; sinon les données premium restent en lecture limitée.',
+          'Créez ou reprenez une session de migration.',
+          'Wizard, batchs et rapports : 100 % API, aucune logique locale.',
+          'Exemple : migration Excel initiale reprise le lendemain.',
+          'Surveillez la progression et l’ETA depuis le tableau de bord migration.',
+        ],
+      },
+      {
+        to: '/accounting',
+        label: 'Comptabilité',
+        hint: 'Propositions & historique',
+        spokenIntro: 'Section Comptabilité. Propositions, moteur et historique.',
+        permission: 'ai.analysis',
+        guide: [
+          'Hub vers propositions V1, moteur V2 et documents traités.',
+          'Aucune écriture définitive sans validation humaine.',
+          'Exemple : ouvrez une proposition, contrôlez, validez.',
+          'Les données viennent des endpoints accounting existants.',
+        ],
+      },
+      {
+        to: '/accounting/intelligence',
+        label: 'Intelligence comptable',
+        hint: 'Recommandations',
+        spokenIntro: 'Intelligence comptable. Recommandations et feedback.',
+        permission: 'accounting_intelligence.read',
+        guide: [
+          'Recommandations expliquées, score de confiance, apprentissage.',
+          'Le feedback utilisateur alimente la mémoire — jamais un refus.',
+          'Exemple : acceptez une reco pour mémoriser le compte.',
+          'API /accounting/intelligence uniquement.',
+        ],
+      },
+      {
+        to: '/banque',
+        label: 'Banque',
+        hint: 'Comptes & synchronisation',
+        spokenIntro: 'Espace Banque. Connexions, comptes et transactions.',
+        permission: 'bank.read',
+        guide: [
+          'Connectez vos banques via un fournisseur interchangeable.',
+          'Le Banking Engine backend reste la source de vérité.',
+          'Exemple : connectez la banque démo puis synchronisez.',
+          'Suivez la santé des connexions et le journal des syncs.',
+        ],
+      },
+      {
+        to: '/search',
+        label: 'Recherche',
+        hint: 'Recherche globale',
+        spokenIntro: 'Recherche globale sur documents, clients et propositions.',
+        permission: 'invoice.read',
+        guide: [
+          'Recherchez documents, clients, fournisseurs, propositions, rapports.',
+          'Le moteur Search Engine backend reste la source de vérité.',
+          'Exemple : tapez un n° de facture ou un fournisseur.',
+          'Accessible aussi depuis la barre du haut.',
+        ],
+      },
+      {
+        to: '/notifications',
+        label: 'Notifications',
+        hint: 'Centre d’alertes',
+        spokenIntro: 'Centre de notifications. Succès, erreurs, jobs et imports.',
+        permission: 'invoice.read',
+        guide: [
+          'Succès, erreurs, imports, migrations, jobs et événements.',
+          'Marquez comme lu ou archivez sans quitter l’écran.',
+          'Exemple : un échec d’envoi Vault apparaît ici.',
+          'Synchronisation via polling intelligent (pas de SSE backend).',
+        ],
+      },
+      {
+        to: '/reports',
+        label: 'Rapports',
+        hint: 'Exports & bilans',
+        spokenIntro: 'Rapports. Accès aux bilans migration et exports.',
+        permission: 'invoice.read',
+        guide: [
+          'Point d’entrée vers rapports migration, exports et pilotage.',
+          'Aucun calcul local : liens vers les écrans déjà branchés API.',
+          'Exemple : ouvrir le rapport d’une session de migration.',
+          'Complété par l’historique comptable et le cockpit.',
+        ],
+      },
+      {
+        to: '/admin/equipe',
+        label: 'Administration',
+        hint: 'Équipe & droits',
+        spokenIntro: 'Administration. Invitez et gérez les droits.',
+        permission: 'users.manage',
+        guide: [
+          'Invitez des collaborateurs et définissez les permissions.',
+          'Les rôles IAM backend restent la source de vérité.',
+          'Exemple : un assistant crée des devis, le dirigeant gère l’abo.',
+          'Abonnement et organisation restent accessibles dans Paramètres.',
+        ],
+      },
+      {
+        to: '/cockpit',
+        label: 'Centre opérationnel',
+        hint: 'Ops & jobs',
+        spokenIntro: 'Centre opérationnel. Jobs, notifs et activité.',
+        permission: 'invoice.read',
+        guide: [
+          'Vue ops : notifications, migrations, propositions comptables.',
+          'Indicateurs financiers = Financial Engine (même source qu’Accueil / Finance).',
+          'Exemple : voir les sessions actives et les alertes non lues.',
+          'Les admins plateforme gardent aussi l’accès ELF Admin.',
+        ],
+      },
+      {
+        to: '/settings',
+        label: 'Paramètres',
+        hint: 'Comptabilité & OCR',
+        spokenIntro: 'Préférences comptables. OCR, comptes et modèles d’e-mail.',
+        guide: [
+          'Comptes comptables, OCR, seuils de confiance.',
+          'L’identité entreprise se gère dans Paramètres ELFIS / Organisation.',
+          'Exemple : mettre à jour le taux de TVA par défaut.',
+          'Accessible dès l’inscription.',
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Commercial',
+    items: [
+      {
+        to: '/deposit',
+        label: 'Déposer',
+        hint: 'Scan de factures',
+        spokenIntro: 'Déposer une facture pour analyse.',
+        permission: 'invoice.create',
+        guide: [
+          'Déposez une photo ou un PDF pour lancer le traitement.',
+          'Flux existant inchangé — API documents / AI.',
+          'Exemple : photo de fournitures puis validation.',
+          'Réservé à l’abonnement ou essai actif.',
         ],
       },
       {
         to: '/facturation',
         label: 'Facturation',
-        hint: 'Factures, devis, encaissements',
-        spokenIntro:
-          'Vous consultez la Facturation. Devis, factures et encaissements sont à portée de main.',
+        hint: 'Factures & devis',
+        spokenIntro: 'Facturation commerciale.',
         permission: 'invoice.read',
         guide: [
-          'Point d’entrée commercial : factures, devis, encaissements et suivi client.',
-          'Pour envoyer : ouvrez le document, puis « Ouvrir ma messagerie ».',
-          'Le PDF est téléchargé : joignez-le dans Gmail ou Outlook avant d’envoyer.',
-          'Avec l’essai ComptaPilot IA, toute la chaîne devis → facture devient disponible.',
+          'Factures, devis et encaissements.',
+          'Envoi via votre messagerie avec PDF joint.',
+          'Exemple : créer un devis puis le convertir.',
+          'Inclus dans l’essai ComptaPilot IA.',
         ],
       },
       {
         to: '/clients',
         label: 'Clients',
         hint: 'Fiches & contacts',
-        spokenIntro:
-          'Voici vos Clients. Centralisez contacts et fiches pour gagner du temps au quotidien.',
+        spokenIntro: 'Vos clients.',
         permission: 'invoice.read',
         guide: [
-          'Centralisez les fiches clients : nom, email, téléphone, adresse, n° TVA.',
-          'Évite les doublons et accélère la création de devis / factures.',
-          'Exemple : vous enregistrez « Dupont SARL » une fois, puis le retrouvez automatiquement au prochain devis.',
-          'Disponible avec l’offre ComptaPilot ; idéal dès le démarrage de l’essai.',
+          'Centralisez les fiches clients.',
+          'Évite les doublons au prochain devis.',
+          'Exemple : enregistrer Dupont SARL une fois.',
+          'Disponible avec l’offre ComptaPilot.',
         ],
       },
       {
         to: '/catalogue',
         label: 'Catalogue',
         hint: 'Produits & services',
-        spokenIntro:
-          'Bienvenue dans le Catalogue. Vos produits et services sont prêts à insérer dans chaque document.',
+        spokenIntro: 'Catalogue produits.',
         permission: 'invoice.read',
         guide: [
-          'Listez vos produits et services avec prix HT, unité et taux de TVA.',
-          'Vous gagnez du temps : plus besoin de retaper les mêmes lignes à chaque devis.',
-          'Exemple : « Audit mensuel — 190 € HT — 20 % TVA » prêt à insérer en un clic.',
-          'Catalogue commercial inclus dans l’abonnement / essai ComptaPilot IA.',
+          'Produits et services avec prix et TVA.',
+          'Insertion rapide dans devis et factures.',
+          'Exemple : audit mensuel 190 € HT.',
+          'Inclus dans l’abonnement / essai.',
         ],
       },
       {
         to: '/activites',
         label: 'Activités',
         hint: 'Agenda commercial',
-        spokenIntro:
-          'Vous êtes sur Activités. Planifiez rendez-vous et suivis commerciaux sans rien oublier.',
+        spokenIntro: 'Agenda commercial.',
         permission: 'invoice.read',
         guide: [
-          'Planifiez rendez-vous, suivis, ventes et interventions liés à vos clients.',
-          'Ça sert à ne rien oublier dans le suivi commercial du quotidien.',
-          'Exemple : RDV client mardi 10 h, puis rappel « devis à relancer » vendredi.',
-          'Agenda commercial débloqué avec l’essai ou l’abonnement actif.',
-        ],
-      },
-    ],
-  },
-  {
-    title: 'Espace',
-    items: [
-      {
-        to: '/organisation',
-        label: 'Entreprise',
-        hint: 'Identité, TVA, e-mails',
-        spokenIntro:
-          'Vous êtes sur Entreprise. Identité, TVA et modèles d’e-mail au même endroit.',
-        guide: [
-          'Renseignez l’identité, la TVA, et les modèles d’objet/message pour devis et factures.',
-          'L’envoi se fait depuis votre messagerie personnelle — joignez le PDF téléchargé.',
-          'Exemple : raison sociale, logo, objet par défaut « Devis {{quote_number}} ».',
-          'Accessible dès l’inscription ; affinez pendant l’essai.',
+          'Rendez-vous et suivis clients.',
+          'Ne rien oublier au quotidien.',
+          'Exemple : RDV mardi, rappel vendredi.',
+          'Débloqué avec essai ou abonnement.',
         ],
       },
       {
-        to: '/admin/equipe',
-        label: 'Équipe',
-        hint: 'Invitations & droits',
-        spokenIntro:
-          'Bienvenue dans Équipe. Invitez vos collaborateurs et ajustez leurs droits.',
-        permission: 'users.manage',
+        to: '/copilote',
+        label: 'Copilote IA',
+        hint: 'Assistant financier',
+        spokenIntro: 'Copilote IA. Posez vos questions financières.',
+        permission: 'ai.analysis',
         guide: [
-          'Invitez des collaborateurs et définissez qui peut voir ou modifier quoi.',
-          'Utile pour travailler à plusieurs sans partager le même mot de passe.',
-          'Exemple : un assistant crée les devis, le dirigeant seul gère l’abonnement.',
-          'La gestion d’équipe reste disponible ; certaines actions métier dépendent de l’abonnement.',
+          'Conversation structurée : faits, estimations, recommandations, manques.',
+          'Le Decision Engine orchestre les moteurs — le LLM n’invente jamais de données.',
+          'Chaque recommandation expose pourquoi, quelles données et le niveau de confiance.',
+          'Donnez votre feedback (utile / inutile / incorrect) pour améliorer l’assistant.',
+        ],
+      },
+      {
+        to: '/intelligence',
+        label: 'Signaux',
+        hint: 'Alertes ELFIS',
+        spokenIntro: 'Signaux et alertes métier.',
+        permission: 'ai.analysis',
+        guide: [
+          'Alertes et anomalies à surveiller.',
+          'Anticiper avant que ça coûte cher.',
+          'Exemple : montant inhabituel.',
+          'Actif avec abonnement ou essai.',
         ],
       },
       {
         to: '/abonnement',
         label: 'Abonnement',
         hint: 'Essai & facturation',
-        spokenIntro:
-          'Voici Abonnement. Gérez votre essai, votre carte et le renouvellement.',
+        spokenIntro: 'Gérez votre abonnement.',
         permission: 'subscription.manage',
         guide: [
-          'Gérez l’essai gratuit, le renouvellement, la carte et les factures de l’organisation.',
-          'C’est ici que vous démarrez les 14 jours d’essai puis le forfait à 19 € / mois.',
-          'Exemple : activez l’essai ou mettez à jour votre carte.',
-          'Sans abonnement finalisé, les modules premium restent verrouillés.',
+          'Billing V2 : abonnement, quotas, historique, plans et paiements.',
+          'L’Entitlement Engine est la source de vérité ; Stripe synchronise.',
+          'Exemple : activer l’essai, suivre la consommation, changer de plan.',
+          'Sans abo, le premium reste verrouillé selon les entitlements.',
+        ],
+      },
+      {
+        to: '/organisation',
+        label: 'Entreprise',
+        hint: 'Identité',
+        spokenIntro: 'Identité de l’entreprise.',
+        guide: [
+          'Raison sociale, TVA, e-mails.',
+          'Accessible dès l’inscription.',
+          'Exemple : logo et objet de devis.',
+          'Complète les Paramètres.',
+        ],
+      },
+      {
+        to: '/modules',
+        label: 'Modules',
+        hint: 'Catalogue produit',
+        spokenIntro: 'Catalogue des modules.',
+        permission: 'invoice.read',
+        guide: [
+          'Vue des modules produit disponibles.',
+          'Navigation vers les espaces intégrés.',
+          'Exemple : ouvrir Migration ou Documents.',
+          'Page désormais accessible depuis la nav.',
         ],
       },
     ],
@@ -227,15 +349,43 @@ export const navSections: NavSection[] = [
 
 export function findNavItem(pathname: string): NavItem | undefined {
   const normalized = pathname.replace(/\/+$/, '') || '/'
+  let best: NavItem | undefined
+  let bestLen = -1
   for (const section of navSections) {
     for (const item of section.items) {
       if (item.to === normalized) return item
-      if (item.to !== '/dashboard' && normalized.startsWith(item.to + '/')) return item
+      if (item.to !== '/dashboard' && normalized.startsWith(item.to + '/')) {
+        if (item.to.length > bestLen) {
+          best = item
+          bestLen = item.to.length
+        }
+      }
     }
   }
-  return undefined
+  return best
 }
 
 export function spokenPageScript(item: NavItem): string {
   return `${item.spokenIntro} ${item.guide[0]} ${item.guide[1]}`
 }
+
+/** Routes produit attendues Phase 1 (tests). */
+export const PHASE1_INTEGRATED_PATHS = [
+  '/dashboard',
+  '/documents',
+  '/migration',
+  '/accounting',
+  '/accounting/proposals',
+  '/accounting/engine',
+  '/accounting/intelligence',
+  '/search',
+  '/notifications',
+  '/reports',
+  '/admin/equipe',
+  '/cockpit',
+  '/settings',
+  '/history',
+  '/deposit',
+  '/facturation',
+  '/modules',
+] as const

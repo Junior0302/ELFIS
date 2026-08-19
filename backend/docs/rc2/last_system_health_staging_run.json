@@ -1,0 +1,239 @@
+{
+  "started_at": "2026-07-22T14:24:13.807289+00:00",
+  "environment": "staging",
+  "database_kind": "postgres",
+  "database_host_masked": "db.***abase.co",
+  "database_url_masked": "postgresql+psycopg://postgres:***@db.stckzlalxrupgawgrojk.supabase.co:5432/postgres",
+  "providers_activated": {
+    "api": "real",
+    "postgresql": "real",
+    "jobs_queue": "real",
+    "event_bus": "real",
+    "search": "real"
+  },
+  "use_real_providers_flag": false,
+  "all_errors": [],
+  "providers": {
+    "modes": {
+      "api": "real",
+      "postgresql": "real",
+      "jobs_queue": "real",
+      "event_bus": "real",
+      "search": "real"
+    },
+    "services": {
+      "api": {
+        "status": "healthy",
+        "summary": "API processus op\u00e9rationnelle",
+        "latency_ms": 1695.91,
+        "version": "0.8.9",
+        "checked_at": "2026-07-22T14:24:16.479448",
+        "metrics": {
+          "uptime_seconds": 0.0,
+          "route_count": 254,
+          "environment": "staging"
+        },
+        "metadata": {
+          "provider_mode": "real",
+          "simulated": false,
+          "environment": "staging",
+          "uptime_seconds": 0.0,
+          "route_count": 254
+        },
+        "error_code": null,
+        "error_message": null,
+        "provider_mode": "real",
+        "simulated": false
+      },
+      "postgresql": {
+        "status": "degraded",
+        "summary": "Latence DB \u00e9lev\u00e9e (1061.32 ms)",
+        "latency_ms": 1061.32,
+        "version": "17.6",
+        "checked_at": "2026-07-22T14:24:17.641173",
+        "metrics": {
+          "active_connections": 12,
+          "pool_size": 5,
+          "max_overflow": 10,
+          "checked_out": 1,
+          "available": 0,
+          "overflow": -4,
+          "latency_ms": 1061.32,
+          "max_connections": 60
+        },
+        "metadata": {
+          "provider_mode": "real",
+          "simulated": false,
+          "dialect": "postgresql"
+        },
+        "error_code": "db_latency_high",
+        "error_message": null,
+        "provider_mode": "real",
+        "simulated": false
+      },
+      "jobs_queue": {
+        "status": "healthy",
+        "summary": "File jobs nominale",
+        "latency_ms": 259.35,
+        "version": "v1",
+        "checked_at": "2026-07-22T14:24:17.927319",
+        "metrics": {
+          "pending": 0,
+          "running": 0,
+          "failed": 0,
+          "completed_recent_count": 0,
+          "oldest_pending_age_seconds": null,
+          "stalled_count": 0,
+          "completed_total": 0
+        },
+        "metadata": {
+          "provider_mode": "real",
+          "simulated": false,
+          "pending_count": 0,
+          "running_count": 0,
+          "failed_count": 0,
+          "completed_recent_count": 0,
+          "oldest_pending_age_seconds": null,
+          "stalled_count": 0
+        },
+        "error_code": null,
+        "error_message": null,
+        "provider_mode": "real",
+        "simulated": false
+      },
+      "event_bus": {
+        "status": "healthy",
+        "summary": "Bus op\u00e9rationnel \u2014 claim nominal",
+        "latency_ms": 250.64,
+        "version": "v1",
+        "checked_at": "2026-07-22T14:24:18.195749",
+        "metrics": {
+          "pending": 0,
+          "processing": 0,
+          "failed": 0,
+          "backlog_count": 0,
+          "oldest_pending_age_seconds": null,
+          "stalled_count": 0,
+          "pending_events": 0
+        },
+        "metadata": {
+          "provider_mode": "real",
+          "simulated": false,
+          "pending_count": 0,
+          "processing_count": 0,
+          "failed_count": 0,
+          "backlog_count": 0,
+          "oldest_pending_age_seconds": null,
+          "stalled_count": 0
+        },
+        "error_code": null,
+        "error_message": null,
+        "provider_mode": "real",
+        "simulated": false
+      },
+      "search": {
+        "status": "healthy",
+        "summary": "Index Search disponible",
+        "latency_ms": 626.17,
+        "version": "v1",
+        "checked_at": "2026-07-22T14:24:18.841086",
+        "metrics": {
+          "indexed_docs": 0,
+          "table_exists": "true",
+          "column_exists": "true",
+          "column_type": "tsvector",
+          "gin_index": "true",
+          "query_ok": "true",
+          "query_latency_ms": 626.17
+        },
+        "metadata": {
+          "provider_mode": "real",
+          "simulated": false,
+          "dialect": "postgresql",
+          "table_exists": true,
+          "column_exists": true,
+          "column_type": "tsvector",
+          "index_exists": true,
+          "query_ok": true
+        },
+        "error_code": null,
+        "error_message": null,
+        "provider_mode": "real",
+        "simulated": false
+      }
+    },
+    "errors": []
+  },
+  "postgres_direct": {
+    "errors": [],
+    "checks": {
+      "select_1": "PASS",
+      "version": "17.6",
+      "active_connections": 12,
+      "max_connections": 60,
+      "pool_size": 5,
+      "checked_out": 1
+    }
+  },
+  "jobs_events": {
+    "errors": [],
+    "checks": {
+      "jobs_count": 0,
+      "events_count": 0,
+      "jobs_groups": {},
+      "events_groups": {},
+      "completed_with_old_lock": 0,
+      "note": "stalled = processing only (completed exclus)"
+    }
+  },
+  "search": {
+    "errors": [],
+    "checks": {
+      "count_before": 0,
+      "search_vector_type": "tsvector",
+      "gin_index": true,
+      "count_after": 0
+    }
+  },
+  "endpoints": {
+    "endpoints": {
+      "/api/admin/system/health": {
+        "status_code": 200,
+        "secrets": [],
+        "ok": true,
+        "service_ids": [
+          "api",
+          "postgresql",
+          "jobs_queue",
+          "event_bus",
+          "search",
+          "billing",
+          "notifications",
+          "authentication",
+          "vault",
+          "storage",
+          "ai",
+          "ocr"
+        ]
+      },
+      "/api/admin/system/metrics?period=24h": {
+        "status_code": 200,
+        "secrets": [],
+        "ok": true
+      },
+      "/api/admin/system/alerts": {
+        "status_code": 200,
+        "secrets": [],
+        "ok": true
+      },
+      "/api/admin/system/logs?limit=20": {
+        "status_code": 200,
+        "secrets": [],
+        "ok": true
+      }
+    },
+    "errors": []
+  },
+  "final_status": "PASS",
+  "finished_at": "2026-07-22T14:24:21.601904+00:00"
+}

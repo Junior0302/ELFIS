@@ -11,6 +11,11 @@ from app.notifications.notification_types import (
     NotificationChannel,
     NotificationSeverity,
     NotificationTypes,
+    TEMPLATE_ACCOUNTING_PROPOSAL_FAILED,
+    TEMPLATE_ACCOUNTING_PROPOSAL_READY,
+    TEMPLATE_ACCOUNTING_PROPOSAL_REJECTED,
+    TEMPLATE_ACCOUNTING_PROPOSAL_REVIEW,
+    TEMPLATE_ACCOUNTING_PROPOSAL_VALIDATED,
     TEMPLATE_DOCUMENT_ARCHIVED,
     TEMPLATE_DOCUMENT_EMAIL_FAILED,
     TEMPLATE_DOCUMENT_EMAIL_SENT,
@@ -134,6 +139,96 @@ class SystemGenericTemplate(NotificationTemplate):
         )
 
 
+class AccountingProposalReadyTemplate(NotificationTemplate):
+    template_name = TEMPLATE_ACCOUNTING_PROPOSAL_READY
+    notification_type = NotificationTypes.ACCOUNTING_PROPOSAL_READY
+    category = NotificationCategories.ACCOUNTING
+    default_severity = NotificationSeverity.SUCCESS
+    default_channels = [NotificationChannel.IN_APP]
+
+    def render(self, data: dict[str, Any]) -> RenderedNotification:
+        number = str(data.get("document_number") or "").strip() or "document"
+        return RenderedNotification(
+            title="Écriture comptable prête",
+            message=(
+                f"La facture {number} a été analysée et une écriture est prête à être vérifiée."
+            ),
+            action_url=f"/accounting/proposals/{data.get('proposal_id') or ''}",
+            action_label="Vérifier l'écriture",
+            severity=self.default_severity,
+        )
+
+
+class AccountingProposalReviewTemplate(NotificationTemplate):
+    template_name = TEMPLATE_ACCOUNTING_PROPOSAL_REVIEW
+    notification_type = NotificationTypes.ACCOUNTING_PROPOSAL_REQUIRES_REVIEW
+    category = NotificationCategories.ACCOUNTING
+    default_severity = NotificationSeverity.WARNING
+    default_channels = [NotificationChannel.IN_APP]
+
+    def render(self, data: dict[str, Any]) -> RenderedNotification:
+        return RenderedNotification(
+            title="Vérification nécessaire",
+            message=(
+                "Certaines informations comptables doivent être contrôlées avant validation."
+            ),
+            action_url=f"/accounting/proposals/{data.get('proposal_id') or ''}",
+            action_label="Contrôler",
+            severity=self.default_severity,
+        )
+
+
+class AccountingProposalValidatedTemplate(NotificationTemplate):
+    template_name = TEMPLATE_ACCOUNTING_PROPOSAL_VALIDATED
+    notification_type = NotificationTypes.ACCOUNTING_PROPOSAL_VALIDATED
+    category = NotificationCategories.ACCOUNTING
+    default_severity = NotificationSeverity.SUCCESS
+    default_channels = [NotificationChannel.IN_APP]
+
+    def render(self, data: dict[str, Any]) -> RenderedNotification:
+        return RenderedNotification(
+            title="Proposition validée",
+            message="L'écriture comptable a été validée avec succès.",
+            action_url=f"/accounting/proposals/{data.get('proposal_id') or ''}",
+            action_label="Voir",
+            severity=self.default_severity,
+        )
+
+
+class AccountingProposalRejectedTemplate(NotificationTemplate):
+    template_name = TEMPLATE_ACCOUNTING_PROPOSAL_REJECTED
+    notification_type = NotificationTypes.ACCOUNTING_PROPOSAL_REJECTED
+    category = NotificationCategories.ACCOUNTING
+    default_severity = NotificationSeverity.WARNING
+    default_channels = [NotificationChannel.IN_APP]
+
+    def render(self, data: dict[str, Any]) -> RenderedNotification:
+        return RenderedNotification(
+            title="Proposition rejetée",
+            message="La proposition d'écriture comptable a été rejetée.",
+            action_url="/accounting/proposals",
+            action_label="Voir les propositions",
+            severity=self.default_severity,
+        )
+
+
+class AccountingProposalFailedTemplate(NotificationTemplate):
+    template_name = TEMPLATE_ACCOUNTING_PROPOSAL_FAILED
+    notification_type = NotificationTypes.ACCOUNTING_PROPOSAL_FAILED
+    category = NotificationCategories.ACCOUNTING
+    default_severity = NotificationSeverity.ERROR
+    default_channels = [NotificationChannel.IN_APP]
+
+    def render(self, data: dict[str, Any]) -> RenderedNotification:
+        return RenderedNotification(
+            title="Échec proposition comptable",
+            message="La génération de l'écriture comptable a échoué ou nécessite une correction.",
+            action_url="/accounting/proposals",
+            action_label="Consulter",
+            severity=self.default_severity,
+        )
+
+
 _TEMPLATES: dict[str, NotificationTemplate] = {
     t.template_name: t
     for t in (
@@ -141,6 +236,11 @@ _TEMPLATES: dict[str, NotificationTemplate] = {
         DocumentEmailFailedTemplate(),
         DocumentArchivedTemplate(),
         SystemGenericTemplate(),
+        AccountingProposalReadyTemplate(),
+        AccountingProposalReviewTemplate(),
+        AccountingProposalValidatedTemplate(),
+        AccountingProposalRejectedTemplate(),
+        AccountingProposalFailedTemplate(),
     )
 }
 

@@ -49,6 +49,22 @@ MODULES: list[dict] = [
         "route": "/facturation",
     },
     {
+        "id": 2,
+        "slug": "banque",
+        "name": "Banque",
+        "status": "live",
+        "summary": "Connexions bancaires, comptes, transactions normalisées et synchronisation.",
+        "capabilities": [
+            "connecteurs_interchangeables",
+            "comptes_multi_banques",
+            "transactions_normalisees",
+            "synchronisation_incrementale",
+            "detection_doublons",
+            "sante_connexions",
+        ],
+        "route": "/banque",
+    },
+    {
         "id": 6,
         "slug": "pilotage",
         "name": "Pilotage",

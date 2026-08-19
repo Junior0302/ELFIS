@@ -124,6 +124,7 @@ def import_bank_csv(
                 amount=round(amount, 2),
                 currency=account.currency,
                 category=categorize(label),
+                source="csv",
             )
         )
         existing_ids.add(external_id)

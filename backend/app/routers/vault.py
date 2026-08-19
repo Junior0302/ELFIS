@@ -102,6 +102,49 @@ async def archive_vault_document(
     if auth.user is None:
         return JSONResponse(status_code=401, content={"detail": "Authentification requise"})
 
+    # Isolation : tenant_id formulaire = organisation active du contexte (anti mass-assignment)
+    try:
+        active_org_id = auth.require_organization_id()
+    except Exception:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": {"code": "organization_required", "message": "Organisation requise"}},
+        )
+    if int(tenant_id) != int(active_org_id):
+        from app.security.security_audit import record_security_event
+        from app.security.security_types import SecurityEventType
+
+        record_security_event(
+            db,
+            event_type=SecurityEventType.CROSS_TENANT_ACCESS_ATTEMPT,
+            user_id=auth.user.id,
+            organization_id=active_org_id,
+            route="/api/vault/documents/archive",
+            details={
+                "requested_tenant_id": int(tenant_id),
+                "active_organization_id": int(active_org_id),
+            },
+        )
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": {
+                    "code": "cross_tenant_denied",
+                    "message": "Le tenant_id ne correspond pas à l’organisation active",
+                }
+            },
+        )
+
+    from app.billing.billing_guards import check_and_consume_quota, require_feature
+    from app.billing.billing_types import FeatureCodes, QuotaCodes
+
+    require_feature(db, active_org_id, FeatureCodes.DOCUMENTS_UPLOAD, user=auth.user)
+    check_and_consume_quota(db, active_org_id, QuotaCodes.DOCUMENTS_PROCESSED_MONTH, 1)
+
     try:
         try:
             doc_type = VaultDocumentType(document_type)
@@ -109,7 +152,7 @@ async def archive_vault_document(
             raise VaultInvalidFileError("Type de document invalide") from exc
 
         meta = VaultArchiveFormMeta(
-            tenant_id=tenant_id,
+            tenant_id=active_org_id,
             document_type=doc_type,
             document_number=document_number,
             invoice_date=_parse_optional_date(invoice_date),

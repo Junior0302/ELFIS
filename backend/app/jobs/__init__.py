@@ -25,9 +25,31 @@ def bootstrap_job_handlers(registry: JobHandlerRegistry | None = None) -> None:
         DocumentInvoiceExtractionJobHandler,
         DocumentQualityCheckJobHandler,
     )
+    from app.jobs.handlers.document_intelligence_handlers import (
+        DocumentTextExtractionJobHandler,
+        DocumentOCRJobHandler,
+        DocumentPrepareAnalysisJobHandler,
+    )
+    from app.jobs.handlers.accounting_handlers import (
+        AccountingProposalJobHandler,
+        AccountingReprocessProposalJobHandler,
+        AccountingValidateMappingJobHandler,
+    )
+    from app.jobs.handlers.search_handlers import (
+        SearchIndexResourceJobHandler,
+        SearchRemoveResourceJobHandler,
+        SearchReindexOrganizationJobHandler,
+    )
+    from app.jobs.handlers.document_extraction_handlers import (
+        DocumentExtractionRunJobHandler,
+    )
     from app.ai import bootstrap_ai_tasks
+    from app.document_intelligence.document_registry import bootstrap_extractors
+    from app.search.search_registry import bootstrap_indexers
 
     bootstrap_ai_tasks()
+    bootstrap_extractors()
+    bootstrap_indexers()
 
     health = HealthCheckJobHandler()
     if not reg.has(health.job_name):
@@ -38,12 +60,28 @@ def bootstrap_job_handlers(registry: JobHandlerRegistry | None = None) -> None:
         reg.register(job_name=meta.job_name, handler=meta)
 
     for handler in (
+        DocumentTextExtractionJobHandler(),
+        DocumentOCRJobHandler(),
+        DocumentPrepareAnalysisJobHandler(),
         DocumentClassificationJobHandler(),
         DocumentInvoiceExtractionJobHandler(),
         DocumentQualityCheckJobHandler(),
+        AccountingProposalJobHandler(),
+        AccountingReprocessProposalJobHandler(),
+        AccountingValidateMappingJobHandler(),
+        SearchIndexResourceJobHandler(),
+        SearchRemoveResourceJobHandler(),
+        SearchReindexOrganizationJobHandler(),
+        DocumentExtractionRunJobHandler(),
     ):
         if not reg.has(handler.job_name):
             reg.register(job_name=handler.job_name, handler=handler)
+
+    from app.jobs.handlers.billing_handlers import register_billing_job_handlers
+    from app.jobs.handlers.reliability_handlers import register_reliability_job_handlers
+
+    register_billing_job_handlers(reg)
+    register_reliability_job_handlers(reg)
 
     if registry is None:
         _handlers_bootstrapped = True

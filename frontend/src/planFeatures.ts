@@ -46,14 +46,8 @@ export const FEATURE_LABELS_FR: Record<string, string> = {
   elfis_chat: 'Chat ELFIS',
 }
 
-export const ROLE_LABELS_FR: Record<string, string> = {
-  owner: 'Propriétaire',
-  admin: 'Administrateur',
-  cfo: 'Directeur financier',
-  comptable: 'Comptable',
-  employe: 'Collaborateur',
-  auditeur: 'Lecteur',
-}
+/** Libellés rôles — alias vers rôles globaux ELFIS (BRAND.ELFIS.2). */
+export { GLOBAL_ROLE_LABELS_FR as ROLE_LABELS_FR } from './platform-roles/globalRoles'
 
 export function planIncludesFeature(plan: string | undefined, feature: string) {
   const key = (plan || 'starter').toLowerCase()

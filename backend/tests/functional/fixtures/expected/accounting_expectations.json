@@ -1,0 +1,65 @@
+{
+  "version": "v1",
+  "notes": "Attentes métier souples — ne pas figer les champs IA non déterministes.",
+  "documents": {
+    "invoice_supplier_valid.pdf": {
+      "document_type": "supplier_invoice",
+      "supplier": "Fournisseur Fictif SA",
+      "invoice_number": "FAC-F-2026-001",
+      "currency": "EUR",
+      "ht": 100.0,
+      "vat": 20.0,
+      "ttc": 120.0,
+      "balanced": true,
+      "expected_review_status": "ready_for_validation",
+      "journal": "ACH",
+      "purchase_account": "607000",
+      "supplier_account": "401000",
+      "vat_account": "445660"
+    },
+    "invoice_customer_valid.pdf": {
+      "document_type": "customer_invoice",
+      "customer": "Client Fictif SARL",
+      "invoice_number": "FAC-C-2026-001",
+      "currency": "EUR",
+      "ht": 200.0,
+      "vat": 40.0,
+      "ttc": 240.0,
+      "balanced": true,
+      "expected_review_status": "ready_for_validation",
+      "journal": "VTE",
+      "sales_account": "707000",
+      "customer_account": "411000",
+      "vat_account": "445710"
+    },
+    "invoice_unbalanced.pdf": {
+      "document_type": "supplier_invoice",
+      "balanced": false,
+      "expected_review_status": "requires_review",
+      "notes": "Incohérence HT/TVA/TTC"
+    },
+    "invoice_missing_field.pdf": {
+      "document_type": "supplier_invoice",
+      "balanced": false,
+      "expected_review_status": "requires_review",
+      "notes": "Champs manquants"
+    },
+    "invoice_requires_review.pdf": {
+      "document_type": "supplier_invoice",
+      "ht": 10000.0,
+      "vat": 2000.0,
+      "ttc": 12000.0,
+      "balanced": true,
+      "expected_review_status": "requires_review",
+      "notes": "Montant élevé / nouveaux tiers"
+    },
+    "quote_valid.pdf": {
+      "document_type": "quote",
+      "ht": 500.0,
+      "vat": 100.0,
+      "ttc": 600.0,
+      "balanced": true,
+      "expected_review_status": "ready_for_validation"
+    }
+  }
+}

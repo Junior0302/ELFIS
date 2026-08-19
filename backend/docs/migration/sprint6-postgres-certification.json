@@ -1,0 +1,79 @@
+{
+  "certified": true,
+  "sprint": "6",
+  "scenarios": [
+    {
+      "scenario": "A_apply",
+      "ok": true,
+      "tables": [
+        "elfis_import_artifacts",
+        "elfis_import_audit_log",
+        "elfis_import_fingerprints",
+        "elfis_import_reports",
+        "elfis_import_runs"
+      ],
+      "missing": [],
+      "indexes": [
+        "elfis_import_artifacts_pkey",
+        "elfis_import_audit_log_pkey",
+        "elfis_import_fingerprints_pkey",
+        "elfis_import_reports_pkey",
+        "elfis_import_runs_pkey",
+        "ix_elfis_imp_art_entity",
+        "ix_elfis_imp_art_run",
+        "ix_elfis_imp_audit_org",
+        "ix_elfis_imp_audit_run",
+        "ix_elfis_imp_doc_val_ver",
+        "ix_elfis_imp_fingerprint",
+        "ix_elfis_imp_fp_run",
+        "ix_elfis_imp_item",
+        "ix_elfis_imp_mig",
+        "ix_elfis_imp_org_created",
+        "ix_elfis_imp_rep_run",
+        "ix_elfis_imp_status",
+        "uq_elfis_imp_fp",
+        "uq_elfis_imp_rep_ver"
+      ]
+    },
+    {
+      "scenario": "B_idempotent",
+      "ok": true,
+      "tables": [
+        "elfis_import_artifacts",
+        "elfis_import_audit_log",
+        "elfis_import_fingerprints",
+        "elfis_import_reports",
+        "elfis_import_runs"
+      ],
+      "missing": [],
+      "indexes": [
+        "elfis_import_artifacts_pkey",
+        "elfis_import_audit_log_pkey",
+        "elfis_import_fingerprints_pkey",
+        "elfis_import_reports_pkey",
+        "elfis_import_runs_pkey",
+        "ix_elfis_imp_art_entity",
+        "ix_elfis_imp_art_run",
+        "ix_elfis_imp_audit_org",
+        "ix_elfis_imp_audit_run",
+        "ix_elfis_imp_doc_val_ver",
+        "ix_elfis_imp_fingerprint",
+        "ix_elfis_imp_fp_run",
+        "ix_elfis_imp_item",
+        "ix_elfis_imp_mig",
+        "ix_elfis_imp_org_created",
+        "ix_elfis_imp_rep_run",
+        "ix_elfis_imp_status",
+        "uq_elfis_imp_fp",
+        "uq_elfis_imp_rep_ver"
+      ]
+    },
+    {
+      "scenario": "C_lifecycle_check",
+      "ok": true,
+      "def": "[(\"CHECK (((status)::text = ANY ((ARRAY['uploaded'::character varying, 'validating'::character varying, 'validated'::character varying, 'quarantined'::c ... (960 characters truncated) ... acter varying, 'archived'::character varying, 'rejected'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))\",)]"
+    }
+  ],
+  "timestamp": "2026-07-23T21:01:10.210554+00:00",
+  "environment": "staging"
+}

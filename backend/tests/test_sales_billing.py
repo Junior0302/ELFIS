@@ -5,7 +5,12 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 from app.models_saas import DocumentEmailLog, Organization, SalesDocument
-from app.services.billing import create_sales_document, delete_sales_document, update_sales_document
+from app.services.billing import (
+    create_sales_document,
+    delete_sales_document,
+    register_payment,
+    update_sales_document,
+)
 from app.services.sales_pdf import sales_document_to_pdf
 
 
@@ -108,3 +113,35 @@ def test_sales_pdf_bytes():
     assert "Atelier Nord" in (brand.legal_name or brand.display_name)
     assert any("SIRET" in line or "SIREN" in line for line in brand.legal_id_lines())
     assert brand.footer_parts()
+
+
+def test_register_payment_partial_with_custom_date():
+    db = _session()
+    org = Organization(name="Pay SA")
+    db.add(org)
+    db.commit()
+    db.refresh(org)
+    doc = create_sales_document(
+        db,
+        organization_id=org.id,
+        doc_type="facture",
+        customer_name="Client P",
+        amount_ht=100,
+        vat_rate=20,
+    )
+    assert doc.amount_ttc == 120.0
+    payment = register_payment(
+        db,
+        doc,
+        amount=40,
+        method="cheque",
+        reference="CHQ-1",
+        paid_at="15-07-2026",
+    )
+    assert payment.paid_at == "15-07-2026"
+    assert payment.reference == "CHQ-1"
+    assert doc.status == "partial"
+    assert doc.paid_amount == 40.0
+    register_payment(db, doc, amount=80, method="virement", reference="VIR-2")
+    assert doc.status == "paid"
+    assert doc.paid_amount == 120.0

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   api,
   type VaultArchiveMeta,
@@ -8,6 +9,14 @@ import {
   type VaultDocumentType,
 } from '../api'
 import { useAuth } from '../auth'
+import FirstActionSuccessPanel from '../components/FirstActionSuccessPanel'
+import {
+  documentSuccessActions,
+  documentsPageCopy,
+  isLaunchDashboardSource,
+  markLaunchDashboardStale,
+} from '../firstExperience'
+import { EmptyState } from '../ui/UiStates'
 import {
   formatVaultAmount,
   formatVaultDate,
@@ -18,6 +27,7 @@ import {
   vaultDocumentTypeLabel,
   VAULT_DOCUMENT_TYPE_LABELS,
 } from '../vaultFormat'
+import '../platform-workspace/platform-workspace.css'
 
 const ACCEPT = 'application/pdf,.pdf'
 const MAX_BYTES = 15 * 1024 * 1024
@@ -27,16 +37,41 @@ const DOCUMENT_TYPES = Object.entries(VAULT_DOCUMENT_TYPE_LABELS).map(([value, l
   label,
 }))
 
-type DocumentsTab = 'deposit' | 'list'
+type DocumentsTab = 'hub' | 'deposit' | 'list'
+
+/** Types utiles à la vue comptable filtrée (Vault reste propriétaire). */
+const ACCOUNTING_DOCUMENT_TYPES: VaultDocumentType[] = [
+  'customer_invoice',
+  'supplier_invoice',
+  'credit_note',
+  'bank_statement',
+  'expense_report',
+]
+
+export type DocumentsSurface = 'accounting' | 'platform'
+
+type DocumentsPageProps = {
+  /** accounting = ComptaPilot filtrée ; platform = Vault global ELFIS */
+  surface?: DocumentsSurface
+}
 
 function isPdf(file: File) {
   const name = file.name.toLowerCase()
   return name.endsWith('.pdf') || file.type === 'application/pdf'
 }
 
-export default function DocumentsPage() {
+export default function DocumentsPage({ surface = 'accounting' }: DocumentsPageProps) {
   const { token, orgId } = useAuth()
-  const [tab, setTab] = useState<DocumentsTab>('deposit')
+  const [searchParams] = useSearchParams()
+  const fromLaunch = isLaunchDashboardSource(searchParams.get('source'))
+  const highlightDocumentId = (searchParams.get('document_id') || '').trim()
+  const isPlatform = surface === 'platform'
+  const typeOptions = isPlatform
+    ? DOCUMENT_TYPES
+    : DOCUMENT_TYPES.filter((t) => ACCOUNTING_DOCUMENT_TYPES.includes(t.value))
+  const [tab, setTab] = useState<DocumentsTab>(() =>
+    fromLaunch ? 'deposit' : highlightDocumentId ? 'list' : 'list',
+  )
 
   // ── dépôt ──────────────────────────────────────────────────────
   const [active, setActive] = useState(false)
@@ -48,6 +83,7 @@ export default function DocumentsPage() {
   const [documentType, setDocumentType] = useState<VaultDocumentType>('customer_invoice')
   const [documentNumber, setDocumentNumber] = useState('')
   const [currency, setCurrency] = useState('EUR')
+  const [showSuccessPanel, setShowSuccessPanel] = useState(false)
 
   // ── liste ──────────────────────────────────────────────────────
   const [listLoading, setListLoading] = useState(false)
@@ -70,6 +106,7 @@ export default function DocumentsPage() {
     setError('')
     setSuccess('')
     setResult(null)
+    setShowSuccessPanel(false)
     if (!isPdf(next)) {
       setError('Seuls les fichiers PDF sont acceptés.')
       setFile(null)
@@ -100,6 +137,7 @@ export default function DocumentsPage() {
     setError('')
     setSuccess('')
     setResult(null)
+    setShowSuccessPanel(false)
     const meta: VaultArchiveMeta = {
       document_type: documentType,
       document_number: documentNumber.trim() || undefined,
@@ -108,8 +146,10 @@ export default function DocumentsPage() {
     try {
       const archived = await api.archiveVaultDocument(file, meta, token, orgId)
       setResult(archived)
-      setSuccess('Document archivé avec succès dans ELFIS Vault.')
+      setSuccess('Document importé')
+      setShowSuccessPanel(true)
       setFile(null)
+      markLaunchDashboardStale()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Archivage impossible')
     } finally {
@@ -145,10 +185,6 @@ export default function DocumentsPage() {
     }
   }, [token, orgId, page, pageSize, filterType, search])
 
-  useEffect(() => {
-    if (tab === 'list') void loadList()
-  }, [tab, loadList])
-
   const openDetail = async (id: string) => {
     if (!token || !orgId) return
     setDetailLoading(true)
@@ -162,6 +198,16 @@ export default function DocumentsPage() {
       setDetailLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (tab === 'list') void loadList()
+  }, [tab, loadList])
+
+  useEffect(() => {
+    if (!highlightDocumentId || tab !== 'list') return
+    void openDetail(highlightDocumentId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once when highlight id is present
+  }, [highlightDocumentId, tab, token, orgId])
 
   const downloadDoc = async (id: string) => {
     if (!token || !orgId) return
@@ -178,27 +224,62 @@ export default function DocumentsPage() {
     }
   }
 
+  const headTitle = isPlatform
+    ? 'Documents'
+    : documentsPageCopy({ fromLaunch }).title.replace(/Documents?/i, 'Documents comptables') ||
+      'Documents comptables'
+  const headLead = isPlatform
+    ? 'ELFIS Vault — tous les documents de l’organisation (permissions existantes).'
+    : 'Vue filtrée des documents comptables. Le fichier appartient à ELFIS Vault.'
+
   return (
     <>
       <div className="page-head">
         <div>
-          <h2>ELFIS Vault – Coffre-fort documentaire sécurisé</h2>
-          <p>
-            Archivez vos PDF comptables dans le coffre privé de votre entreprise, isolé par
-            organisation.
-          </p>
+          <h2>{isPlatform ? 'Documents' : headTitle}</h2>
+          <p>{headLead}</p>
+          {fromLaunch ? (
+            <p className="muted first-experience-back">
+              <Link to="/dashboard">Retour au Dashboard</Link>
+            </p>
+          ) : null}
         </div>
       </div>
+
+      {!isPlatform ? (
+        <div className="platform-surface-banner" style={{ marginBottom: '1rem' }}>
+          <strong>Documents comptables · projection Vault</strong>
+          <p>
+            Factures, avoirs, justificatifs, extraits et pièces liées à la comptabilité. Aucune copie
+            de fichier.
+          </p>
+          <div className="platform-surface-banner__actions">
+            <Link className="btn" to="/platform/documents">
+              Ouvrir tous les documents dans ELFIS Core
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <div className="platform-surface-banner" style={{ marginBottom: '1rem' }}>
+          <strong>ELFIS Vault</strong>
+          <p>Stockage unique. Les Pilots consomment des projections filtrées.</p>
+          <div className="platform-surface-banner__actions">
+            <Link className="btn secondary" to="/documents">
+              Vue documents comptables
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="billing-tabs" style={{ marginBottom: '1.25rem' }} role="tablist">
         <button
           type="button"
           role="tab"
-          className={`billing-tab ${tab === 'deposit' ? 'active' : ''}`}
-          aria-selected={tab === 'deposit'}
-          onClick={() => setTab('deposit')}
+          className={`billing-tab ${tab === 'hub' ? 'active' : ''}`}
+          aria-selected={tab === 'hub'}
+          onClick={() => setTab('hub')}
         >
-          Déposer un document
+          Parcours
         </button>
         <button
           type="button"
@@ -207,14 +288,92 @@ export default function DocumentsPage() {
           aria-selected={tab === 'list'}
           onClick={() => setTab('list')}
         >
-          Mes documents
+          Liste & aperçu
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`billing-tab ${tab === 'deposit' ? 'active' : ''}`}
+          aria-selected={tab === 'deposit'}
+          onClick={() => setTab('deposit')}
+        >
+          Déposer
         </button>
       </div>
 
+      {tab === 'hub' ? (
+        <div className="ui-card-grid">
+          <a className="ui-card ui-card-link" href="#/" onClick={(e) => { e.preventDefault(); setTab('list') }}>
+            <h3>Liste & filtres</h3>
+            <p className="muted">Recherche, type, statut, pagination Vault.</p>
+          </a>
+          <a className="ui-card ui-card-link" href="#/" onClick={(e) => { e.preventDefault(); setTab('deposit') }}>
+            <h3>Dépôt / archive</h3>
+            <p className="muted">Archivage PDF sécurisé (Vault API).</p>
+          </a>
+          <Link className="ui-card ui-card-link" to="/deposit">
+            <h3>Analyse documentaire</h3>
+            <p className="muted">Flux dépôt + analyse AI existant.</p>
+          </Link>
+          <Link className="ui-card ui-card-link" to="/history">
+            <h3>Extraction & historique</h3>
+            <p className="muted">Documents traités, exports, audit métier.</p>
+          </Link>
+          <Link className="ui-card ui-card-link" to="/migration">
+            <h3>Validation / import</h3>
+            <p className="muted">Migration Center — validation et import API.</p>
+          </Link>
+          <Link className="ui-card ui-card-link" to="/accounting">
+            <h3>Proposition comptable</h3>
+            <p className="muted">Hub comptabilité & moteur V2.</p>
+          </Link>
+          <Link className="ui-card ui-card-link" to="/search">
+            <h3>Recherche</h3>
+            <p className="muted">Search Engine global.</p>
+          </Link>
+          <Link className="ui-card ui-card-link" to="/cockpit">
+            <h3>Audit / monitoring</h3>
+            <p className="muted">Cockpit jobs & notifications.</p>
+          </Link>
+        </div>
+      ) : null}
+
       {tab === 'deposit' ? (
         <>
+          <p className="muted first-experience-hint" style={{ marginBottom: '1rem' }}>
+            Formats autorisés : PDF · taille max 15 Mo. Les fichiers importés sont conservés dans
+            votre espace documentaire. L’analyse éventuelle est distincte de l’import.
+          </p>
+
+          {showSuccessPanel && result ? (
+            <FirstActionSuccessPanel
+              title="Document importé"
+              description="Le document est maintenant disponible dans votre espace :"
+              resourceName={result.original_filename}
+              primaryAction={documentSuccessActions().primary}
+              secondaryActions={[
+                {
+                  label: 'Voir le document',
+                  onClick: () => {
+                    setTab('list')
+                    void openDetail(result.id)
+                  },
+                  tone: 'secondary',
+                },
+                ...documentSuccessActions().secondary,
+              ]}
+              extra={
+                <p className="muted" style={{ marginBottom: '0.75rem' }}>
+                  Import terminé. Une analyse peut démarrer en arrière-plan : elle n’est confirmée
+                  que lorsque le backend le signale.
+                </p>
+              }
+            />
+          ) : null}
+
           <div
             className={`dropzone ${active ? 'active' : ''} ${loading ? 'busy' : ''}`}
+            aria-busy={loading}
             onDragEnter={(e) => {
               e.preventDefault()
               setActive(true)
@@ -251,8 +410,8 @@ export default function DocumentsPage() {
                     />
                   </label>
                   {file && (
-                    <button type="button" className="btn" onClick={() => void archive()}>
-                      Archiver
+                    <button type="button" className="btn" disabled={loading} onClick={() => void archive()}>
+                      Importer un document
                     </button>
                   )}
                 </div>
@@ -271,7 +430,7 @@ export default function DocumentsPage() {
                   onChange={(e) => setDocumentType(e.target.value as VaultDocumentType)}
                   disabled={loading}
                 >
-                  {DOCUMENT_TYPES.map((opt) => (
+                  {typeOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -304,21 +463,33 @@ export default function DocumentsPage() {
                 type="button"
                 className="btn"
                 disabled={loading || !file}
+                aria-busy={loading}
                 onClick={() => void archive()}
               >
-                {loading ? 'Archivage…' : 'Archiver'}
+                {loading ? 'Import en cours…' : 'Importer un document'}
               </button>
             </div>
-            {loading && <p className="muted" style={{ marginTop: '0.75rem' }}>Chargement…</p>}
-            {error && <p className="form-error">{error}</p>}
-            {success && !error && (
-              <p className="muted" style={{ marginTop: '0.75rem', color: 'var(--forest)' }}>
+            {loading && (
+              <p className="muted" style={{ marginTop: '0.75rem' }} aria-live="polite">
+                Upload en cours…
+              </p>
+            )}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}{' '}
+                <button type="button" className="linkish" onClick={() => void archive()} disabled={loading || !file}>
+                  Réessayer
+                </button>
+              </p>
+            )}
+            {success && !error && !showSuccessPanel && (
+              <p className="muted" style={{ marginTop: '0.75rem', color: 'var(--pilot-primary, var(--forest))' }} role="status">
                 {success}
               </p>
             )}
           </div>
 
-          {result && (
+          {result && !showSuccessPanel && (
             <div className="panel" style={{ marginTop: '1.25rem' }}>
               <h3>Document archivé</h3>
               <div className="form-grid">
@@ -349,7 +520,7 @@ export default function DocumentsPage() {
                   }}
                 >
                   <option value="">Tous</option>
-                  {DOCUMENT_TYPES.map((opt) => (
+                  {typeOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -390,9 +561,15 @@ export default function DocumentsPage() {
             {listError && <p className="form-error">{listError}</p>}
 
             {!listLoading && !listError && items.length === 0 && (
-              <p className="muted" style={{ marginTop: '1rem' }}>
-                Aucun document archivé pour le moment.
-              </p>
+              <EmptyState
+                title="Aucun document importé"
+                description="Ajoutez vos justificatifs et factures fournisseurs dans votre espace documentaire sécurisé."
+                action={
+                  <button type="button" className="btn" onClick={() => setTab('deposit')}>
+                    Importer un document
+                  </button>
+                }
+              />
             )}
 
             {!listLoading && items.length > 0 && (

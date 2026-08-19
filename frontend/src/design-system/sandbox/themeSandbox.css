@@ -1,0 +1,222 @@
+/* Theme sandbox — uses ONLY --pilot-* tokens (no legacy product CSS variables). */
+
+.ds-theme-sandbox-host {
+  min-height: 100vh;
+  background: var(--pilot-surface, #f5f5f5);
+  color: var(--pilot-text, #111);
+}
+
+.ds-theme-sandbox {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  font-family: Outfit, system-ui, sans-serif;
+}
+
+.ds-theme-sandbox__eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pilot-text-muted);
+}
+
+.ds-theme-sandbox h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  color: var(--pilot-text);
+}
+
+.ds-theme-sandbox__lede {
+  margin: 0 0 1.5rem;
+  color: var(--pilot-text-muted);
+}
+
+.ds-theme-sandbox__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.ds-theme-sandbox__field select {
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--pilot-border);
+  border-radius: 8px;
+  background: var(--pilot-surface-elevated);
+  color: var(--pilot-text);
+}
+
+.ds-theme-sandbox__field select:focus-visible {
+  outline: 2px solid var(--pilot-focus);
+  outline-offset: 2px;
+}
+
+.ds-theme-sandbox__status {
+  margin: 0 0 1.5rem;
+  color: var(--pilot-text-muted);
+  font-size: 0.95rem;
+}
+
+.ds-theme-sandbox__section {
+  margin-bottom: 1.75rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--pilot-border);
+}
+
+.ds-theme-sandbox__section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.ds-theme-sandbox__dl {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ds-theme-sandbox__dl dt {
+  font-size: 0.75rem;
+  color: var(--pilot-text-muted);
+}
+
+.ds-theme-sandbox__dl dd {
+  margin: 0.15rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ds-theme-sandbox__swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 3px;
+  border: 1px solid var(--pilot-border-strong);
+  flex-shrink: 0;
+}
+
+.ds-theme-sandbox__gradient {
+  height: 3.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--pilot-border);
+  margin-bottom: 0.5rem;
+}
+
+.ds-theme-sandbox__examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.ds-theme-sandbox__btn {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--pilot-primary);
+  color: var(--pilot-primary-contrast);
+}
+
+.ds-theme-sandbox__btn:hover {
+  background: var(--pilot-primary-hover);
+}
+
+.ds-theme-sandbox__btn:active {
+  background: var(--pilot-primary-active);
+}
+
+.ds-theme-sandbox__btn:focus-visible {
+  outline: 2px solid var(--pilot-focus);
+  outline-offset: 2px;
+}
+
+.ds-theme-sandbox__card {
+  flex: 1 1 14rem;
+  padding: 1rem;
+  border-radius: 10px;
+  background: var(--pilot-surface-elevated);
+  border: 1px solid var(--pilot-border);
+  color: var(--pilot-text);
+}
+
+.ds-theme-sandbox__card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.ds-theme-sandbox__card p {
+  margin: 0;
+  color: var(--pilot-text-muted);
+  font-size: 0.9rem;
+}
+
+.ds-theme-sandbox__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--pilot-accent-soft);
+  color: var(--pilot-text);
+  border: 1px solid var(--pilot-border);
+}
+
+.ds-theme-sandbox__focus-link {
+  color: var(--pilot-accent);
+  font-weight: 600;
+}
+
+.ds-theme-sandbox__focus-link:focus-visible {
+  outline: 2px solid var(--pilot-focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.ds-theme-sandbox__charts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.ds-theme-sandbox__charts li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+}
+
+.ds-theme-sandbox__charts span:first-child {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  border: 1px solid var(--pilot-border);
+}
+
+.ds-theme-sandbox__token-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.ds-theme-sandbox__token-list li {
+  display: grid;
+  grid-template-columns: auto 9rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ds-theme-sandbox__hint {
+  color: var(--pilot-text-muted);
+  font-size: 0.85rem;
+}

@@ -1,0 +1,285 @@
+/* ELFIS Insight Framework V1 — tokens Design System + motion discrète */
+
+.elf-insight {
+  --elf-insight-accent: var(--pilot-info, #1d4ed8);
+  --elf-insight-bg: color-mix(in srgb, var(--elf-insight-accent) 8%, transparent);
+  --elf-insight-border: color-mix(in srgb, var(--elf-insight-accent) 35%, transparent);
+  box-sizing: border-box;
+  color: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.elf-insight--card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--elf-insight-border);
+  background: var(--elf-insight-bg);
+  border-inline-start: 3px solid var(--elf-insight-accent);
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.elf-insight--compact {
+  padding: 0.55rem 0.7rem;
+  gap: 0.35rem;
+}
+
+.elf-insight--inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.4rem 0;
+  border-inline-start: 3px solid var(--elf-insight-accent);
+  padding-inline-start: 0.65rem;
+}
+
+.elf-insight--banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--elf-insight-border);
+  background: var(--elf-insight-bg);
+}
+
+.elf-insight--toast {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--elf-insight-border);
+  background: var(--elf-insight-bg);
+  box-shadow: 0 4px 16px color-mix(in srgb, #000 8%, transparent);
+  animation: elf-insight-enter 0.22s ease;
+}
+
+.elf-insight-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.elf-insight-banner__text span,
+.elf-insight__summary,
+.elf-insight-inline__summary,
+.elf-insight-toast__msg {
+  color: color-mix(in srgb, currentColor 78%, transparent);
+}
+
+.elf-insight-icon {
+  flex-shrink: 0;
+  fill: var(--elf-insight-accent);
+}
+
+.elf-insight-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--elf-insight-accent);
+  background: color-mix(in srgb, var(--elf-insight-accent) 12%, transparent);
+}
+
+.elf-insight-badge__label {
+  line-height: 1.2;
+}
+
+.elf-insight-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.elf-insight-header__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.elf-insight-inline__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.elf-insight-inline__title {
+  font-size: 0.9rem;
+}
+
+.elf-insight-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+  font-size: 0.72rem;
+  opacity: 0.72;
+}
+
+.elf-insight-footer__source {
+  font-style: italic;
+}
+
+.elf-insight-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.elf-insight-action {
+  appearance: none;
+  border: 1px solid var(--elf-insight-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.28rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.elf-insight-action:hover:not(:disabled),
+.elf-insight-action:focus-visible {
+  background: color-mix(in srgb, var(--elf-insight-accent) 14%, transparent);
+  outline: 2px solid var(--elf-insight-accent);
+  outline-offset: 2px;
+}
+
+.elf-insight-action:disabled,
+.elf-insight-action[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.elf-insight-action--primary {
+  background: color-mix(in srgb, var(--elf-insight-accent) 18%, transparent);
+  border-color: var(--elf-insight-accent);
+}
+
+.elf-insight-action--ghost {
+  border-color: transparent;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.elf-insight-why__toggle {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--elf-insight-accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.elf-insight-why__toggle:focus-visible {
+  outline: 2px solid var(--elf-insight-accent);
+  outline-offset: 2px;
+}
+
+.elf-insight-details {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: color-mix(in srgb, currentColor 80%, transparent);
+}
+
+.elf-insight-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.elf-insight-list__item {
+  margin: 0;
+}
+
+.elf-insight-list--empty {
+  padding: 0.5rem 0;
+  opacity: 0.75;
+}
+
+.elf-insight-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.elf-insight-stack__card {
+  animation: elf-insight-enter 0.2s ease;
+}
+
+@keyframes elf-insight-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .elf-insight--toast,
+  .elf-insight-stack__card,
+  .elf-insight--card,
+  .elf-insight-action {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Contraste / sévérité critique */
+.elf-insight--sev-critical {
+  --elf-insight-bg: color-mix(in srgb, var(--pilot-danger, #b42318) 12%, transparent);
+}
+
+.elf-insight--success {
+  --elf-insight-accent: var(--pilot-success, #15803d);
+}
+
+.elf-insight--critical {
+  --elf-insight-accent: var(--pilot-danger, #b42318);
+}
+
+.elf-insight--attention {
+  --elf-insight-accent: var(--pilot-warning, #c4782b);
+}
+
+.elf-insight--information,
+.elf-insight--suggestion,
+.elf-insight--analysis {
+  --elf-insight-accent: var(--pilot-info, #1d4ed8);
+}
+
+.elf-insight--opportunity {
+  --elf-insight-accent: var(--pilot-success, #15803d);
+}
+
+.elf-insight--confirmation {
+  --elf-insight-accent: var(--pilot-warning, #c4782b);
+}

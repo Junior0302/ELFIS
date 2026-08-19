@@ -1,3 +1,14 @@
+import {
+  API_REQUEST_TIMEOUT_MS,
+  authDevLog,
+  checkBackendHealth,
+  getApiRoot,
+  isAbortError,
+} from './authNetwork'
+
+export { checkBackendHealth, getApiRoot }
+export type { BackendHealthStatus } from './authNetwork'
+
 export type AccountingLine = {
   account: string
   label: string
@@ -209,6 +220,7 @@ export type VaultDocumentsQuery = {
   sort_order?: 'asc' | 'desc'
 }
 
+/** @deprecated Legacy `/dashboard/stats` — surfaces client migrées vers Financial Engine. */
 export type DashboardStats = {
   invoice_count: number
   total_ht: number
@@ -235,27 +247,10 @@ export type CompanySettings = {
  * Base API adaptée au réseau local :
  * - avec VITE_API_URL : URL forcée
  * - en dev Vite : "/api" (proxy same-origin → accessible via IP LAN)
- * - sinon : http(s)://{hostname}:8001/api
+ * - sinon : http(s)://{hostname}:8000/api
  */
 function apiRoot(): string {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL as string
-  if (import.meta.env.DEV) return '/api'
-  // Production Firebase Hosting / domaine custom → API Render
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname
-    const productionHosts = new Set([
-      'elfis-core.web.app',
-      'elfis-core.firebaseapp.com',
-      'elfis-core.com',
-      'www.elfis-core.com',
-    ])
-    if (productionHosts.has(host)) {
-      return 'https://elfis-core-api.onrender.com/api'
-    }
-  }
-  const { protocol, hostname } = window.location
-  const port = (import.meta.env.VITE_API_PORT as string) || '8001'
-  return `${protocol}//${hostname}:${port}/api`
+  return getApiRoot()
 }
 
 async function parseError(res: Response): Promise<string> {
@@ -304,11 +299,22 @@ function friendlyError(status: number, message: string, path?: string): string {
         : 'PDF indisponible pour le moment. Réessayez dans quelques minutes.'
     }
     if (isLocalApi) {
-      return 'Service API introuvable. Lancez le backend : start-backend.bat (port 8001)'
+      return 'Service API introuvable. Lancez le backend : start-backend.bat (port 8000)'
     }
-    return message || 'Ressource introuvable sur l’API'
+    return 'Cette ressource est indisponible pour le moment.'
   }
-  if (status === 401) return message || 'Email ou mot de passe incorrect'
+  if (status === 401) return message || 'Votre session a expiré. Reconnectez-vous pour continuer.'
+  if (status === 402) {
+    return 'Cette fonctionnalité nécessite un essai ou un abonnement actif.'
+  }
+  if (status === 403) return 'Vous n’avez pas l’autorisation d’accéder à cette ressource.'
+  if (status === 429) return 'Trop de demandes. Réessayez dans quelques instants.'
+  if (status === 500 || status === 502 || status === 503) {
+    return 'Le service est temporairement indisponible. Réessayez plus tard.'
+  }
+  if (/^erreur\s*api\s*\d+/i.test(message)) {
+    return 'Une erreur est survenue. Réessayez ou contactez le support.'
+  }
   return message
 }
 
@@ -320,12 +326,48 @@ async function request<T>(
   const headers = new Headers(init?.headers || {})
   if (auth?.token) headers.set('Authorization', `Bearer ${auth.token}`)
   if (auth?.orgId) headers.set('X-Organization-Id', String(auth.orgId))
-  const res = await fetch(`${apiRoot()}${path}`, { ...init, headers })
-  if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res), path))
-  if (res.status === 204) return undefined as T
-  const contentType = res.headers.get('content-type') || ''
-  if (contentType.includes('application/json')) return res.json() as Promise<T>
-  return undefined as T
+
+  const controller = new AbortController()
+  const externalSignal = init?.signal
+  const onExternalAbort = () => controller.abort()
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true })
+  }
+  const timer = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS)
+  const started = Date.now()
+  const url = `${apiRoot()}${path}`
+
+  try {
+    const res = await fetch(url, { ...init, headers, signal: controller.signal })
+    if (import.meta.env.DEV && path.startsWith('/auth/')) {
+      authDevLog(res.ok ? 'request ok' : 'request failed', {
+        path,
+        status: res.status,
+        ms: Date.now() - started,
+        requestId: res.headers.get('x-request-id') || undefined,
+        apiRoot: apiRoot(),
+      })
+    }
+    if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res), path))
+    if (res.status === 204) return undefined as T
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) return res.json() as Promise<T>
+    return undefined as T
+  } catch (err) {
+    if (isAbortError(err)) {
+      authDevLog('request timeout', { path, ms: Date.now() - started, apiRoot: apiRoot() })
+      throw new Error('Le serveur ELFIS Core ne répond pas. Vérifiez que le backend est démarré.')
+    }
+    if (err instanceof TypeError) {
+      authDevLog('request network', { path, ms: Date.now() - started, apiRoot: apiRoot() })
+      throw new Error('Le serveur ELFIS Core ne répond pas. Vérifiez que le backend est démarré.')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+    if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort)
+  }
 }
 
 async function requestBlob(
@@ -335,23 +377,35 @@ async function requestBlob(
 ): Promise<{ blob: Blob; filename: string }> {
   const headers = new Headers({ Authorization: `Bearer ${token}` })
   if (orgId) headers.set('X-Organization-Id', String(orgId))
-  const res = await fetch(`${apiRoot()}${path}`, { headers })
-  if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res), path))
-  const disposition = res.headers.get('content-disposition') || ''
-  const filename = disposition.match(/filename="?([^"]+)"?/i)?.[1] || 'export'
-  return { blob: await res.blob(), filename }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${apiRoot()}${path}`, { headers, signal: controller.signal })
+    if (!res.ok) throw new Error(friendlyError(res.status, await parseError(res), path))
+    const disposition = res.headers.get('content-disposition') || ''
+    const filename = disposition.match(/filename="?([^"]+)"?/i)?.[1] || 'export'
+    return { blob: await res.blob(), filename }
+  } catch (err) {
+    if (isAbortError(err) || err instanceof TypeError) {
+      throw new Error('Le serveur ELFIS Core ne répond pas. Vérifiez que le backend est démarré.')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export async function downloadApiFile(
   path: string,
   token: string,
   orgId?: number | null,
+  preferredFilename?: string,
 ): Promise<void> {
   const { blob, filename } = await requestBlob(path, token, orgId)
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = filename
+  link.download = preferredFilename?.trim() || filename
   document.body.appendChild(link)
   link.click()
   link.remove()
@@ -359,13 +413,24 @@ export async function downloadApiFile(
 }
 
 
+export type WorkspaceProvisionStatus = {
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  current_step: string
+  progress: number
+  setup_completed: boolean
+  error_code?: string | null
+  error_message?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  provisioning_version?: number
+}
+
 export const api = {
   health: () =>
     request<{ status: string; ai_mode: string; product: string; details?: { version?: string } }>('/health'),
-  dashboard: (token?: string | null, orgId?: number | null) =>
-    request<DashboardStats>('/dashboard/stats', undefined, { token, orgId }),
-  dashboardPilot: (token?: string | null, orgId?: number | null) =>
-    request<PilotOverview>('/dashboard/pilot', undefined, { token, orgId }),
+  // Legacy retirés du client : api.dashboard (/dashboard/stats) et api.dashboardPilot
+  // (/dashboard/pilot). Source de vérité = financialApi → /api/financial/*.
+  // Endpoints backend encore présents mais deprecated (voir app/routers/dashboard.py).
   listDocuments: (
     params: { q?: string; status?: string; needs_review?: boolean } | undefined,
     token: string,
@@ -517,6 +582,122 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       },
+      { token, orgId },
+    ),
+  listContacts: (
+    token?: string | null,
+    orgId?: number | null,
+    params?: { contact_type?: string; q?: string },
+  ) => {
+    const search = new URLSearchParams()
+    if (params?.contact_type) search.set('contact_type', params.contact_type)
+    if (params?.q) search.set('q', params.q)
+    const qs = search.toString()
+    return request<{ contacts: Contact[] }>(
+      `/contacts${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token, orgId },
+    )
+  },
+  createContact: (
+    payload: {
+      contact_type?: string
+      company_name?: string
+      email?: string
+      phone?: string
+      vat_number?: string
+      address_line_1?: string
+      postal_code?: string
+      city?: string
+      siret?: string
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; contact: Contact }>(
+      '/contacts',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  updateContact: (
+    contactId: number,
+    payload: Partial<{
+      contact_type: string
+      status: string
+      company_name: string
+      email: string
+      phone: string
+      vat_number: string
+      address_line_1: string
+      postal_code: string
+      city: string
+      siret: string
+      allow_iban_replace: boolean
+    }>,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean; contact: Contact }>(
+      `/contacts/${contactId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  deleteContact: (contactId: number, token?: string | null, orgId?: number | null) =>
+    request<{ ok: boolean; contact: Contact }>(
+      `/contacts/${contactId}`,
+      { method: 'DELETE' },
+      { token, orgId },
+    ),
+  listFiscalPeriods: (token?: string | null, orgId?: number | null) =>
+    request<{
+      periods: Array<{
+        id: number
+        period_key: string
+        kind: string
+        status: string
+        notes: string
+        closed_at: string | null
+      }>
+    }>('/fiscal/periods', undefined, { token, orgId }),
+  closeFiscalPeriod: (
+    payload: { period_key: string; kind: string; notes?: string },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{
+      period: {
+        id: number
+        period_key: string
+        kind: string
+        status: string
+        notes: string
+        closed_at: string | null
+      }
+    }>(
+      '/fiscal/periods/close',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      { token, orgId },
+    ),
+  reopenFiscalPeriod: (
+    periodId: number,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{ ok: boolean }>(
+      `/fiscal/periods/${periodId}/reopen`,
+      { method: 'POST' },
       { token, orgId },
     ),
   getElfisReport: (id: number, token: string, orgId?: number | null) =>
@@ -730,17 +911,151 @@ export const api = {
     if (params?.q) search.set('q', params.q)
     if (params?.status) search.set('status', params.status)
     const qs = search.toString()
-    return request<BillingOverview>(`/billing/overview${qs ? `?${qs}` : ''}`, undefined, {
+    return request<BillingOverview>(`/billing/sales-overview${qs ? `?${qs}` : ''}`, undefined, {
       token,
       orgId,
     })
   },
+  /** Billing System V2 — Entitlement Engine (abonnements / quotas). */
+  saasBillingOverview: (token?: string | null, orgId?: number | null) =>
+    request<{
+      overview: Record<string, unknown>
+      plans: Array<Record<string, unknown>>
+      history_preview: Array<Record<string, unknown>>
+    }>('/billing/overview', undefined, { token, orgId }),
+  saasBillingPlans: (token?: string | null, orgId?: number | null) =>
+    request<{ plans: Array<Record<string, unknown>> }>('/billing/plans', undefined, {
+      token,
+      orgId,
+    }),
+  saasBillingSubscription: (token?: string | null, orgId?: number | null) =>
+    request<Record<string, unknown>>('/billing/subscription', undefined, { token, orgId }),
+  saasBillingUsage: (token?: string | null, orgId?: number | null) =>
+    request<{ usage: unknown }>('/billing/usage', undefined, { token, orgId }),
+  saasBillingQuotas: (token?: string | null, orgId?: number | null) =>
+    request<{ quotas: Record<string, unknown> }>('/billing/quotas', undefined, { token, orgId }),
+  saasBillingHistory: (token?: string | null, orgId?: number | null) =>
+    request<{ events: Array<Record<string, unknown>> }>('/billing/history', undefined, {
+      token,
+      orgId,
+    }),
+  saasBillingCheckout: (
+    payload: {
+      plan_code?: string
+      automatic_renewal_accepted: boolean
+      terms_accepted: boolean
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<{ url: string }>('/billing/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, { token, orgId }),
+  saasBillingPortal: (token?: string | null, orgId?: number | null) =>
+    request<{ url: string }>('/billing/customer-portal', { method: 'POST' }, { token, orgId }),
+  platformBillingOverview: (token: string) =>
+    request<{
+      mrr_eur: number
+      arr_eur: number
+      subscriptions: Record<string, number>
+      subscriptions_total: number
+      churn_cancelled_ratio_pct: number
+      past_due: number
+      trials: number
+      note?: string
+      source?: string
+      generated_at?: string
+    }>('/platform/billing/overview', undefined, { token }),
+  platformBillingSubscriptionsList: (
+    token: string,
+    params?: { status?: string; limit?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.limit) q.set('limit', String(params.limit))
+    const qs = q.toString()
+    return request<{ subscriptions: Array<Record<string, unknown>> }>(
+      `/platform/billing/subscriptions${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token },
+    )
+  },
+  platformBillingSuspend: (subscriptionId: string, token: string) =>
+    request<{ ok: boolean; status: string }>(
+      `/platform/billing/subscriptions/${subscriptionId}/suspend`,
+      { method: 'POST' },
+      { token },
+    ),
+  platformBillingRestore: (subscriptionId: string, token: string) =>
+    request<{ ok: boolean; status: string }>(
+      `/platform/billing/subscriptions/${subscriptionId}/restore`,
+      { method: 'POST' },
+      { token },
+    ),
   listCustomers: (token?: string | null, orgId?: number | null, q?: string) => {
     const qs = q ? `?q=${encodeURIComponent(q)}` : ''
     return request<{ customers: CustomerRecord[] }>(`/billing/customers${qs}`, undefined, {
       token,
       orgId,
     })
+  },
+  listSharedRelations: (
+    token: string,
+    orgId?: number | null,
+    params?: {
+      q?: string
+      role?: string
+      source?: string
+      status?: string
+      page?: number
+      page_size?: number
+    },
+  ) => {
+    const sp = new URLSearchParams()
+    if (params?.q) sp.set('q', params.q)
+    if (params?.role) sp.set('role', params.role)
+    if (params?.source) sp.set('source', params.source)
+    if (params?.status) sp.set('status', params.status)
+    if (params?.page) sp.set('page', String(params.page))
+    if (params?.page_size) sp.set('page_size', String(params.page_size))
+    const qs = sp.toString()
+    return request<SharedRelationListResponse>(
+      `/shared/relations${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token, orgId },
+    )
+  },
+  searchSharedRelations: (
+    token: string,
+    orgId: number | null | undefined,
+    q: string,
+    page = 1,
+    pageSize = 20,
+  ) =>
+    request<SharedRelationListResponse>(
+      `/shared/relations/search?q=${encodeURIComponent(q)}&page=${page}&page_size=${pageSize}`,
+      undefined,
+      { token, orgId },
+    ),
+  getSharedRelation: (token: string, orgId: number | null | undefined, relationId: string) =>
+    request<SharedRelationDetailResponse>(
+      `/shared/relations/${encodeURIComponent(relationId)}`,
+      undefined,
+      { token, orgId },
+    ),
+  listSharedRelationDuplicates: (
+    token: string,
+    orgId?: number | null,
+    relationId?: string,
+  ) => {
+    const qs = relationId ? `?relation_id=${encodeURIComponent(relationId)}` : ''
+    return request<{
+      items: SharedRelationDuplicate[]
+      auto_merge: boolean
+      note?: string
+    }>(`/shared/relations/duplicates${qs}`, undefined, { token, orgId })
   },
   createCustomer: (
     payload: {
@@ -758,6 +1073,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }, { token, orgId }),
+  getCustomer: (id: number, token?: string | null, orgId?: number | null) =>
+    request<CustomerRecord>(`/billing/customers/${id}`, undefined, { token, orgId }),
   updateCustomer: (
     id: number,
     payload: Partial<{
@@ -880,6 +1197,13 @@ export const api = {
       vat_rate?: number
       notes?: string
       due_days?: number
+      branding?: { showLogo?: boolean; template?: string }
+      lines?: Array<{
+        label: string
+        quantity: number
+        unit_price: number
+        catalog_item_id?: number | null
+      }>
     },
     token?: string | null,
     orgId?: number | null,
@@ -905,6 +1229,13 @@ export const api = {
       vat_rate?: number
       notes?: string
       due_days?: number
+      branding?: { showLogo?: boolean; template?: string }
+      lines?: Array<{
+        label: string
+        quantity: number
+        unit_price: number
+        catalog_item_id?: number | null
+      }>
     },
     token?: string | null,
     orgId?: number | null,
@@ -917,8 +1248,12 @@ export const api = {
   deleteSalesDoc: (docId: number, token?: string | null, orgId?: number | null) =>
     request<{ ok: boolean }>(`/billing/documents/${docId}`, { method: 'DELETE' }, { token, orgId }),
   salesDocPdfUrl: (docId: number) => `${apiRoot()}/billing/documents/${docId}/pdf`,
-  downloadSalesDocPdf: (docId: number, token: string, orgId?: number | null) =>
-    downloadApiFile(`/billing/documents/${docId}/pdf`, token, orgId),
+  downloadSalesDocPdf: (
+    docId: number,
+    token: string,
+    orgId?: number | null,
+    preferredFilename?: string,
+  ) => downloadApiFile(`/billing/documents/${docId}/pdf`, token, orgId, preferredFilename),
   openSalesDocPdfBlob: async (docId: number, token: string, orgId?: number | null) => {
     const { blob } = await requestBlob(`/billing/documents/${docId}/pdf`, token, orgId)
     return URL.createObjectURL(blob)
@@ -950,6 +1285,9 @@ export const api = {
       send_mode?: string
       sender_email?: string
       can_send_direct?: boolean
+      mailer_provider?: string
+      mailer_reason_code?: string
+      mailer_sender_configured?: boolean
       status?: string
       business_document_id?: string
       business_document_type?: string
@@ -979,6 +1317,9 @@ export const api = {
       connections?: EmailConnection[]
       default_connection_id?: number | null
       can_send_direct?: boolean
+      mailer_provider?: string
+      mailer_reason_code?: string
+      mailer_sender_configured?: boolean
     }>(`/billing/documents/${docId}/emails`, undefined, { token, orgId }),
   listEmailConnections: (token?: string | null, orgId?: number | null) =>
     request<{
@@ -1146,6 +1487,7 @@ export const api = {
       currency: string
       primary_color: string
       secondary_color: string
+      documents_show_logo: boolean | null
     }>,
     token: string,
   ) =>
@@ -1287,12 +1629,1188 @@ export const api = {
       },
       { token, orgId },
     ).then((result) => result.subscription),
+  /** Disponibilité backend de l’essai local (GET /api/dev/trial-status). */
+  getDevTrialStatus: async (token: string, orgId?: number | null) => {
+    const headers = new Headers({ Authorization: `Bearer ${token}` })
+    if (orgId != null) headers.set('X-Organization-Id', String(orgId))
+    const res = await fetch(`${apiRoot()}/dev/trial-status`, {
+      method: 'GET',
+      headers,
+    })
+    if (!res.ok) {
+      const err = new Error('DEV_TRIAL_STATUS_FAILED') as Error & {
+        status: number
+        code: string
+        requestId?: string | null
+      }
+      err.status = res.status
+      err.code = 'DEV_TRIAL_STATUS_FAILED'
+      err.requestId =
+        res.headers.get('x-request-id') || res.headers.get('x-correlation-id')
+      throw err
+    }
+    return res.json() as Promise<{
+      allowed: boolean
+      environment: string
+      flag_enabled: boolean
+      reason: string | null
+      already_active: boolean
+    }>
+  },
+  /** Développement uniquement (backend: ELFIS_DEV_TRIAL_ENABLED). */
+  /** C1.11 — démarrer / reprendre le provisioning workspace. */
+  provisionWorkspace: (
+    token: string,
+    orgId: number | null | undefined,
+    draft: {
+      company_name: string
+      industry: string
+      industry_other?: string | null
+      country: string
+      currency: string
+      vat_status: string
+      vat_number?: string | null
+    },
+  ) =>
+    request<WorkspaceProvisionStatus>('/workspace/provision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_name: draft.company_name,
+        industry: draft.industry,
+        industry_other: draft.industry_other ?? null,
+        country: draft.country,
+        currency: draft.currency,
+        vat_status: draft.vat_status,
+        vat_number: draft.vat_number ?? null,
+      }),
+    }, { token, orgId }),
+  getWorkspaceProvisionStatus: (token: string, orgId?: number | null) =>
+    request<WorkspaceProvisionStatus>('/workspace/provision/status', undefined, {
+      token,
+      orgId,
+    }),
+  getLaunchDashboard: (token: string, orgId?: number | null) =>
+    request<import('./launchDashboard').LaunchDashboardData>('/dashboard/launch', undefined, {
+      token,
+      orgId,
+    }),
+  getCommandCenter: (token: string, orgId?: number | null) =>
+    request<import('./commandCenter').CommandCenterData>('/dashboard/command-center', undefined, {
+      token,
+      orgId,
+    }),
+  getSalesDashboard: (token: string, orgId?: number | null) =>
+    request<import('./sales/salesDashboard').SalesDashboardData>('/sales/dashboard', undefined, {
+      token,
+      orgId,
+    }),
+  listSalesLeads: (token: string, orgId?: number | null, params?: { page?: number; q?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.q) qs.set('q', params.q)
+    const s = qs.toString() ? `?${qs}` : ''
+    return request<import('./sales/salesOps').SalesListResponse<import('./sales/salesOps').SalesLead>>(
+      `/sales/leads${s}`,
+      undefined,
+      { token, orgId },
+    )
+  },
+  createSalesLead: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<import('./sales/salesOps').SalesLead>('/sales/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  updateSalesLead: (
+    token: string,
+    orgId: number | null | undefined,
+    id: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesOps').SalesLead>(`/sales/leads/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  deleteSalesLead: (token: string, orgId: number | null | undefined, id: number) =>
+    request<void>(`/sales/leads/${id}`, { method: 'DELETE' }, { token, orgId }),
+  listSalesCompanies: (
+    token: string,
+    orgId?: number | null,
+    params?: { page?: number; q?: string },
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.q) qs.set('q', params.q)
+    const s = qs.toString() ? `?${qs}` : ''
+    return request<
+      import('./sales/salesOps').SalesListResponse<import('./sales/salesOps').SalesCompany>
+    >(`/sales/companies${s}`, undefined, { token, orgId })
+  },
+  createSalesCompany: (
+    token: string,
+    orgId: number | null | undefined,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesOps').SalesCompany>('/sales/companies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  updateSalesCompany: (
+    token: string,
+    orgId: number | null | undefined,
+    id: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesOps').SalesCompany>(`/sales/companies/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  deleteSalesCompany: (token: string, orgId: number | null | undefined, id: number) =>
+    request<void>(`/sales/companies/${id}`, { method: 'DELETE' }, { token, orgId }),
+  listSalesPeople: (token: string, orgId?: number | null, params?: { page?: number; q?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.q) qs.set('q', params.q)
+    const s = qs.toString() ? `?${qs}` : ''
+    return request<
+      import('./sales/salesOps').SalesListResponse<import('./sales/salesOps').SalesPerson>
+    >(`/sales/people${s}`, undefined, { token, orgId })
+  },
+  createSalesPerson: (
+    token: string,
+    orgId: number | null | undefined,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesOps').SalesPerson>('/sales/people', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  updateSalesPerson: (
+    token: string,
+    orgId: number | null | undefined,
+    id: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesOps').SalesPerson>(`/sales/people/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  deleteSalesPerson: (token: string, orgId: number | null | undefined, id: number) =>
+    request<void>(`/sales/people/${id}`, { method: 'DELETE' }, { token, orgId }),
+  createSalesOpportunity: (
+    token: string,
+    orgId: number | null | undefined,
+    body: Record<string, unknown>,
+  ) =>
+    request<{ id: number; name: string }>('/sales/opportunities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  listSalesTasks: (token: string, orgId?: number | null, params?: { page?: number; q?: string; status?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.q) qs.set('q', params.q)
+    if (params?.status) qs.set('status', params.status)
+    const s = qs.toString() ? `?${qs}` : ''
+    return request<
+      import('./sales/salesOps').SalesListResponse<import('./sales/salesOps').SalesTaskRow>
+    >(`/sales/tasks${s}`, undefined, { token, orgId })
+  },
+  createSalesTask: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<import('./sales/salesOps').SalesTaskRow>('/sales/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  updateSalesTask: (
+    token: string,
+    orgId: number | null | undefined,
+    id: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesOps').SalesTaskRow>(`/sales/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  deleteSalesTask: (token: string, orgId: number | null | undefined, id: number) =>
+    request<void>(`/sales/tasks/${id}`, { method: 'DELETE' }, { token, orgId }),
+  listSalesActivities: (
+    token: string,
+    orgId?: number | null,
+    params?: { page?: number; q?: string },
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.q) qs.set('q', params.q)
+    const s = qs.toString() ? `?${qs}` : ''
+    return request<
+      import('./sales/salesOps').SalesListResponse<import('./sales/salesOps').SalesActivityRow>
+    >(`/sales/activities${s}`, undefined, { token, orgId })
+  },
+  createSalesActivity: (
+    token: string,
+    orgId: number | null | undefined,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesOps').SalesActivityRow>('/sales/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  createSalesNote: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<{ id: number }>('/sales/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  updateSalesNote: (
+    token: string,
+    orgId: number | null | undefined,
+    id: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<{ id: number }>(`/sales/notes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  getSalesCalendar: (
+    token: string,
+    orgId: number | null | undefined,
+    fromDate: string,
+    toDate: string,
+  ) =>
+    request<{ events: import('./sales/salesOps').CalendarEvent[]; from_date: string; to_date: string }>(
+      `/sales/ops/calendar?from_date=${fromDate}&to_date=${toDate}`,
+      undefined,
+      { token, orgId },
+    ),
+  previewSalesImport: (
+    token: string,
+    orgId: number | null | undefined,
+    body: { resource: string; csv_text: string; delimiter?: string },
+  ) =>
+    request<Record<string, unknown>>('/sales/ops/import/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  commitSalesImport: (
+    token: string,
+    orgId: number | null | undefined,
+    body: { resource: string; rows: Record<string, unknown>[]; skip_duplicates?: boolean },
+  ) =>
+    request<{ created: number; skipped: number; errors: string[] }>('/sales/ops/import/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  scanSalesDuplicates: (token: string, orgId: number | null | undefined, resource: string) =>
+    request<Record<string, unknown>>(`/sales/ops/duplicates/${resource}`, undefined, { token, orgId }),
+  resolveSalesDuplicate: (
+    token: string,
+    orgId: number | null | undefined,
+    body: Record<string, unknown>,
+  ) =>
+    request<Record<string, unknown>>('/sales/ops/duplicates/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  bulkSalesAction: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<{ updated: number; skipped: number; errors: string[] }>('/sales/ops/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  getSalesJournal: (token: string, orgId?: number | null, limit = 50) =>
+    request<{ items: import('./sales/salesOps').JournalItem[]; generated_at: string }>(
+      `/sales/ops/journal?limit=${limit}`,
+      undefined,
+      { token, orgId },
+    ),
+  listSalesSavedViews: (token: string, orgId?: number | null, resource?: string) => {
+    const qs = resource ? `?resource=${resource}` : ''
+    return request<Array<Record<string, unknown>>>(`/sales/ops/saved-views${qs}`, undefined, {
+      token,
+      orgId,
+    })
+  },
+  createSalesSavedView: (
+    token: string,
+    orgId: number | null | undefined,
+    body: Record<string, unknown>,
+  ) =>
+    request<Record<string, unknown>>('/sales/ops/saved-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  updateSalesSavedView: (
+    token: string,
+    orgId: number | null | undefined,
+    id: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<Record<string, unknown>>(`/sales/ops/saved-views/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  deleteSalesSavedView: (token: string, orgId: number | null | undefined, id: number) =>
+    request<void>(`/sales/ops/saved-views/${id}`, { method: 'DELETE' }, { token, orgId }),
+
+  // Sales Collaboration S1.9
+  listSalesTeams: (token: string, orgId?: number | null) =>
+    request<import('./sales/salesCollab').SalesTeam[]>(`/sales/collab/teams`, undefined, { token, orgId }),
+  createSalesTeam: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<import('./sales/salesCollab').SalesTeam>('/sales/collab/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  addSalesTeamMember: (
+    token: string,
+    orgId: number | null | undefined,
+    teamId: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesCollab').SalesTeamMember>(`/sales/collab/teams/${teamId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  getSalesTeamDashboard: (token: string, orgId?: number | null, teamId?: number | null) => {
+    const qs = teamId != null ? `?team_id=${teamId}` : ''
+    return request<import('./sales/salesCollab').TeamDashboard>(
+      `/sales/collab/team-dashboard${qs}`,
+      undefined,
+      { token, orgId },
+    )
+  },
+  assignSalesResource: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/sales/collab/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  transferSalesOwnership: (
+    token: string,
+    orgId: number | null | undefined,
+    body: Record<string, unknown>,
+  ) =>
+    request<Record<string, unknown>>('/sales/collab/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  listSalesComments: (
+    token: string,
+    orgId: number | null | undefined,
+    entityType: string,
+    entityId: number,
+  ) =>
+    request<import('./sales/salesCollab').SalesComment[]>(
+      `/sales/collab/comments?entity_type=${entityType}&entity_id=${entityId}`,
+      undefined,
+      { token, orgId },
+    ),
+  createSalesComment: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<import('./sales/salesCollab').SalesComment>('/sales/collab/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  deleteSalesComment: (token: string, orgId: number | null | undefined, id: number) =>
+    request<void>(`/sales/collab/comments/${id}`, { method: 'DELETE' }, { token, orgId }),
+  listSalesMentionCandidates: (token: string, orgId?: number | null, q = '') =>
+    request<import('./sales/salesCollab').MentionCandidate[]>(
+      `/sales/collab/mentions/candidates?q=${encodeURIComponent(q)}`,
+      undefined,
+      { token, orgId },
+    ),
+  listSalesFollowers: (
+    token: string,
+    orgId: number | null | undefined,
+    entityType: string,
+    entityId: number,
+  ) =>
+    request<import('./sales/salesCollab').SalesFollower[]>(
+      `/sales/collab/followers?entity_type=${entityType}&entity_id=${entityId}`,
+      undefined,
+      { token, orgId },
+    ),
+  followSalesResource: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<import('./sales/salesCollab').SalesFollower>('/sales/collab/followers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  unfollowSalesResource: (
+    token: string,
+    orgId: number | null | undefined,
+    entityType: string,
+    entityId: number,
+  ) =>
+    request<void>(
+      `/sales/collab/followers?entity_type=${entityType}&entity_id=${entityId}`,
+      { method: 'DELETE' },
+      { token, orgId },
+    ),
+  listSalesReviews: (
+    token: string,
+    orgId?: number | null,
+    params?: { status?: string; mine?: boolean },
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.status) qs.set('status', params.status)
+    if (params?.mine) qs.set('mine', 'true')
+    const s = qs.toString() ? `?${qs}` : ''
+    return request<import('./sales/salesCollab').SalesReview[]>(`/sales/collab/reviews${s}`, undefined, {
+      token,
+      orgId,
+    })
+  },
+  createSalesReview: (token: string, orgId: number | null | undefined, body: Record<string, unknown>) =>
+    request<import('./sales/salesCollab').SalesReview>('/sales/collab/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  decideSalesReview: (
+    token: string,
+    orgId: number | null | undefined,
+    reviewId: number,
+    body: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesCollab').SalesReview>(`/sales/collab/reviews/${reviewId}/decide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  getSalesCollabView: (
+    token: string,
+    orgId: number | null | undefined,
+    params: { view: string; resource: string; team_id?: number; page?: number },
+  ) => {
+    const qs = new URLSearchParams()
+    qs.set('view', params.view)
+    qs.set('resource', params.resource)
+    if (params.team_id != null) qs.set('team_id', String(params.team_id))
+    if (params.page) qs.set('page', String(params.page))
+    return request<{ items: Record<string, unknown>[]; pagination: Record<string, number> }>(
+      `/sales/collab/views?${qs}`,
+      undefined,
+      { token, orgId },
+    )
+  },
+
+  getSalesIntelligence: (token: string, orgId?: number | null, sync = true) =>
+    request<import('./sales/salesIntelligence').IntelligenceOverview>(
+      `/sales/intelligence?sync=${sync ? 'true' : 'false'}`,
+      undefined,
+      { token, orgId },
+    ),
+  listSalesInsights: (
+    token: string,
+    orgId?: number | null,
+    params?: {
+      category?: string
+      severity?: string
+      status?: string
+      source_type?: string
+      source_id?: string
+      page?: number
+      limit?: number
+      sort?: string
+    },
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.category) qs.set('category', params.category)
+    if (params?.severity) qs.set('severity', params.severity)
+    if (params?.status) qs.set('status', params.status)
+    if (params?.source_type) qs.set('source_type', params.source_type)
+    if (params?.source_id) qs.set('source_id', params.source_id)
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.limit) qs.set('limit', String(params.limit))
+    if (params?.sort) qs.set('sort', params.sort)
+    const suffix = qs.toString() ? `?${qs}` : ''
+    return request<{
+      items: import('./sales/salesIntelligence').SalesInsight[]
+      total: number
+      page: number
+      limit: number
+    }>(`/sales/intelligence/insights${suffix}`, undefined, { token, orgId })
+  },
+  getSalesInsight: (token: string, orgId: number | null | undefined, insightId: number) =>
+    request<import('./sales/salesIntelligence').SalesInsight>(
+      `/sales/intelligence/insights/${insightId}`,
+      undefined,
+      { token, orgId },
+    ),
+  acknowledgeSalesInsight: (token: string, orgId: number | null | undefined, insightId: number) =>
+    request<import('./sales/salesIntelligence').SalesInsight>(
+      `/sales/intelligence/insights/${insightId}/acknowledge`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  dismissSalesInsight: (
+    token: string,
+    orgId: number | null | undefined,
+    insightId: number,
+    reason?: string,
+  ) =>
+    request<import('./sales/salesIntelligence').SalesInsight>(
+      `/sales/intelligence/insights/${insightId}/dismiss`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || null }),
+      },
+      { token, orgId },
+    ),
+  syncSalesIntelligence: (token: string, orgId?: number | null) =>
+    request<Record<string, number>>('/sales/intelligence/sync', { method: 'POST' }, { token, orgId }),
+  getSalesPipeline: (token: string, orgId?: number | null, pipelineId?: number | null) => {
+    const qs = pipelineId != null ? `?pipeline_id=${pipelineId}` : ''
+    return request<import('./sales/salesPipeline').PipelineBoard>(`/sales/pipeline${qs}`, undefined, {
+      token,
+      orgId,
+    })
+  },
+  moveSalesOpportunityStage: (
+    token: string,
+    orgId: number | null | undefined,
+    opportunityId: number,
+    body: { stage_id: number; expected_stage_id?: number | null },
+  ) =>
+    request<import('./sales/salesPipeline').PipelineCard>(
+      `/sales/pipeline/opportunities/${opportunityId}/move`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      { token, orgId },
+    ),
+  getSalesPipelineDrawer: (token: string, orgId: number | null | undefined, opportunityId: number) =>
+    request<import('./sales/salesPipeline').PipelineDrawer>(
+      `/sales/pipeline/opportunities/${opportunityId}/drawer`,
+      undefined,
+      { token, orgId },
+    ),
+  getSalesWorkspace: (
+    token: string,
+    orgId: number | null | undefined,
+    entity: string,
+    entityId: number,
+  ) =>
+    request<import('./sales/salesWorkspace').RelationshipWorkspace>(
+      `/sales/workspace/${entity}/${entityId}`,
+      undefined,
+      { token, orgId },
+    ),
+  getSalesDealWorkspace: (token: string, orgId: number | null | undefined, opportunityId: number) =>
+    request<import('./sales/salesDeal').DealWorkspace>(
+      `/sales/opportunities/${opportunityId}/workspace`,
+      undefined,
+      { token, orgId },
+    ),
+  addSalesDealProduct: (
+    token: string,
+    orgId: number | null | undefined,
+    opportunityId: number,
+    body: {
+      name: string
+      description?: string | null
+      quantity?: string | number
+      unit_price?: string | number
+      discount_percent?: string | number
+      position?: number
+    },
+  ) =>
+    request<import('./sales/salesDeal').DealWorkspace['products'][number]>(
+      `/sales/opportunities/${opportunityId}/products`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      { token, orgId },
+    ),
+  removeSalesDealProduct: (
+    token: string,
+    orgId: number | null | undefined,
+    opportunityId: number,
+    productId: number,
+  ) =>
+    request<void>(`/sales/opportunities/${opportunityId}/products/${productId}`, { method: 'DELETE' }, {
+      token,
+      orgId,
+    }),
+  listSalesProposals: (token: string, orgId?: number | null) =>
+    request<{ items: import('./sales/salesProposals').ProposalListItem[]; pagination: unknown }>(
+      '/sales/proposals',
+      undefined,
+      { token, orgId },
+    ),
+  createSalesProposal: (
+    token: string,
+    orgId: number | null | undefined,
+    body: {
+      opportunity_id?: number | null
+      sales_company_id?: number | null
+      person_id?: number | null
+      proposal_type?: string
+      title?: string
+      currency?: string
+      seed_from_opportunity_products?: boolean
+      amount_source?: 'calculated' | 'final'
+    },
+  ) =>
+    request<import('./sales/salesProposals').ProposalListItem>('/sales/proposals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, { token, orgId }),
+  getSalesProposalWorkspace: (token: string, orgId: number | null | undefined, proposalId: number) =>
+    request<import('./sales/salesProposals').ProposalWorkspace>(
+      `/sales/proposals/${proposalId}/workspace`,
+      undefined,
+      { token, orgId },
+    ),
+  runSalesProposalAction: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+    action: string,
+    body?: Record<string, unknown>,
+  ) =>
+    request<import('./sales/salesProposals').ProposalListItem>(
+      `/sales/proposals/${proposalId}/${action}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      },
+      { token, orgId },
+    ),
+  generateSalesProposalPdf: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+  ) =>
+    request<unknown>(`/sales/proposals/${proposalId}/generate-pdf`, { method: 'POST' }, {
+      token,
+      orgId,
+    }),
+  prepareSalesProposalConversion: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+  ) =>
+    request<Record<string, unknown>>(`/sales/proposals/${proposalId}/prepare-conversion`, {
+      method: 'POST',
+    }, { token, orgId }),
+  getSalesProposalConversionState: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+  ) =>
+    request<import('./sales/salesProposals').ProposalConversionState>(
+      `/sales/proposals/${proposalId}/conversion-state`,
+      undefined,
+      { token, orgId },
+    ),
+  getSalesProposalConversionPreview: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+    customerId?: number | null,
+  ) => {
+    const qs = customerId != null ? `?customer_id=${customerId}` : ''
+    return request<import('./sales/salesProposals').InvoiceConversionPreview>(
+      `/sales/proposals/${proposalId}/conversion-preview${qs}`,
+      { method: 'POST' },
+      { token, orgId },
+    )
+  },
+  resolveSalesProposalConversionCustomer: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+    body: {
+      customer_resolution_mode: import('./sales/salesProposals').CustomerResolutionMode
+      customer_id?: number | null
+      customer_payload?: Record<string, unknown> | null
+      confirm_possible_match?: boolean
+      force_create?: boolean
+    },
+  ) =>
+    request<{ customer: { id: number; name: string }; created: boolean }>(
+      `/sales/proposals/${proposalId}/conversion/customer`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      { token, orgId },
+    ),
+  convertSalesProposalToInvoice: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+    body: {
+      customer_resolution_mode: import('./sales/salesProposals').CustomerResolutionMode
+      customer_id?: number | null
+      customer_payload?: Record<string, unknown> | null
+      accepted_version_id?: number | null
+      expected_proposal_updated_at?: string | null
+      idempotency_key?: string | null
+      confirm_possible_match?: boolean
+    },
+  ) =>
+    request<import('./sales/salesProposals').ConvertToInvoiceResult>(
+      `/sales/proposals/${proposalId}/convert-to-invoice`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      { token, orgId },
+    ),
+  compareSalesProposalVersions: (
+    token: string,
+    orgId: number | null | undefined,
+    proposalId: number,
+    fromVersionId: number,
+    toVersionId: number,
+  ) =>
+    request<Record<string, unknown>>(
+      `/sales/proposals/${proposalId}/versions/compare?from_version_id=${fromVersionId}&to_version_id=${toVersionId}`,
+      undefined,
+      { token, orgId },
+    ),
+  listDecisions: (
+    token: string,
+    orgId?: number | null,
+    params?: { status?: string; severity?: string; page?: number; page_size?: number; sync?: boolean },
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.status) qs.set('status', params.status)
+    if (params?.severity) qs.set('severity', params.severity)
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.page_size) qs.set('page_size', String(params.page_size))
+    if (params?.sync === false) qs.set('sync', 'false')
+    const suffix = qs.toString() ? `?${qs}` : ''
+    return request<import('./decisionCenter').DecisionListResponse>(`/decisions${suffix}`, undefined, {
+      token,
+      orgId,
+    })
+  },
+  getWorkQueue: (
+    token: string,
+    orgId?: number | null,
+    params?: {
+      bucket?: string
+      severity?: string
+      decision_type?: string
+      source_type?: string
+      search?: string
+      sort?: string
+      page?: number
+      page_size?: number
+      sync?: boolean
+    },
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.bucket) qs.set('bucket', params.bucket)
+    if (params?.severity) qs.set('severity', params.severity)
+    if (params?.decision_type) qs.set('decision_type', params.decision_type)
+    if (params?.source_type) qs.set('source_type', params.source_type)
+    if (params?.search) qs.set('search', params.search)
+    if (params?.sort) qs.set('sort', params.sort)
+    if (params?.page) qs.set('page', String(params.page))
+    if (params?.page_size) qs.set('page_size', String(params.page_size))
+    if (params?.sync) qs.set('sync', 'true')
+    const suffix = qs.toString() ? `?${qs}` : ''
+    return request<import('./workQueue').WorkQueueResponse>(`/work-queue${suffix}`, undefined, {
+      token,
+      orgId,
+    })
+  },
+  startDecision: (decisionId: string, token: string, orgId?: number | null) =>
+    request<import('./decisionCenter').DecisionDetail>(`/decisions/${decisionId}/start`, { method: 'POST' }, {
+      token,
+      orgId,
+    }),
+  reopenDecision: (decisionId: string, token: string, orgId?: number | null) =>
+    request<import('./decisionCenter').DecisionDetail>(`/decisions/${decisionId}/reopen`, { method: 'POST' }, {
+      token,
+      orgId,
+    }),
+  dismissDecision: (decisionId: string, token: string, orgId?: number | null) =>
+    request<{ ok: boolean; decision: import('./decisionCenter').DecisionItem }>(
+      `/decisions/${decisionId}/dismiss`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  getDecision: (
+    decisionId: string,
+    token: string,
+    orgId?: number | null,
+    params?: { sync?: boolean },
+  ) => {
+    const qs = params?.sync === false ? '?sync=false' : ''
+    return request<import('./decisionCenter').DecisionDetail>(`/decisions/${decisionId}${qs}`, undefined, {
+      token,
+      orgId,
+    })
+  },
+  executeDecisionAction: (
+    decisionId: string,
+    actionType: string,
+    token: string,
+    orgId?: number | null,
+    body?: {
+      idempotency_key?: string
+      comment?: string
+      confirm_balanced_entry?: boolean
+      confirm_document_reviewed?: boolean
+    },
+  ) =>
+    request<import('./decisionCenter').DecisionExecuteResponse>(
+      `/decisions/${decisionId}/actions/${encodeURIComponent(actionType)}`,
+      { method: 'POST', body: JSON.stringify(body || {}) },
+      { token, orgId },
+    ),
+  markAccountingDiscovered: (token: string, orgId?: number | null) =>
+    request<{ ok: boolean; accounting_discovery_completed: boolean }>(
+      '/dashboard/launch/accounting-discovered',
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  activateDevTrial: async (token: string, orgId?: number | null) => {
+    const headers = new Headers({ Authorization: `Bearer ${token}` })
+    if (orgId != null) headers.set('X-Organization-Id', String(orgId))
+    const res = await fetch(`${apiRoot()}/dev/activate-trial`, {
+      method: 'POST',
+      headers,
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      let code = ''
+      try {
+        const data = JSON.parse(text) as { detail?: { code?: string; message?: string } | string }
+        if (typeof data.detail === 'object' && data.detail && 'code' in data.detail) {
+          code = String(data.detail.code || '')
+        }
+      } catch {
+        /* ignore */
+      }
+      const err = new Error(
+        code === 'dev_trial_disabled' || code === 'dev_trial_environment_forbidden'
+          ? 'DEV_TRIAL_DISABLED'
+          : res.status === 401
+            ? 'DEV_TRIAL_UNAUTHORIZED'
+            : res.status === 404
+              ? 'DEV_TRIAL_NOT_FOUND'
+              : res.status === 409
+                ? 'DEV_TRIAL_CONFLICT'
+                : res.status >= 500
+                  ? 'DEV_TRIAL_SERVER'
+                  : 'DEV_TRIAL_FAILED',
+      ) as Error & { status: number; code: string; requestId?: string | null }
+      err.status = res.status
+      err.code = code || err.message
+      err.requestId =
+        res.headers.get('x-request-id') || res.headers.get('x-correlation-id')
+      throw err
+    }
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      return res.json() as Promise<{
+        subscription: SubscriptionInfo
+        outcome: 'created' | 'already_active'
+        environment: string
+      }>
+    }
+    return {
+      subscription: null as unknown as SubscriptionInfo,
+      outcome: 'created' as const,
+      environment: 'development',
+    }
+  },
   platformOverview: (token: string) =>
     request<PlatformOverview>('/platform/overview', undefined, { token }),
+  platformDashboard: (token: string, period: '24h' | '7d' | '30d' = '24h') =>
+    request<PlatformDashboard>(`/platform/dashboard?period=${period}`, undefined, { token }),
+  platformHealthServices: (token: string) =>
+    request<{ checked_at: string; services: PlatformServiceHealth[] }>(
+      '/platform/health/services',
+      undefined,
+      { token },
+    ),
+  platformOrgOpsDetail: (organizationId: number, token: string) =>
+    request<PlatformOrgOpsDetail>(`/platform/organizations/${organizationId}/ops-detail`, undefined, {
+      token,
+    }),
+  platformSuspendOrganization: (organizationId: number, reason: string, token: string) =>
+    request<{ ok: boolean; platform_status: string }>(
+      `/platform/organizations/${organizationId}/suspend`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      },
+      { token },
+    ),
+  platformRestoreOrganization: (organizationId: number, reason: string, token: string) =>
+    request<{ ok: boolean; platform_status: string }>(
+      `/platform/organizations/${organizationId}/restore`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      },
+      { token },
+    ),
+  platformIncidents: (token: string, params?: { status?: string; organization_id?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.organization_id) q.set('organization_id', String(params.organization_id))
+    const suffix = q.toString() ? `?${q}` : ''
+    return request<{ incidents: PlatformIncident[]; total: number }>(
+      `/platform/incidents${suffix}`,
+      undefined,
+      { token },
+    )
+  },
+  platformIncidentAction: (
+    incidentId: string,
+    action: 'acknowledge' | 'resolve' | 'ignore',
+    note: string,
+    token: string,
+  ) =>
+    request<PlatformIncident>(`/platform/incidents/${incidentId}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note }),
+    }, { token }),
+  platformAudit: (token: string) =>
+    request<{ audits: PlatformAuditRow[]; total: number }>('/platform/audit', undefined, { token }),
+  platformSecurityEvents: (token: string) =>
+    request<{ events: Array<Record<string, unknown>> }>('/platform/security/events', undefined, { token }),
+  platformSecurityConfiguration: (token: string) =>
+    request<Record<string, unknown>>('/platform/security/configuration', undefined, { token }),
+  platformObservabilityMetrics: (token: string) =>
+    request<{ format: string; metrics: Record<string, unknown> }>(
+      '/platform/observability/metrics',
+      undefined,
+      { token },
+    ),
+  platformObservabilityHealth: (token: string) =>
+    request<Record<string, unknown>>('/platform/observability/health', undefined, { token }),
+  platformReliabilityRetention: (token: string) =>
+    request<{ policies: Array<Record<string, unknown>> }>('/platform/reliability/retention', undefined, {
+      token,
+    }),
+  platformReliabilityCleanupDryRun: (token: string) =>
+    request<Record<string, unknown>>(
+      '/platform/reliability/cleanup/dry-run',
+      { method: 'POST' },
+      { token },
+    ),
+  platformReliabilityReadiness: (token: string) =>
+    request<Record<string, unknown>>('/platform/reliability/readiness', undefined, { token }),
+  platformReliabilityBackupPolicy: (token: string) =>
+    request<Record<string, unknown>>('/platform/reliability/backup-policy', undefined, { token }),
+  platformGlobalSearch: (token: string, q: string) =>
+    request<{ query: string; results: Record<string, unknown[]> }>(
+      `/platform/global-search?q=${encodeURIComponent(q)}`,
+      undefined,
+      { token },
+    ),
   platformOrganizations: (token: string) =>
     request<{ organizations: PlatformOrganization[] }>('/platform/organizations', undefined, { token }),
   platformUsers: (token: string) =>
     request<{ users: PlatformUser[] }>('/platform/users', undefined, { token }),
+  platformAccountingProposals: (
+    token: string,
+    params?: {
+      organization_id?: number
+      status?: string
+      page?: number
+      page_size?: number
+      requires_review?: boolean
+    },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.organization_id != null) q.set('organization_id', String(params.organization_id))
+    if (params?.status) q.set('status', params.status)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    if (params?.requires_review != null) q.set('requires_review', String(params.requires_review))
+    const qs = q.toString()
+    return request<{
+      total: number
+      page: number
+      page_size: number
+      proposals: Array<{
+        proposal_id: string
+        organization_id: number
+        vault_document_id: string
+        document_type: string
+        status: string
+        requires_review: boolean
+        confidence?: number | null
+        amount_ttc?: number | null
+        created_at: string
+      }>
+    }>(`/platform/accounting/proposals${qs ? `?${qs}` : ''}`, undefined, { token })
+  },
+  platformAccountingReviews: (
+    token: string,
+    params?: { organization_id?: number; page?: number; page_size?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.organization_id != null) q.set('organization_id', String(params.organization_id))
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<{ total: number; reviews: Array<Record<string, unknown>> }>(
+      `/platform/accounting/reviews${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token },
+    )
+  },
+  platformAiUsage: (
+    token: string,
+    params?: { organization_id?: number; page?: number; page_size?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.organization_id != null) q.set('organization_id', String(params.organization_id))
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<{
+      total: number
+      usage: Array<{
+        execution_id: string
+        organization_id: number
+        task_name: string
+        provider: string
+        model: string
+        input_tokens?: number | null
+        output_tokens?: number | null
+        total_tokens?: number | null
+        estimated_cost?: number | null
+        currency?: string | null
+        created_at: string
+      }>
+    }>(`/platform/ai/usage${qs ? `?${qs}` : ''}`, undefined, { token })
+  },
+  platformAiExecutions: (
+    token: string,
+    params?: { organization_id?: number; status?: string; page?: number; page_size?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.organization_id != null) q.set('organization_id', String(params.organization_id))
+    if (params?.status) q.set('status', params.status)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<{
+      total: number
+      executions: Array<Record<string, unknown>>
+    }>(`/platform/ai/executions${qs ? `?${qs}` : ''}`, undefined, { token })
+  },
+  platformNotificationsAdmin: (
+    token: string,
+    params?: { organization_id?: number; page?: number; page_size?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.organization_id != null) q.set('organization_id', String(params.organization_id))
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<{
+      total: number
+      notifications: Array<Record<string, unknown>>
+    }>(`/platform/notifications${qs ? `?${qs}` : ''}`, undefined, { token })
+  },
+  platformJobs: (
+    token: string,
+    params?: { status?: string; page?: number; page_size?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<{ total: number; jobs: Array<Record<string, unknown>> }>(
+      `/platform/jobs${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token },
+    )
+  },
+  platformJobRetry: (jobId: string, token: string) =>
+    request<Record<string, unknown>>(`/platform/jobs/${jobId}/retry`, { method: 'POST' }, { token }),
+  platformJobCancel: (jobId: string, token: string) =>
+    request<Record<string, unknown>>(`/platform/jobs/${jobId}/cancel`, { method: 'POST' }, { token }),
+  platformJobManualRetry: (jobId: string, reason: string, token: string) =>
+    request<Record<string, unknown>>(
+      `/platform/jobs/${jobId}/manual-retry`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) },
+      { token },
+    ),
+  platformJobManualCancel: (jobId: string, reason: string, token: string) =>
+    request<Record<string, unknown>>(
+      `/platform/jobs/${jobId}/manual-cancel`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) },
+      { token },
+    ),
+  platformEvents: (token: string, params?: { status?: string; page?: number; page_size?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<{ total: number; events: Array<Record<string, unknown>> }>(
+      `/platform/events${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token },
+    )
+  },
+  platformVaultDocuments: (
+    token: string,
+    params?: { organization_id?: number; page?: number; page_size?: number },
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.organization_id != null) q.set('organization_id', String(params.organization_id))
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<Record<string, unknown>>(
+      `/platform/vault-documents${qs ? `?${qs}` : ''}`,
+      undefined,
+      { token },
+    )
+  },
+  platformBillingPlans: (token: string) =>
+    request<{ plans: Array<Record<string, unknown>> }>('/platform/billing/plans', undefined, {
+      token,
+    }),
+  platformEmailStatus: (token: string) =>
+    request<Record<string, unknown>>('/platform/email-status', undefined, { token }),
   updatePlatformUser: (
     userId: number,
     payload: { status: 'active' | 'suspended' | 'banned' },
@@ -1445,7 +2963,6 @@ export const api = {
     }>(`/jobs/${jobId}/cancel`, { method: 'POST' }, { token, orgId }),
   startDocumentAnalysis: (
     vaultDocumentId: string,
-    body?: { extracted_text?: string; filename?: string },
     token?: string | null,
     orgId?: number | null,
   ) =>
@@ -1458,7 +2975,7 @@ export const api = {
       reused_existing_analysis: boolean
     }>(
       `/ai/documents/${vaultDocumentId}/analyze`,
-      { method: 'POST', body: JSON.stringify(body || {}) },
+      { method: 'POST', body: JSON.stringify({}) },
       { token, orgId },
     ),
   getDocumentAnalysis: (vaultDocumentId: string, token?: string | null, orgId?: number | null) =>
@@ -1474,6 +2991,200 @@ export const api = {
       updated_at: string
       completed_at?: string | null
     }>(`/ai/documents/${vaultDocumentId}/analysis`, undefined, { token, orgId }),
+  /** Étapes d'affichage pour le suivi d'analyse documentaire. */
+  documentAnalysisStageLabel: (stage?: string | null, status?: string | null): string => {
+    if (status === 'blocked' || stage === 'awaiting_ocr') return 'En attente OCR'
+    if (status === 'failed') return 'Erreur'
+    switch (stage) {
+      case 'text_extraction':
+        return 'Extraction du texte'
+      case 'classification':
+        return 'Classification'
+      case 'extraction':
+        return 'Extraction des données'
+      case 'validation':
+        return 'Contrôle qualité'
+      case 'completed':
+        return 'Terminé'
+      default:
+        return 'Préparation du document'
+    }
+  },
+  listAccountingProposals: (
+    params?: { status?: string; requires_review?: boolean; page?: number; page_size?: number },
+    token?: string | null,
+    orgId?: number | null,
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.requires_review != null) q.set('requires_review', String(params.requires_review))
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    const qs = q.toString()
+    return request<{
+      total: number
+      page: number
+      page_size: number
+      proposals: Array<{
+        proposal_id: string
+        vault_document_id: string
+        document_type: string
+        document_number?: string | null
+        supplier_name?: string | null
+        customer_name?: string | null
+        amount_ttc?: number | null
+        currency: string
+        status: string
+        confidence?: number | null
+        requires_review: boolean
+        created_at: string
+      }>
+    }>(`/accounting/proposals${qs ? `?${qs}` : ''}`, undefined, { token, orgId })
+  },
+  getAccountingProposal: (proposalId: string, token?: string | null, orgId?: number | null) =>
+    request<{
+      proposal_id: string
+      status: string
+      current_stage: string
+      document_type: string
+      document_number?: string | null
+      supplier_name?: string | null
+      customer_name?: string | null
+      amount_ht?: number | null
+      amount_vat?: number | null
+      amount_ttc?: number | null
+      currency: string
+      confidence?: number | null
+      requires_review: boolean
+      review_reasons?: string[]
+      document_validation?: Record<string, unknown>
+      financial_validation?: Record<string, unknown>
+      accounting_mapping?: Record<string, unknown>
+      quality_summary?: Record<string, unknown>
+      entry?: Record<string, unknown> | null
+      lines?: Array<Record<string, unknown>>
+      reviews?: Array<Record<string, unknown>>
+      allowed_actions?: string[]
+      disclaimer?: string
+      [key: string]: unknown
+    }>(`/accounting/proposals/${proposalId}`, undefined, {
+      token,
+      orgId,
+    }),
+  updateAccountingProposal: (
+    proposalId: string,
+    body: Record<string, unknown>,
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<Record<string, unknown>>(
+      `/accounting/proposals/${proposalId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+      { token, orgId },
+    ),
+  validateAccountingProposal: (
+    proposalId: string,
+    body: { comment?: string; confirm_balanced_entry: boolean; confirm_document_reviewed: boolean },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<Record<string, unknown>>(
+      `/accounting/proposals/${proposalId}/validate`,
+      { method: 'POST', body: JSON.stringify(body) },
+      { token, orgId },
+    ),
+  rejectAccountingProposal: (
+    proposalId: string,
+    body: { reason: string; comment?: string },
+    token?: string | null,
+    orgId?: number | null,
+  ) =>
+    request<Record<string, unknown>>(
+      `/accounting/proposals/${proposalId}/reject`,
+      { method: 'POST', body: JSON.stringify(body) },
+      { token, orgId },
+    ),
+  reopenAccountingProposal: (proposalId: string, token?: string | null, orgId?: number | null) =>
+    request<Record<string, unknown>>(
+      `/accounting/proposals/${proposalId}/reopen`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  buildAccountingProposal: (vaultDocumentId: string, token?: string | null, orgId?: number | null) =>
+    request<{
+      proposal_id?: string | null
+      job_id?: string | null
+      status: string
+      reused_existing?: boolean
+    }>(
+      `/accounting/documents/${vaultDocumentId}/build-proposal`,
+      { method: 'POST' },
+      { token, orgId },
+    ),
+  searchElfis: (
+    params?: {
+      q?: string
+      resource_type?: string
+      status?: string
+      category?: string
+      sort?: string
+      page?: number
+      page_size?: number
+      amount_min?: number
+      amount_max?: number
+      currency?: string
+      requires_review?: boolean
+    },
+    token?: string | null,
+    orgId?: number | null,
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.q) q.set('q', params.q)
+    if (params?.resource_type) q.set('resource_type', params.resource_type)
+    if (params?.status) q.set('status', params.status)
+    if (params?.category) q.set('category', params.category)
+    if (params?.sort) q.set('sort', params.sort)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.page_size) q.set('page_size', String(params.page_size))
+    if (params?.amount_min != null) q.set('amount_min', String(params.amount_min))
+    if (params?.amount_max != null) q.set('amount_max', String(params.amount_max))
+    if (params?.currency) q.set('currency', params.currency)
+    if (params?.requires_review != null) q.set('requires_review', String(params.requires_review))
+    const qs = q.toString()
+    return request<{
+      items: Array<{
+        search_document_id: string
+        resource_type: string
+        resource_id: string
+        title: string
+        subtitle?: string | null
+        snippet: string
+        status?: string | null
+        category?: string | null
+        document_date?: string | null
+        amount?: number | null
+        currency?: string | null
+        action_url?: string | null
+        score: number
+        metadata?: Record<string, unknown>
+      }>
+      page: number
+      page_size: number
+      total: number
+      total_pages: number
+      query?: string | null
+      execution_time_ms: number
+    }>(`/search${qs ? `?${qs}` : ''}`, undefined, { token, orgId })
+  },
+  searchSuggestions: (q: string, limit = 10, token?: string | null, orgId?: number | null) =>
+    request<{
+      suggestions: Array<{
+        title: string
+        resource_type: string
+        resource_id: string
+        action_url?: string | null
+      }>
+    }>(`/search/suggestions?q=${encodeURIComponent(q)}&limit=${limit}`, undefined, { token, orgId }),
 }
 
 
@@ -1548,9 +3259,79 @@ export type SubscriptionInfo = {
 
 export type PlatformOverview = {
   organizations: number
+  organizations_suspended?: number
   users: number
   active_memberships: number
   subscriptions_by_status: Partial<Record<SubscriptionStatus, number>>
+}
+
+export type PlatformDashboard = {
+  period: string
+  computed_at: string
+  organizations_total: number
+  organizations_active: number
+  organizations_suspended: number
+  users_total: number
+  subscriptions_trialing: number
+  subscriptions_active: number
+  subscriptions_past_due: number
+  subscriptions_cancelled: number
+  documents_processed_today: number
+  ai_analyses_today: number
+  accounting_proposals_today: number
+  jobs_pending: number
+  jobs_running: number
+  jobs_failed: number
+  jobs_dead_letter: number
+  events_dead_letter: number
+  email_deliveries_failed: number
+  extractions_awaiting_ocr: number
+  proposals_requires_review: number
+  incidents_open: number
+}
+
+export type PlatformServiceHealth = {
+  service: string
+  status: string
+  message: string
+  checked_at: string
+  metrics: Record<string, unknown>
+}
+
+export type PlatformOrgOpsDetail = {
+  organization: {
+    id: number
+    name: string
+    platform_status: string
+    platform_suspend_reason?: string
+  }
+  users: Array<{ user_id: number; email: string; role: string; status: string }>
+  counts: Record<string, number>
+  billing: Record<string, unknown>
+  support_links: Record<string, string>
+}
+
+export type PlatformIncident = {
+  incident_id: string
+  organization_id: number | null
+  incident_type: string
+  severity: string
+  status: string
+  title: string
+  summary: string | null
+  last_seen_at: string
+}
+
+export type PlatformAuditRow = {
+  audit_id: string
+  actor_email: string | null
+  organization_id: number | null
+  action: string
+  target_type: string
+  target_id: string | null
+  reason: string | null
+  status: string
+  created_at: string
 }
 
 export type PlatformOrganization = {
@@ -1558,6 +3339,7 @@ export type PlatformOrganization = {
   name: string
   legal_name: string
   country: string
+  platform_status?: string
   member_count: number
   subscription: SubscriptionInfo
   created_at: string | null
@@ -1574,6 +3356,7 @@ export type PlatformUser = {
   created_at: string | null
 }
 
+/** @deprecated Legacy `/dashboard/pilot` — remplacé par Financial Engine overview. */
 export type PilotOverview = {
   health: 'ok' | 'attention' | 'critique' | 'setup'
   ca: number
@@ -1632,6 +3415,7 @@ export type SalesDoc = {
   issue_date: string
   due_date: string
   status: string
+  customer_id?: number | null
   customer_name: string
   customer_email: string
   amount_ht: number
@@ -1641,7 +3425,13 @@ export type SalesDoc = {
   paid_amount: number
   signature_status: string
   notes: string
-  lines?: { label?: string; quantity?: number; unit_price?: number }[]
+  branding?: { showLogo?: boolean; template?: string }
+  lines?: {
+    label?: string
+    quantity?: number
+    unit_price?: number
+    catalog_item_id?: number | null
+  }[]
 }
 
 export type DocumentEmailLog = {
@@ -1781,6 +3571,68 @@ export type CustomerRecord = {
   created_at?: string
 }
 
+export type SharedRelationRole =
+  | 'customer'
+  | 'supplier'
+  | 'prospect'
+  | 'partner'
+  | 'employee'
+  | 'commercial_account'
+  | 'billing_contact'
+
+export type SharedRelation = {
+  id: string
+  organization_id: number
+  party_type: 'person' | 'organization' | 'unknown'
+  display_name: string
+  legal_name: string
+  first_name: string
+  last_name: string
+  emails: string[]
+  phones: string[]
+  addresses: Array<{
+    line1: string
+    line2: string
+    postal_code: string
+    city: string
+    country: string
+  }>
+  tax_number: string
+  siren: string
+  siret: string
+  roles: SharedRelationRole[]
+  status: string
+  source_system: 'customer' | 'contact' | 'sales_company'
+  source_entity_id: number
+  created_at?: string | null
+  updated_at?: string | null
+  links?: Record<string, string>
+}
+
+export type SharedRelationDuplicate = {
+  possible_duplicate: boolean
+  confidence: number
+  matching_fields: string[]
+  related_entity_ids: string[]
+  left_id: string
+  right_id: string
+}
+
+export type SharedRelationListResponse = {
+  items: SharedRelation[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type SharedRelationDetailResponse = {
+  relation: SharedRelation
+  roles: SharedRelationRole[]
+  usages: Record<string, unknown>
+  duplicates: SharedRelationDuplicate[]
+}
+
 export type CatalogItem = {
   id: number
   name: string
@@ -1830,6 +3682,7 @@ export type OrgDetail = {
     logo: string
     primary_color: string
     secondary_color: string
+    documents_show_logo?: boolean | null
     subscription_plan: string
   }
   can_edit?: boolean

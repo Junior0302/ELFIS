@@ -127,6 +127,28 @@ class AIService:
         if not settings.elfis_ai_enabled:
             raise AIDisabledError()
 
+        from app.billing.billing_exceptions import FeatureNotAvailableError, QuotaExceededError
+        from app.billing.billing_types import FeatureCodes, QuotaCodes
+        from app.billing.entitlement_service import EntitlementService
+        from app.billing.quota_service import QuotaService
+        from app.ai.ai_exceptions import AIBlockedError
+
+        feature = FeatureCodes.AI_CLASSIFICATION
+        if "invoice" in (request.task_name or "") or "extraction" in (request.task_name or ""):
+            feature = FeatureCodes.AI_INVOICE_EXTRACTION
+        elif "quality" in (request.task_name or ""):
+            feature = FeatureCodes.AI_QUALITY_CHECK
+        try:
+            EntitlementService(self._db).require(request.organization_id, feature)
+            if getattr(settings, "elfis_billing_enforce_quotas", False):
+                QuotaService(self._db).consume(
+                    request.organization_id, QuotaCodes.AI_EXECUTIONS_MONTH, 1
+                )
+        except FeatureNotAvailableError as exc:
+            raise AIBlockedError(str(exc.message)) from exc
+        except QuotaExceededError as exc:
+            raise AIBlockedError(str(exc.message)) from exc
+
         self.validate_task(request.task_name, request.task_version)
         input_data = self.sanitize_input(dict(request.input_data or {}))
 

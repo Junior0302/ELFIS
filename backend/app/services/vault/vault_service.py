@@ -56,16 +56,31 @@ def _validate_pdf(*, filename: str | None, content_type: str | None, content: by
     if len(content) > max_bytes:
         raise VaultFileTooLargeError(settings.elfis_vault_max_file_size_mb)
 
-    ext = Path(filename or "").suffix.lower()
-    if ext != ".pdf":
-        raise VaultInvalidFileError("Seuls les fichiers PDF sont acceptés")
+    # Consolidation Security V1 — chemins / double extension
+    try:
+        from app.security.security_file_validation import validate_uploaded_file
+        from app.security.security_exceptions import SecurityError
 
-    mime = (content_type or "").split(";")[0].strip().lower()
-    if mime and mime not in ALLOWED_MIME and mime != "application/octet-stream":
-        raise VaultInvalidFileError("Type MIME non autorisé (application/pdf requis)")
-
-    if not content.startswith(PDF_MAGIC):
-        raise VaultInvalidFileError("Signature PDF invalide")
+        validate_uploaded_file(
+            filename=filename or "document.pdf",
+            content_type=content_type,
+            content=content,
+            max_bytes=max_bytes,
+            allow_images=False,
+            allow_text=False,
+        )
+    except SecurityError as exc:
+        raise VaultInvalidFileError(exc.message) from exc
+    except Exception:
+        # Fallback historique si module indisponible
+        ext = Path(filename or "").suffix.lower()
+        if ext != ".pdf":
+            raise VaultInvalidFileError("Seuls les fichiers PDF sont acceptés")
+        mime = (content_type or "").split(";")[0].strip().lower()
+        if mime and mime not in ALLOWED_MIME and mime != "application/octet-stream":
+            raise VaultInvalidFileError("Type MIME non autorisé (application/pdf requis)")
+        if not content.startswith(PDF_MAGIC):
+            raise VaultInvalidFileError("Signature PDF invalide")
 
 
 def _to_response(doc: VaultDocument) -> VaultDocumentResponse:
@@ -175,7 +190,63 @@ def archive_document(
             extra={"document_id": doc.id, "organization_id": meta.tenant_id},
         )
 
+    # Déclenche le pipeline Document Intelligence / AI / Accounting (best-effort)
+    _publish_vault_archived_event(
+        db,
+        organization_id=meta.tenant_id,
+        document_id=doc.id,
+        document_type=meta.document_type.value,
+        version=int(getattr(doc, "version", 1) or 1),
+        user_id=user_id,
+    )
+
     return _to_response(doc)
+
+
+def _publish_vault_archived_event(
+    db: Session,
+    *,
+    organization_id: int,
+    document_id: str,
+    document_type: str,
+    version: int,
+    user_id: int | None,
+) -> None:
+    try:
+        import uuid
+
+        from app.events.event_bus import safe_publish
+        from app.events.event_schemas import DomainEvent
+        from app.events.event_types import EventNames
+
+        safe_publish(
+            db,
+            DomainEvent(
+                event_name=EventNames.VAULT_DOCUMENT_ARCHIVED,
+                organization_id=organization_id,
+                aggregate_type="vault_document",
+                aggregate_id=document_id,
+                payload={
+                    "vault_document_id": document_id,
+                    "document_type": document_type,
+                    "archive_status": "archived",
+                    "version": version,
+                    "document_version": version,
+                },
+                metadata={
+                    "source": "vault_archive",
+                    "actor_user_id": str(user_id) if user_id is not None else None,
+                },
+                correlation_id=uuid.uuid4(),
+                idempotency_key=f"vault:archived:{organization_id}:{document_id}:{version}",
+            ),
+            commit=True,
+        )
+    except Exception:
+        logger.exception(
+            "vault_archived_event_publish_failed",
+            extra={"document_id": document_id, "organization_id": organization_id},
+        )
 
 
 def _to_list_item(doc: VaultDocument) -> VaultDocumentListItem:

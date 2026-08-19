@@ -33,69 +33,79 @@ def _user_facing_error(exc: Exception) -> tuple[str, str]:
     msg = str(exc)
     lower = msg.lower()
     if "adresse e-mail destinataire manquante" in lower or lower.strip() == "missing recipient":
-        return "missing_recipient", "Ajoutez une adresse e-mail au client avant l’envoi."
+        return "recipient_missing", "Ajoutez une adresse e-mail au client avant l’envoi."
+    if "invalid" in lower and ("email" in lower or "destinataire" in lower or "recipient" in lower):
+        return "recipient_invalid", "L’adresse e-mail du destinataire est invalide."
     if "pdf" in lower and ("indisponible" in lower or "génér" in lower or "volumineux" in lower):
-        return "pdf_error", "Le document PDF n’a pas pu être généré. Veuillez réessayer."
+        return "attachment_missing", "Le document PDF n’a pas pu être généré. Veuillez réessayer."
+    if "timeout" in lower or "timed out" in lower:
+        return "timeout", "Délai dépassé lors de l’envoi. Réessayez dans quelques minutes."
     if "reconnectez" in lower or "expiré" in lower or "révoqué" in lower:
-        return "connection_expired", msg[:280]
+        return "connection_expired", "La connexion e-mail a expiré. Reconnectez votre boîte dans Paramètres."
     if "introuvable" in lower and "boîte" in lower:
-        return "connection_missing", msg[:280]
+        return "connection_missing", "Aucune boîte e-mail connectée. Configurez l’expéditeur dans Paramètres."
     if "535" in lower or "auth smtp" in lower:
         return (
-            "smtp_auth_failed",
-            "Authentification SMTP Brevo refusée (535). "
-            "Sur Render : SMTP_USER = login …@smtp-brevo.com, "
-            "SMTP_PASSWORD = clé xsmtpsib-…, ou renseignez BREVO_API_KEY (xkeysib-…).",
+            "authentication_failed",
+            "Authentification SMTP refusée. Vérifiez la configuration e-mail côté plateforme ELFIS.",
         )
     if "xsmtpsib" in lower and "brevo_api_key" in lower:
         return (
-            "brevo_wrong_key_type",
-            "BREVO_API_KEY contient une clé SMTP. Mettez xkeysib-… dans BREVO_API_KEY "
-            "et xsmtpsib-… dans SMTP_PASSWORD, puis Manual Deploy.",
+            "missing_api_key",
+            "Configuration e-mail plateforme invalide (type de clé). Contactez l’admin ELFIS.",
         )
     if "key not found" in lower or "clé brevo invalide" in lower or "clé api brevo invalide" in lower:
         return (
-            "brevo_key_invalid",
-            "Brevo refuse la clé API (Key not found). "
-            "Dans Brevo → SMTP & API → Clés API : désactivez les IP autorisées, "
-            "régénérez une clé xkeysib-…, collez-la dans Render BREVO_API_KEY, "
-            "puis Manual Deploy. Vérifiez aussi SMTP_PASSWORD (xsmtpsib-…).",
+            "authentication_failed",
+            "Le fournisseur d’e-mail a refusé la clé API. Contactez l’admin ELFIS.",
         )
     if "sender" in lower and (
         "not verified" in lower or "invalid" in lower or "unrecognised" in lower or "unauthorized" in lower
     ):
         return (
             "sender_not_verified",
-            "L’expéditeur PLATFORM_EMAIL_FROM n’est pas validé dans Brevo. "
-            "Utilisez contact@elfis-core.com (ou un expéditeur vérifié) dans Render.",
+            "L’expéditeur plateforme n’est pas validé chez le fournisseur. Contactez l’admin ELFIS.",
+        )
+    if "provider_not_configured" in lower or "aucun canal d’envoi" in lower:
+        if "sender_not_configured" in lower:
+            return (
+                "sender_not_configured",
+                "Expéditeur plateforme manquant. Admin : renseignez PLATFORM_EMAIL_FROM sur le serveur.",
+            )
+        if "missing_smtp" in lower:
+            return (
+                "missing_smtp_credentials",
+                "Identifiants SMTP incomplets. Admin : SMTP_USER + SMTP_PASSWORD (xsmtpsib-…) sur le serveur.",
+            )
+        if "missing_api_key" in lower:
+            return (
+                "missing_api_key",
+                "Clé API Brevo manquante ou invalide. Admin : BREVO_API_KEY (xkeysib-…) sur le serveur.",
+            )
+        return (
+            "provider_not_configured",
+            "Envoi serveur non configuré. Admin ELFIS : variables SMTP_* ou BREVO_API_KEY "
+            "(backend .env / Render), puis redémarrage. Voir /elfadmin/configuration.",
         )
     if "brevo a refusé" in lower:
-        # Extraire le détail court entre parenthèses si présent
-        detail = ""
-        start = msg.find("(")
-        end = msg.find(")", start + 1) if start >= 0 else -1
-        if 0 <= start < end and end - start < 120:
-            detail = msg[start + 1 : end].strip()
         return (
-            "brevo_refused",
-            (
-                f"Brevo a refusé l’envoi ({detail}). "
-                if detail
-                else "Brevo a refusé l’envoi. "
-            )
-            + "Vérifiez BREVO_API_KEY et PLATFORM_EMAIL_FROM sur Render.",
+            "delivery_failed",
+            "Le fournisseur d’e-mail a refusé l’envoi. Réessayez plus tard ou contactez le support.",
+        )
+    if "réseau brevo" in lower or "connexion smtp impossible" in lower or "unreachable" in lower:
+        return (
+            "provider_unreachable",
+            "Le fournisseur d’e-mail est injoignable. Réessayez plus tard.",
         )
     if "indisponible" in lower or "non configuré" in lower:
-        return "platform_unavailable", (
-            "Le service d’envoi est temporairement indisponible. "
-            "Vérifiez SMTP/Brevo sur Render."
+        return "provider_not_configured", (
+            "Envoi serveur non configuré côté plateforme ELFIS. "
+            "Admin : SMTP_* ou BREVO_API_KEY + PLATFORM_EMAIL_FROM, puis redémarrage."
         )
     if "réponse" in lower or ("reply" in lower and "to" in lower and "manqu" in lower):
-        return "missing_reply_to", "Ajoutez l’adresse e-mail de votre entreprise dans Paramètres → Entreprise."
-    short = msg.strip().replace("\n", " ")
-    if len(short) > 240:
-        short = short[:237] + "…"
-    return "provider_error", short or (
+        return "missing_reply_to", "Ajoutez l’adresse e-mail de votre entreprise dans Organisation."
+    # Ne jamais renvoyer le texte brut du provider (secrets, stack, clés API).
+    return "delivery_failed", (
         "L’e-mail n’a pas pu être envoyé. Aucun message n’a été remis au destinataire."
     )
 
@@ -189,13 +199,36 @@ def send_sales_document_email(
         sent_at=datetime.utcnow(),
     )
     db.add(log)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:  # IntegrityError concurrent idempotency
+        from sqlalchemy.exc import IntegrityError
+
+        if not isinstance(exc, IntegrityError):
+            raise
+        db.rollback()
+        existing = (
+            db.query(DocumentEmailLog)
+            .filter(
+                DocumentEmailLog.organization_id == doc.organization_id,
+                DocumentEmailLog.idempotency_key == key,
+            )
+            .order_by(DocumentEmailLog.id.desc())
+            .first()
+        )
+        if existing:
+            return existing
+        raise
     db.refresh(log)
 
     if not to_email or not is_valid_email(to_email):
         log.status = "failed"
-        log.error_code = "missing_recipient"
-        log.error_message = "Ajoutez une adresse e-mail au client avant l’envoi."
+        log.error_code = "recipient_missing" if not to_email else "recipient_invalid"
+        log.error_message = (
+            "Ajoutez une adresse e-mail au client avant l’envoi."
+            if not to_email
+            else "L’adresse e-mail du destinataire est invalide."
+        )
         db.add(log)
         db.commit()
         db.refresh(log)
@@ -404,7 +437,9 @@ def log_mailto_document_send(
         .filter(
             DocumentEmailLog.organization_id == doc.organization_id,
             DocumentEmailLog.idempotency_key == key,
-            DocumentEmailLog.status.in_(("preparing", "queued", "sent", "delivered", "opened")),
+            DocumentEmailLog.status.in_(
+                ("preparing", "queued", "sent", "delivered", "opened", "mailto_opened")
+            ),
             DocumentEmailLog.sent_at >= datetime.utcnow() - timedelta(minutes=2),
         )
         .first()
@@ -426,7 +461,7 @@ def log_mailto_document_send(
         provider="mailto",
         provider_message_id="",
         idempotency_key=key,
-        status="sent",
+        status="mailto_opened",
         error_code="",
         error_message="Ouvert dans la messagerie de l’utilisateur — PDF à joindre manuellement.",
         sent_at=datetime.utcnow(),

@@ -1,0 +1,45 @@
+{
+  "started_at": "2026-07-22T14:46:03.953452+00:00",
+  "environment": "staging",
+  "database_host_masked": "db.***abase.co",
+  "database_url_masked": "postgresql+psycopg://postgres:***@db.stckzlalxrupgawgrojk.supabase.co:5432/postgres",
+  "errors": [],
+  "migration": {
+    "ok": true,
+    "note": "upgrade_head applied"
+  },
+  "tables": {
+    "required": [
+      "elfis_platform_roles",
+      "elfis_platform_permissions",
+      "elfis_platform_role_permissions",
+      "elfis_platform_user_roles"
+    ],
+    "missing": []
+  },
+  "sync": {
+    "created": 44,
+    "updated": 0,
+    "unchanged": 0,
+    "inactivated": 0,
+    "catalog_size": 44
+  },
+  "bootstrap": {
+    "roles_created": 5,
+    "roles_updated": 0,
+    "user_assignments": 0
+  },
+  "system_roles": [
+    "platform_admin",
+    "platform_operator",
+    "platform_support",
+    "platform_viewer",
+    "super_admin"
+  ],
+  "active_assignments_count": 0,
+  "resolver_empty_user": {
+    "authenticated": true,
+    "perm_count": 0
+  },
+  "final_status": "PASS"
+}

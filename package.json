@@ -1,0 +1,16 @@
+{
+  "name": "elfis-core",
+  "private": true,
+  "version": "0.8.9",
+  "description": "ELFIS Core monorepo — scripts développeur",
+  "scripts": {
+    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev/elfis-launcher.ps1",
+    "dev:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev/elfis-stop.ps1",
+    "dev:status": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev/elfis-status.ps1",
+    "dev:frontend": "npm --prefix frontend run dev -- --host localhost --port 5173 --strictPort",
+    "dev:backend": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Set-Location backend; .\\.venv\\Scripts\\uvicorn.exe app.main:app --reload --reload-dir app --host 127.0.0.1 --port 8000\""
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

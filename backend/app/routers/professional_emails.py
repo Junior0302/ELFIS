@@ -105,14 +105,21 @@ def request_professional_email(
     elif notify.get("error"):
         message = (
             "Votre demande est enregistrée côté admin, mais la notification e-mail "
-            f"n’a pas pu partir ({notify['error']}). "
-            "Contactez le support si besoin."
+            "n’a pas pu partir. Contactez le support si besoin."
         )
+    # Ne pas exposer mail_status (fragments de clés, has_smtp_password) ni l’erreur brute.
+    safe_notify = {
+        "admin_notified": bool(notify.get("admin_notified")),
+        "user_confirmed": bool(notify.get("user_confirmed")),
+        "mail_configured": bool(notify.get("mail_configured")),
+    }
+    if notify.get("error"):
+        safe_notify["error"] = "notification_failed"
     return {
         "ok": True,
         "message": message,
         "email": serialize_professional_email(row),
-        "notify": notify,
+        "notify": safe_notify,
     }
 
 

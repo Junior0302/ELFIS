@@ -1,0 +1,32 @@
+{
+  "certified": true,
+  "sprint": "5",
+  "scenarios": [
+    {
+      "scenario": "A_apply",
+      "ok": true,
+      "tables": [
+        "elfis_validation_duplicates",
+        "elfis_validation_fields",
+        "elfis_validation_history",
+        "elfis_validation_matches",
+        "elfis_validation_sessions"
+      ],
+      "missing": []
+    },
+    {
+      "scenario": "B_idempotent",
+      "ok": true,
+      "tables": [
+        "elfis_validation_duplicates",
+        "elfis_validation_fields",
+        "elfis_validation_history",
+        "elfis_validation_matches",
+        "elfis_validation_sessions"
+      ],
+      "missing": []
+    }
+  ],
+  "timestamp": "2026-07-23T20:42:43.846647+00:00",
+  "environment": "staging"
+}

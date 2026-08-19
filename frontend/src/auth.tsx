@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type Membership, type AuthUser } from './api'
+import { authDevLog, getApiRoot, mapLoginFailure } from './authNetwork'
+import { closeAllOverlays } from './design-system/overlays/manager/overlayLifecycle'
 import {
   firebaseLogin,
   firebaseLogout,
@@ -118,16 +120,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!firebaseReady) {
           throw new Error('Connexion indisponible pour le moment. Réessayez plus tard.')
         }
+        const started = Date.now()
+        authDevLog('login start', {
+          apiRoot: getApiRoot(),
+          endpoint: '/auth/firebase',
+        })
         try {
           const fbUser = await firebaseLogin(email, password)
           const idToken = await fbUser.getIdToken()
           const res = await api.firebaseSession({ id_token: idToken })
           applySession(res, { setToken, setUser, setMemberships, setOrgIdState })
+          authDevLog('login ok', { ms: Date.now() - started, orgCount: res.memberships.length })
           void syncFirestoreMemberships(res.user, res.memberships).catch((error) => {
             console.error('Synchronisation Firestore impossible', error)
           })
         } catch (err) {
-          throw new Error(mapFirebaseError(err))
+          const message = mapLoginFailure(err instanceof Error ? err : new Error(mapFirebaseError(err)))
+          // Prefer Firebase-mapped messages when Firebase code is present
+          const code =
+            typeof err === 'object' && err && 'code' in err
+              ? String((err as { code: string }).code)
+              : ''
+          const finalMessage = code.startsWith('auth/') ? mapFirebaseError(err) : message
+          authDevLog('login failed', {
+            ms: Date.now() - started,
+            code: code || undefined,
+            status: undefined,
+            apiRoot: getApiRoot(),
+          })
+          throw new Error(finalMessage)
         }
       },
       register: async (payload) => {
@@ -153,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       logout: () => {
+        closeAllOverlays('logout')
         void firebaseLogout()
         localStorage.removeItem(TOKEN_KEY)
         localStorage.removeItem(ORG_KEY)
@@ -162,6 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setOrgIdState(null)
       },
       setOrgId: (id: number) => {
+        if (orgId !== null && orgId !== id) {
+          closeAllOverlays('organization_change')
+        }
         setOrgIdState(id)
         localStorage.setItem(ORG_KEY, String(id))
         if (token) {

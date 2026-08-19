@@ -1,0 +1,56 @@
+/**
+ * Hub Espaces ELFIS — types domaine métier (BRAND.ELFIS.1).
+ * Routes / moteurs inchangés ; terminologie UX = espaces, pas applications.
+ */
+
+import type { ProductId } from '../design-system/types'
+import type { LauncherProductState } from './launcher.types'
+
+export type SpaceId =
+  | 'finance'
+  | 'commercial'
+  | 'documents'
+  | 'rh'
+  | 'analyse'
+  | 'support'
+
+export type SpaceShortcut = {
+  id: string
+  label: string
+  to: string
+}
+
+export type SpaceDefinition = {
+  id: SpaceId
+  title: string
+  description: string
+  /** Accent discret carte (navy shell + teinte domaine). */
+  accent: string
+  /** Signature discrète — ex. « Moteur ComptaPilot ». */
+  engineLabel: string | null
+  /** Produit moteur associé (lastProduct / thème) — null si aucun. */
+  engineProductId: ProductId | null
+  /** Route d’entrée réelle SPA, ou null → badge Bientôt. */
+  entryRoute: string | null
+  shortcuts: readonly SpaceShortcut[]
+  /** Alias recherche métier (facture, TVA, pipeline…). */
+  searchAliases: readonly string[]
+  capabilities: readonly string[]
+}
+
+export type ResolvedSpace = {
+  space: SpaceDefinition
+  state: LauncherProductState
+  canOpen: boolean
+  route?: string
+  label: string
+  reason?: string
+  isLastUsed?: boolean
+  /** Horodatage lastProduct si données réelles. */
+  lastActivityAt?: string | null
+}
+
+export type SpaceSections = {
+  available: ResolvedSpace[]
+  comingSoon: ResolvedSpace[]
+}

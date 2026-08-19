@@ -87,7 +87,6 @@ export default function SettingsPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [logoBusy, setLogoBusy] = useState(false)
   const [emailSettings, setEmailSettings] = useState<OrgEmailSettings | null>(null)
   const [emailSaving, setEmailSaving] = useState(false)
   const [emailMessage, setEmailMessage] = useState('')
@@ -142,76 +141,22 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       const legal = brand.legal_name.trim() || brand.name.trim()
-      const [orgRes] = await Promise.all([
-        api.updateOrganization(
-          orgId,
-          {
-            name: brand.name.trim() || legal,
-            legal_name: legal,
-            siren: brand.siren,
-            vat_number: brand.vat_number,
-            address: brand.address,
-            postal_code: brand.postal_code,
-            city: brand.city,
-            country: brand.country,
-            phone: brand.phone,
-            email: brand.email,
-            website: brand.website,
-            iban: brand.iban,
-            bic: brand.bic,
-            share_capital: brand.share_capital,
-            legal_form: brand.legal_form,
-            legal_mentions: brand.legal_mentions,
-          },
-          token,
-        ),
-        api.saveSettings(
-          {
-            ...form,
-            company_name: legal || form.company_name,
-            siret: brand.siren || form.siret,
-            vat_number: brand.vat_number || form.vat_number,
-          },
-          token,
-          orgId,
-        ),
-      ])
-      setBrand(fromOrg(orgRes.organization))
-      setMessage('Paramètres entreprise enregistrés. Les prochaines factures et devis utiliseront ces infos.')
+      // Identité org gérée via /organisation — ici on synchronise seulement les champs settings métier.
+      await api.saveSettings(
+        {
+          ...form,
+          company_name: legal || form.company_name,
+          siret: brand.siren || form.siret,
+          vat_number: brand.vat_number || form.vat_number,
+        },
+        token,
+        orgId,
+      )
+      setMessage('Préférences comptables enregistrées.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const onLogoSelected = async (file: File | null) => {
-    if (!file || !token || !orgId || !canEdit) return
-    setLogoBusy(true)
-    setError('')
-    try {
-      const res = await api.uploadOrganizationLogo(orgId, file, token)
-      setBrand(fromOrg(res.organization))
-      setMessage('Logo mis à jour.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload logo impossible')
-    } finally {
-      setLogoBusy(false)
-    }
-  }
-
-  const onLogoDelete = async () => {
-    if (!token || !orgId || !canEdit) return
-    setLogoBusy(true)
-    setError('')
-    try {
-      const res = await api.deleteOrganizationLogo(orgId, token)
-      setBrand(fromOrg(res.organization))
-      setMessage('Logo supprimé.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Suppression impossible')
-    } finally {
-      setLogoBusy(false)
     }
   }
 
@@ -259,199 +204,43 @@ export default function SettingsPage() {
     <>
       <div className="page-head">
         <div>
-          <h2>Paramètres</h2>
+          <h2>Préférences ComptaPilot</h2>
           <p>
-            Identité de l’entreprise pour vos factures et devis, puis préférences OCR / TVA. Le profil
-            personnel se gère dans Mon compte.
+            Réglages comptables et OCR. L’identité légale de l’entreprise se gère dans les paramètres
+            ELFIS (Organisation).
           </p>
         </div>
-        <Link className="btn secondary" to="/compte">
-          Mon compte
-        </Link>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Link className="btn secondary" to="/platform/settings">
+            Paramètres ELFIS
+          </Link>
+          <Link className="btn secondary" to="/platform/organization">
+            Organisation
+          </Link>
+        </div>
       </div>
 
       {error && <div className="auth-alert auth-alert-error">{error}</div>}
 
-      <form className="panel" onSubmit={onSubmit}>
-        <h3>Entreprise</h3>
+      <section className="panel" aria-labelledby="settings-org-summary">
+        <h3 id="settings-org-summary">Identité entreprise (lecture)</h3>
         <p className="muted">
-          Ces informations remplacent entièrement la mention plateforme sur les PDF commerciaux.
+          Données partagées utilisées sur les PDF — gestion officielle dans{' '}
+          <Link to="/platform/organization">Organisation</Link> (ELFIS Core).
         </p>
-
-        <div className="brand-logo-block">
-          <h4>Logo de l’entreprise</h4>
-          <div className="brand-logo-row">
-            <div className="brand-logo-preview" aria-hidden>
-              {brand.logo ? <img src={brand.logo} alt="" /> : <span>Sans logo</span>}
-            </div>
-            <div className="brand-logo-actions">
-              <label className="btn secondary" htmlFor="company_logo">
-                {logoBusy ? 'Traitement…' : brand.logo ? 'Remplacer le logo' : 'Importer un logo'}
-              </label>
-              <input
-                id="company_logo"
-                type="file"
-                accept="image/png,image/jpeg,image/jpg,image/svg+xml,.png,.jpg,.jpeg,.svg"
-                disabled={!canEdit || logoBusy}
-                onChange={(e) => {
-                  void onLogoSelected(e.target.files?.[0] || null)
-                  e.currentTarget.value = ''
-                }}
-              />
-              {brand.logo && (
-                <button
-                  type="button"
-                  className="btn secondary"
-                  disabled={!canEdit || logoBusy}
-                  onClick={() => void onLogoDelete()}
-                >
-                  Supprimer
-                </button>
-              )}
-              <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-                PNG, JPG, JPEG ou SVG · 2 Mo max. Une miniature est générée automatiquement.
-              </p>
-            </div>
+        <div className="brand-logo-row" style={{ marginBottom: '1rem' }}>
+          <div className="brand-logo-preview" aria-hidden>
+            {brand.logo ? <img src={brand.logo} alt="" /> : <span>Sans logo</span>}
+          </div>
+          <div>
+            <strong>{previewName}</strong>
+            <p className="muted" style={{ margin: '0.25rem 0 0' }}>
+              {[brand.siren && `SIRET ${brand.siren}`, brand.vat_number && `TVA ${brand.vat_number}`]
+                .filter(Boolean)
+                .join(' · ') || 'Complétez l’organisation pour les mentions légales.'}
+            </p>
           </div>
         </div>
-
-        <div className="form-grid" style={{ marginTop: '1rem' }}>
-          <div className="field">
-            <label>Nom commercial</label>
-            <input
-              value={brand.name}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, name: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Raison sociale</label>
-            <input
-              value={brand.legal_name}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, legal_name: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Forme juridique</label>
-            <input
-              value={brand.legal_form}
-              disabled={!canEdit}
-              placeholder="SAS, SARL…"
-              onChange={(e) => setBrand({ ...brand, legal_form: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Capital social</label>
-            <input
-              value={brand.share_capital}
-              disabled={!canEdit}
-              placeholder="10 000 €"
-              onChange={(e) => setBrand({ ...brand, share_capital: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>SIRET / SIREN</label>
-            <input
-              value={brand.siren}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, siren: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>N° TVA</label>
-            <input
-              value={brand.vat_number}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, vat_number: e.target.value })}
-            />
-          </div>
-          <div className="field full">
-            <label>Adresse</label>
-            <textarea
-              rows={2}
-              value={brand.address}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, address: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Code postal</label>
-            <input
-              value={brand.postal_code}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, postal_code: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Ville</label>
-            <input
-              value={brand.city}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, city: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Pays</label>
-            <input
-              value={brand.country}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, country: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Téléphone</label>
-            <input
-              value={brand.phone}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, phone: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>E-mail</label>
-            <input
-              type="email"
-              value={brand.email}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, email: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>Site internet</label>
-            <input
-              value={brand.website}
-              disabled={!canEdit}
-              placeholder="https://"
-              onChange={(e) => setBrand({ ...brand, website: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>IBAN</label>
-            <input
-              value={brand.iban}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, iban: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label>BIC</label>
-            <input
-              value={brand.bic}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, bic: e.target.value })}
-            />
-          </div>
-          <div className="field full">
-            <label>Mentions légales (pied de page)</label>
-            <textarea
-              rows={2}
-              value={brand.legal_mentions}
-              disabled={!canEdit}
-              onChange={(e) => setBrand({ ...brand, legal_mentions: e.target.value })}
-            />
-          </div>
-        </div>
-
         <section className="brand-preview-card" aria-label="Aperçu document">
           <h4>Aperçu</h4>
           <div className="brand-preview-sheet">
@@ -472,16 +261,19 @@ export default function SettingsPage() {
             </div>
             <p className="muted">Couleurs PDF préparées pour une personnalisation ultérieure.</p>
             <div className="brand-preview-swatches" aria-hidden>
-              <span className="brand-preview-swatch" style={{ background: '#0B3D2E' }} title="Principale" />
-              <span className="brand-preview-swatch" style={{ background: '#E7F2EC' }} title="Secondaire" />
+              <span className="brand-preview-swatch" style={{ background: 'var(--pilot-primary)' }} title="Principale" />
+              <span className="brand-preview-swatch" style={{ background: 'var(--pilot-secondary)' }} title="Secondaire" />
             </div>
           </div>
         </section>
+      </section>
 
-        <h3 style={{ marginTop: '1.5rem' }}>Modèles d’e-mail</h3>
+      <form className="panel" onSubmit={onSubmit}>
+        <h3>Modèles d’e-mail</h3>
         <p className="muted">
-          Les devis et factures s’envoient depuis <strong>votre messagerie</strong> (Gmail, Outlook…).
-          Préparez ici les objets et messages par défaut qui s’ouvrent automatiquement.
+          Les devis et factures s’envoient via <strong>SMTP / connexion plateforme</strong> lorsque
+          c’est configuré ; sinon via votre messagerie (mailto + PDF à joindre). Préparez ici les
+          objets et messages par défaut.
         </p>
 
         {emailSettings ? (

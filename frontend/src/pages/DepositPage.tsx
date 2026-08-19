@@ -38,7 +38,6 @@ export default function DepositPage() {
   useEffect(() => {
     if (!loading) return
     setStep(0)
-    // Progression indicative pendant l'attente réelle du backend (pas une durée garantie).
     const timers = [
       window.setTimeout(() => setStep(1), 400),
       window.setTimeout(() => setStep(2), 900),

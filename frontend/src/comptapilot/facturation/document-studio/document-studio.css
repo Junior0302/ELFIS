@@ -1,0 +1,542 @@
+/**
+ * Document Studio V1 — presentation tokens & surfaces (F1.3.5)
+ * UX only — no workflow / API coupling.
+ */
+
+.fp-composer-modal-root.ds-studio,
+.elf-cmp-focus--guided.elf-cmp-focus--studio {
+  --ds-studio-green: #1f6b4a;
+  --ds-studio-green-soft: color-mix(in srgb, #1f6b4a 12%, #fff);
+  --ds-studio-warm-gray: #f3f1ee;
+  --ds-studio-warm-gray-deep: #e8e4df;
+  --ds-studio-ink: #1c2430;
+  --ds-studio-muted: color-mix(in srgb, #1c2430 58%, transparent);
+  --ds-studio-secondary: color-mix(in srgb, #1c2430 42%, transparent);
+  --ds-studio-blue: #3d6e99;
+  --ds-studio-blue-soft: color-mix(in srgb, #3d6e99 10%, #fff);
+  --ds-studio-white: #ffffff;
+  --ds-studio-input: #f0eeeb;
+  --ds-studio-radius: 1.05rem;
+  --ds-studio-radius-sm: 0.75rem;
+  --ds-studio-shadow: 0 1px 2px rgba(28, 36, 48, 0.04), 0 10px 28px rgba(28, 36, 48, 0.06);
+  --ds-studio-shadow-soft: 0 1px 3px rgba(28, 36, 48, 0.05);
+  --ds-studio-motion: 200ms ease;
+  --ds-studio-space: 1.25rem;
+}
+
+.fp-composer-modal-root.ds-studio {
+  background: var(--ds-studio-warm-gray);
+}
+
+.fp-composer-modal-root.ds-studio .elf-cmp-focus--modal {
+  background: transparent;
+  padding: 0.65rem 1rem 0.75rem;
+  gap: 0.65rem;
+}
+
+.fp-composer-modal-root.ds-studio .elf-cmp-focus__header {
+  background: color-mix(in srgb, var(--ds-studio-warm-gray) 88%, #fff);
+  border-radius: var(--ds-studio-radius-sm);
+  padding: 0.55rem 0.75rem;
+}
+
+.fp-composer-modal-root.ds-studio .elf-cmp-focus__workspace {
+  gap: 1rem;
+  grid-template-columns: minmax(0, 60%) minmax(0, 40%);
+}
+
+.fp-composer-modal-root.ds-studio .elf-cmp-focus__editor {
+  padding: 0.15rem 0.15rem 0.5rem;
+}
+
+.fp-composer-modal-root.ds-studio .elf-cmp-body {
+  gap: 1rem;
+}
+
+/* —— Step hero —— */
+.ds-studio-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 0.15rem 0.1rem 0.35rem;
+  animation: ds-studio-fade-in var(--ds-studio-motion);
+}
+
+.ds-studio-hero__icon {
+  flex-shrink: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.85rem;
+  display: grid;
+  place-items: center;
+  background: var(--ds-studio-green-soft);
+  color: var(--ds-studio-green);
+  box-shadow: var(--ds-studio-shadow-soft);
+}
+
+.ds-studio-hero__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.ds-studio-hero__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ds-studio-ink);
+  line-height: 1.25;
+  outline: none;
+}
+
+.ds-studio-hero__help {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--ds-studio-muted);
+  max-width: 36rem;
+}
+
+/* —— Studio surfaces —— */
+.ds-studio-panel,
+.ds-studio-card {
+  background: var(--ds-studio-white);
+  border-radius: var(--ds-studio-radius);
+  box-shadow: var(--ds-studio-shadow);
+  border: 1px solid color-mix(in srgb, var(--ds-studio-ink) 5%, transparent);
+  padding: 1.15rem 1.2rem;
+  animation: ds-studio-rise var(--ds-studio-motion);
+}
+
+.ds-studio-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+}
+
+.ds-studio-card--smart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: color-mix(in srgb, var(--ds-studio-green) 4%, #fff);
+  border-color: color-mix(in srgb, var(--ds-studio-green) 14%, transparent);
+}
+
+.ds-studio-card__name {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: var(--ds-studio-ink);
+}
+
+.ds-studio-card__meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.84rem;
+  color: var(--ds-studio-muted);
+  line-height: 1.4;
+}
+
+.ds-studio-card__meta li[data-empty='true'] {
+  display: none;
+}
+
+.ds-studio-products-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ds-studio-products-summary__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.86rem;
+  color: var(--ds-studio-ink);
+  padding: 0.35rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ds-studio-ink) 6%, transparent);
+}
+
+.ds-studio-products-summary__row:last-child {
+  border-bottom: 0;
+}
+
+.ds-studio-products-summary__secondary {
+  color: var(--ds-studio-secondary);
+  font-size: 0.78rem;
+}
+
+/* —— Inputs —— */
+.fp-composer-modal-root.ds-studio .fp-composer-inspector-field input,
+.fp-composer-modal-root.ds-studio .fp-composer-inspector-field textarea,
+.fp-composer-modal-root.ds-studio .fp-line-editor__field input,
+.fp-composer-modal-root.ds-studio .ps-picker input,
+.fp-composer-modal-root.ds-studio input[type='text'],
+.fp-composer-modal-root.ds-studio input[type='number'],
+.fp-composer-modal-root.ds-studio textarea {
+  background: var(--ds-studio-input);
+  border: 1px solid color-mix(in srgb, var(--ds-studio-ink) 8%, transparent);
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  transition: border-color var(--ds-studio-motion), box-shadow var(--ds-studio-motion);
+}
+
+.fp-composer-modal-root.ds-studio .fp-composer-inspector-field input:focus,
+.fp-composer-modal-root.ds-studio .fp-composer-inspector-field textarea:focus,
+.fp-composer-modal-root.ds-studio .fp-line-editor__field input:focus,
+.fp-composer-modal-root.ds-studio textarea:focus,
+.fp-composer-modal-root.ds-studio input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--ds-studio-blue) 45%, transparent);
+  box-shadow: 0 0 0 3px var(--ds-studio-blue-soft);
+}
+
+.fp-composer-modal-root.ds-studio .fp-composer-fields {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+/* —— Conseil placeholder (no AI engine) —— */
+.ds-studio-conseil {
+  margin-top: 0.25rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: var(--ds-studio-radius-sm);
+  background: var(--ds-studio-blue-soft);
+  border: 1px solid color-mix(in srgb, var(--ds-studio-blue) 16%, transparent);
+  animation: ds-studio-fade-in var(--ds-studio-motion);
+}
+
+.ds-studio-conseil__label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-studio-blue);
+}
+
+.ds-studio-conseil__example {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--ds-studio-ink);
+}
+
+.ds-studio-conseil__disclaimer {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: var(--ds-studio-secondary);
+}
+
+/* —— Living stepper —— */
+.elf-cmp-focus--studio .elf-cmp-progress {
+  padding: 0.15rem 0.35rem 0.35rem;
+}
+
+.elf-cmp-focus--studio .elf-cmp-progress__fill {
+  background: var(--ds-studio-green, #1f6b4a);
+  transition: width var(--ds-studio-motion);
+}
+
+.elf-cmp-focus--studio .elf-cmp-progress__dot::before {
+  content: '○';
+  width: auto;
+  height: auto;
+  background: transparent;
+  border-radius: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--ds-studio-ink, #1c2430) 35%, transparent);
+  transition: color var(--ds-studio-motion), transform var(--ds-studio-motion), opacity var(--ds-studio-motion);
+}
+
+.elf-cmp-focus--studio .elf-cmp-progress__dot--blocked::before,
+.elf-cmp-focus--studio .elf-cmp-progress__dot--upcoming::before {
+  content: '○';
+  opacity: 0.7;
+}
+
+.elf-cmp-focus--studio .elf-cmp-progress__dot--current::before {
+  content: '◐';
+  color: var(--ds-studio-green, #1f6b4a);
+  transform: scale(1.15);
+}
+
+.elf-cmp-focus--studio .elf-cmp-progress__dot--completed::before {
+  content: '✓';
+  color: var(--ds-studio-green, #1f6b4a);
+  font-weight: 700;
+}
+
+.elf-cmp-focus--studio .elf-cmp-progress__item--current .elf-cmp-progress__label {
+  color: var(--ds-studio-green, #1f6b4a);
+}
+
+.elf-cmp-focus--studio .elf-cmp-progress__dot.is-clickable:hover::before,
+.elf-cmp-focus--studio .elf-cmp-progress__dot.is-clickable:focus-visible::before {
+  transform: scale(1.12);
+}
+
+/* —— PDF vivant (structure always visible) —— */
+.ds-studio-pdf {
+  margin: 0.65rem;
+  padding: 1.35rem 1.4rem 1.1rem;
+  background: var(--ds-studio-white, #fff);
+  border-radius: 0.2rem;
+  box-shadow: 0 2px 10px rgba(28, 36, 48, 0.08);
+  color: var(--ds-studio-ink, #1c2430);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  min-height: 22rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border: 1px solid color-mix(in srgb, #1c2430 6%, transparent);
+}
+
+.ds-studio-pdf__masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, #1c2430 8%, transparent);
+}
+
+.ds-studio-pdf__logo {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.45rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #1f6b4a 28%, #fff), #fff 55%),
+    color-mix(in srgb, #1c2430 6%, #fff);
+  border: 1px dashed color-mix(in srgb, #1c2430 18%, transparent);
+}
+
+.ds-studio-pdf__doc-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-align: right;
+}
+
+.ds-studio-pdf__number {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--ds-studio-secondary, #6b7280);
+  text-align: right;
+}
+
+.ds-studio-pdf__block {
+  min-height: 2.4rem;
+  transition: opacity var(--ds-studio-motion), transform var(--ds-studio-motion);
+}
+
+.ds-studio-pdf__block[data-filled='false'] {
+  opacity: 0.55;
+}
+
+.ds-studio-pdf__block[data-filled='true'] {
+  animation: ds-studio-rise var(--ds-studio-motion);
+}
+
+.ds-studio-pdf__label {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ds-studio-secondary, #6b7280);
+}
+
+.ds-studio-pdf__placeholder {
+  margin: 0;
+  color: color-mix(in srgb, #1c2430 38%, transparent);
+  font-style: italic;
+}
+
+.ds-studio-pdf__value {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ds-studio-ink, #1c2430);
+}
+
+.ds-studio-pdf__meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--ds-studio-muted, #5a6570);
+}
+
+.ds-studio-pdf__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.ds-studio-pdf__table th {
+  text-align: left;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ds-studio-secondary, #6b7280);
+  padding: 0.35rem 0.25rem;
+  border-bottom: 1px solid color-mix(in srgb, #1c2430 12%, transparent);
+}
+
+.ds-studio-pdf__table td {
+  padding: 0.45rem 0.25rem;
+  border-bottom: 1px solid color-mix(in srgb, #1c2430 6%, transparent);
+  vertical-align: top;
+}
+
+.ds-studio-pdf__table tr[data-skeleton='true'] td {
+  color: color-mix(in srgb, #1c2430 32%, transparent);
+  font-style: italic;
+}
+
+.ds-studio-pdf__table tr[data-filled='true'] {
+  animation: ds-studio-fade-in var(--ds-studio-motion);
+}
+
+.ds-studio-pdf__totals {
+  margin-left: auto;
+  width: min(100%, 12rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.35rem;
+}
+
+.ds-studio-pdf__totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.ds-studio-pdf__totals strong {
+  font-size: 0.92rem;
+  color: var(--ds-studio-green, #1f6b4a);
+}
+
+.ds-studio-pdf__footer {
+  margin-top: auto;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in srgb, #1c2430 8%, transparent);
+  font-size: 0.72rem;
+  color: var(--ds-studio-secondary, #6b7280);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.fp-composer-modal-root.ds-studio .ld-preview-viewport {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #1c2430 3%, #f3f1ee), #ebe7e2);
+  border-radius: var(--ds-studio-radius-sm);
+  padding: 0.35rem;
+}
+
+/* —— Guided step shell —— */
+.fp-guided-step.ds-studio-step {
+  gap: 1.15rem;
+  padding: 0.15rem 0.1rem 0.5rem;
+}
+
+.fp-guided-step.ds-studio-step .fp-guided-step__gate {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--ds-studio-radius-sm);
+  background: color-mix(in srgb, #b42318 6%, #fff);
+}
+
+.fp-composer-modal-root.ds-studio .fp-guided-footer {
+  padding: 0.65rem 0.15rem 0.15rem;
+  border-top-color: color-mix(in srgb, var(--ds-studio-ink) 8%, transparent);
+}
+
+.fp-composer-modal-root.ds-studio .fp-guided-footer .btn {
+  border-radius: 0.7rem;
+  padding: 0.55rem 1.1rem;
+}
+
+.fp-composer-modal-root.ds-studio .fp-composer-client-card {
+  /* legacy class kept; studio smart card supersedes */
+  display: none;
+}
+
+.fp-composer-modal-root.ds-studio .ds-studio-card.fp-composer-client-card,
+.fp-composer-modal-root.ds-studio .ds-studio-card--smart {
+  display: flex;
+}
+
+.fp-composer-modal-root.ds-studio .elf-cmp-section__title {
+  font-size: 0.95rem;
+}
+
+.fp-composer-modal-root.ds-studio .fp-line-editor__row {
+  background: var(--ds-studio-white);
+  border-radius: var(--ds-studio-radius-sm);
+  box-shadow: var(--ds-studio-shadow-soft);
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--ds-studio-ink) 5%, transparent);
+}
+
+.fp-composer-modal-root.ds-studio .fp-wizard-empty {
+  padding: 1.25rem;
+  border-radius: var(--ds-studio-radius-sm);
+  background: color-mix(in srgb, var(--ds-studio-warm-gray) 70%, #fff);
+  color: var(--ds-studio-muted);
+  text-align: center;
+}
+
+/* —— Motion —— */
+@keyframes ds-studio-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ds-studio-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-studio-hero,
+  .ds-studio-panel,
+  .ds-studio-card,
+  .ds-studio-conseil,
+  .ds-studio-pdf__block[data-filled='true'],
+  .ds-studio-pdf__table tr[data-filled='true'],
+  .elf-cmp-focus--studio .elf-cmp-progress__fill,
+  .elf-cmp-focus--studio .elf-cmp-progress__dot::before {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 960px) {
+  .fp-composer-modal-root.ds-studio .elf-cmp-focus__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-studio-hero__title {
+    font-size: 1.2rem;
+  }
+}

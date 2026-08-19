@@ -1,0 +1,306 @@
+/* F1.3.2.2 — LibraryCatalogModal + ProductCreationDialog */
+
+:root {
+  --fp-z-documents: 0;
+  --fp-z-composer-backdrop: 1000;
+  --fp-z-composer-dialog: 1010;
+  --fp-z-submodal-backdrop: 1020;
+  --fp-z-catalog-modal: 1030;
+  --fp-z-nested-create: 1040;
+}
+
+.fp-catalog-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--fp-z-submodal-backdrop, 1020);
+  display: grid;
+  place-items: center;
+  padding: clamp(0.75rem, 2.5vh, 1.5rem);
+  background: rgba(8, 19, 30, 0.28);
+  /* Pas de blur sur le catalogue — Composer reste assombri, panneau net */
+  backdrop-filter: none;
+  animation: fp-catalog-backdrop-in 200ms var(--motion-easing-emphasized, ease);
+}
+
+.fp-catalog-modal {
+  position: relative;
+  z-index: var(--fp-z-catalog-modal, 1030);
+  width: clamp(620px, 72vw, 820px);
+  max-width: min(96vw, 820px);
+  min-height: min(72vh, 760px);
+  max-height: min(88vh, 900px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: var(--fp-navy, #0b1f3a);
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 10%, transparent);
+  box-shadow:
+    0 28px 64px rgba(8, 19, 30, 0.28),
+    0 0 0 1px color-mix(in srgb, var(--fp-navy, #0b1f3a) 6%, transparent);
+  outline: none;
+  animation: fp-catalog-modal-in 200ms var(--motion-easing-emphasized, ease);
+}
+
+.fp-catalog-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 10%, transparent);
+  flex-shrink: 0;
+}
+
+.fp-catalog-modal__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.fp-catalog-modal__desc {
+  margin: 0.3rem 0 0;
+  font-size: 0.88rem;
+  color: color-mix(in srgb, var(--fp-navy, #0b1f3a) 58%, transparent);
+  line-height: 1.35;
+}
+
+.fp-catalog-modal__close {
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--fp-navy, #0b1f3a) 55%, transparent);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+}
+
+.fp-catalog-modal__close:focus-visible {
+  outline: 2px solid var(--pilot-focus, #2d5a43);
+  outline-offset: 2px;
+}
+
+.fp-catalog-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.85rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.fp-catalog-modal__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.fp-catalog-modal__search input {
+  width: 100%;
+  min-height: 2.45rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 14%, transparent);
+  font: inherit;
+  background: #fff;
+}
+
+.fp-catalog-modal__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.fp-catalog-modal__tab {
+  border: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 12%, transparent);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.28rem 0.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--fp-navy, #0b1f3a) 70%, transparent);
+  cursor: pointer;
+}
+
+.fp-catalog-modal__tab.is-selected {
+  background: color-mix(in srgb, var(--fp-navy, #0b1f3a) 8%, #fff);
+  color: var(--fp-navy, #0b1f3a);
+  font-weight: 600;
+}
+
+.fp-catalog-modal__toast {
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, #2d5a43 12%, #fff);
+  color: #1f3d2e;
+  font-size: 0.88rem;
+}
+
+.fp-catalog-modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.fp-catalog-modal__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 10%, transparent);
+  background: #fff;
+}
+
+.fp-catalog-modal__item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.fp-catalog-modal__meta,
+.fp-catalog-modal__desc-item {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--fp-navy, #0b1f3a) 55%, transparent);
+}
+
+.fp-catalog-modal__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1.15rem;
+  border-top: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 10%, transparent);
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--fp-navy, #0b1f3a) 2%, #fff);
+}
+
+/* Product creation nested */
+.fp-product-create-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--fp-z-nested-create, 1040);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 19, 30, 0.32);
+  backdrop-filter: none;
+  animation: fp-catalog-backdrop-in 180ms var(--motion-easing-emphasized, ease);
+}
+
+.fp-product-create-dialog {
+  width: min(100%, 26rem);
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 10%, transparent);
+  box-shadow: 0 20px 48px rgba(8, 19, 30, 0.28);
+  outline: none;
+  animation: fp-catalog-modal-in 180ms var(--motion-easing-emphasized, ease);
+}
+
+.fp-product-create-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 10%, transparent);
+}
+
+.fp-product-create-dialog__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.fp-product-create-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.fp-product-create-dialog__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.fp-product-create-dialog__form input {
+  min-height: 2.35rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 14%, transparent);
+  font: inherit;
+}
+
+.fp-product-create-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes fp-catalog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fp-catalog-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fp-catalog-modal-backdrop,
+  .fp-catalog-modal,
+  .fp-product-create-backdrop,
+  .fp-product-create-dialog {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .fp-catalog-modal {
+    width: 100%;
+    max-width: 100vw;
+    min-height: 85vh;
+    max-height: 100vh;
+    border-radius: 0.85rem 0.85rem 0 0;
+    align-self: end;
+  }
+
+  .fp-catalog-modal-backdrop {
+    place-items: end center;
+    padding: 0;
+  }
+}

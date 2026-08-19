@@ -11,6 +11,7 @@ from app.models_saas import Contact, ContactSuggestion
 from app.services.auth import write_audit
 from app.services.contacts.creation_service import (
     create_contact_from_document,
+    create_manual_contact,
     serialize_contact,
     update_contact,
 )
@@ -72,6 +73,28 @@ class EnrichFromDocumentIn(BaseModel):
     field_values: dict = Field(default_factory=dict)
     suggestion_id: int | None = None
     confirm_iban: bool = False
+
+
+class ContactCreateIn(BaseModel):
+    contact_type: str = "supplier"
+    company_name: str | None = None
+    trade_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    siren: str | None = None
+    siret: str | None = None
+    vat_number: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    country: str | None = "France"
+    iban: str | None = None
+    bic: str | None = None
+    payment_terms: str | None = None
+    payment_method: str | None = None
 
 
 class ContactPatchIn(BaseModel):
@@ -319,12 +342,42 @@ def list_contacts(
     org_id = auth.require_organization_id()
     query = db.query(Contact).filter(Contact.organization_id == org_id)
     if contact_type:
-        query = query.filter(Contact.contact_type == contact_type)
+        # Inclure les contacts mixtes pour fournisseurs / clients
+        if contact_type == "supplier":
+            query = query.filter(Contact.contact_type.in_(("supplier", "customer_and_supplier")))
+        elif contact_type == "customer":
+            query = query.filter(
+                Contact.contact_type.in_(("customer", "customer_and_supplier", "prospect"))
+            )
+        else:
+            query = query.filter(Contact.contact_type == contact_type)
     if q:
         like = f"%{q.strip()}%"
         query = query.filter(Contact.company_name.ilike(like))
     rows = query.order_by(Contact.company_name.asc()).limit(200).all()
     return {"contacts": [serialize_contact(c) for c in rows]}
+
+
+@router.post("/contacts")
+def create_contact(
+    payload: ContactCreateIn,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("invoice.create")
+    org_id = auth.require_organization_id()
+    data = payload.model_dump(exclude={"contact_type"})
+    try:
+        contact = create_manual_contact(
+            db,
+            organization_id=org_id,
+            user_id=auth.user.id if auth.user else None,
+            contact_type=payload.contact_type,
+            confirmed_data=data,
+        )
+    except ContactError as exc:
+        raise _http_from_contact_error(exc) from exc
+    return {"ok": True, "contact": serialize_contact(contact)}
 
 
 @router.get("/contacts/{contact_id}")
@@ -361,6 +414,33 @@ def patch_contact(
             payload=data,
             user_id=auth.user.id if auth.user else None,
             allow_iban_replace=allow,
+        )
+    except ContactError as exc:
+        raise _http_from_contact_error(exc) from exc
+    return {"ok": True, "contact": serialize_contact(contact)}
+
+
+@router.delete("/contacts/{contact_id}")
+def delete_contact(
+    contact_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    """Soft-delete : statut archived (conserve l’historique OCR / liens)."""
+    auth.require("invoice.create")
+    org_id = auth.require_organization_id()
+    try:
+        contact = get_org_contact(db, contact_id, org_id)
+        contact.status = "archived"
+        db.add(contact)
+        db.commit()
+        db.refresh(contact)
+        write_audit(
+            db,
+            user_id=auth.user.id if auth.user else None,
+            organization_id=org_id,
+            action=f"contact_archived:{contact.id}",
+            module="contacts",
         )
     except ContactError as exc:
         raise _http_from_contact_error(exc) from exc

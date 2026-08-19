@@ -1,0 +1,81 @@
+{
+  "certified": true,
+  "sprint": "7",
+  "scenarios": [
+    {
+      "scenario": "A_apply",
+      "ok": true,
+      "tables": [
+        "elfis_smart_migration_batch_items",
+        "elfis_smart_migration_batches",
+        "elfis_smart_migration_cleanup_log",
+        "elfis_smart_migration_reports",
+        "elfis_smart_migration_runs"
+      ],
+      "missing": [],
+      "indexes": [
+        "elfis_smart_migration_batch_items_pkey",
+        "elfis_smart_migration_batches_pkey",
+        "elfis_smart_migration_cleanup_log_pkey",
+        "elfis_smart_migration_reports_pkey",
+        "elfis_smart_migration_runs_pkey",
+        "ix_elfis_sm_batch_mig",
+        "ix_elfis_sm_batch_run",
+        "ix_elfis_sm_batch_status",
+        "ix_elfis_sm_cleanup_org",
+        "ix_elfis_sm_item_batch",
+        "ix_elfis_sm_item_doc",
+        "ix_elfis_sm_rep_run",
+        "ix_elfis_sm_run_mig",
+        "ix_elfis_sm_run_org",
+        "ix_elfis_sm_run_status",
+        "uq_elfis_sm_batch_idx",
+        "uq_elfis_sm_item_doc",
+        "uq_elfis_sm_rep_ver"
+      ]
+    },
+    {
+      "scenario": "B_idempotent",
+      "ok": true,
+      "tables": [
+        "elfis_smart_migration_batch_items",
+        "elfis_smart_migration_batches",
+        "elfis_smart_migration_cleanup_log",
+        "elfis_smart_migration_reports",
+        "elfis_smart_migration_runs"
+      ],
+      "missing": [],
+      "indexes": [
+        "elfis_smart_migration_batch_items_pkey",
+        "elfis_smart_migration_batches_pkey",
+        "elfis_smart_migration_cleanup_log_pkey",
+        "elfis_smart_migration_reports_pkey",
+        "elfis_smart_migration_runs_pkey",
+        "ix_elfis_sm_batch_mig",
+        "ix_elfis_sm_batch_run",
+        "ix_elfis_sm_batch_status",
+        "ix_elfis_sm_cleanup_org",
+        "ix_elfis_sm_item_batch",
+        "ix_elfis_sm_item_doc",
+        "ix_elfis_sm_rep_run",
+        "ix_elfis_sm_run_mig",
+        "ix_elfis_sm_run_org",
+        "ix_elfis_sm_run_status",
+        "uq_elfis_sm_batch_idx",
+        "uq_elfis_sm_item_doc",
+        "uq_elfis_sm_rep_ver"
+      ]
+    },
+    {
+      "scenario": "C_constraints",
+      "ok": true,
+      "constraints": [
+        "uq_elfis_sm_batch_idx",
+        "uq_elfis_sm_item_doc",
+        "uq_elfis_sm_rep_ver"
+      ]
+    }
+  ],
+  "timestamp": "2026-07-23T21:14:29.597771+00:00",
+  "environment": "staging"
+}

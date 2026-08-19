@@ -31,6 +31,9 @@ ROLE_PERMS: dict[str, list[str]] = {
         "email_accounts.view",
         "documents.read",
         "documents.write",
+        "documents.create",
+        "documents.download",
+        "documents.archive",
         "documents.send_email",
         "documents.view_email_history",
         "invoice.create",
@@ -42,6 +45,31 @@ ROLE_PERMS: dict[str, list[str]] = {
         "ai.analysis",
         "finance.read",
         "subscription.manage",
+        "sales.read",
+        "sales.write",
+        "sales.manage",
+        "sales.pipeline.manage",
+        "sales.export",
+        "sales.admin",
+        "sales.proposals.read",
+        "sales.proposals.write",
+        "sales.proposals.approve",
+        "sales.proposals.send",
+        "sales.proposals.accept",
+        "sales.proposals.convert",
+        "sales.proposals.delete",
+        "sales.proposals.admin",
+        "sales.intelligence.read",
+        "sales.intelligence.manage",
+        "sales.intelligence.dismiss",
+        "sales.intelligence.sync",
+        "sales.team.read",
+        "sales.team.manage",
+        "sales.assign",
+        "sales.review",
+        "sales.comment",
+        "sales.mention",
+        "sales.transfer",
     ],
     "cfo": [
         "finance.read",
@@ -51,9 +79,17 @@ ROLE_PERMS: dict[str, list[str]] = {
         "reporting.read",
         "invoice.read",
         "tax.manage",
+        "documents.read",
+        "documents.download",
         "documents.send_email",
         "documents.view_email_history",
         "email_accounts.view",
+        "sales.read",
+        "sales.export",
+        "sales.proposals.read",
+        "sales.intelligence.read",
+        "sales.team.read",
+        "sales.comment",
     ],
     "comptable": [
         "invoice.create",
@@ -63,18 +99,51 @@ ROLE_PERMS: dict[str, list[str]] = {
         "bank.read",
         "documents.read",
         "documents.write",
+        "documents.create",
+        "documents.download",
+        "documents.archive",
         "documents.send_email",
         "documents.view_email_history",
         "email_accounts.view",
+        "sales.read",
+        "sales.proposals.read",
+        "sales.comment",
     ],
-    "employe": ["invoice.create", "documents.read", "quote.create", "documents.send_email"],
+    "employe": [
+        "invoice.create",
+        "documents.read",
+        "documents.write",
+        "documents.create",
+        "documents.download",
+        "quote.create",
+        "documents.send_email",
+        "sales.read",
+        "sales.write",
+        "sales.proposals.read",
+        "sales.proposals.write",
+        "sales.proposals.send",
+        "sales.proposals.accept",
+        "sales.intelligence.read",
+        "sales.intelligence.dismiss",
+        "sales.team.read",
+        "sales.assign",
+        "sales.review",
+        "sales.comment",
+        "sales.mention",
+        "sales.transfer",
+    ],
     "auditeur": [
         "invoice.read",
         "documents.read",
+        "documents.download",
         "documents.view_email_history",
         "finance.read",
         "bank.read",
         "tax.read",
+        "sales.read",
+        "sales.proposals.read",
+        "sales.intelligence.read",
+        "sales.team.read",
     ],
 }
 
@@ -92,6 +161,9 @@ ALL_PERMISSIONS = [
     ("settings.manage", "settings"),
     ("documents.read", "documents"),
     ("documents.write", "documents"),
+    ("documents.create", "documents"),
+    ("documents.download", "documents"),
+    ("documents.archive", "documents"),
     ("documents.send_email", "documents"),
     ("documents.view_email_history", "documents"),
     ("email_accounts.view", "email"),
@@ -101,6 +173,31 @@ ALL_PERMISSIONS = [
     ("forecast.read", "previsions"),
     ("reporting.read", "pilotage"),
     ("subscription.manage", "subscription"),
+    ("sales.read", "sales"),
+    ("sales.write", "sales"),
+    ("sales.manage", "sales"),
+    ("sales.pipeline.manage", "sales"),
+    ("sales.export", "sales"),
+    ("sales.admin", "sales"),
+    ("sales.proposals.read", "sales"),
+    ("sales.proposals.write", "sales"),
+    ("sales.proposals.approve", "sales"),
+    ("sales.proposals.send", "sales"),
+    ("sales.proposals.accept", "sales"),
+    ("sales.proposals.convert", "sales"),
+    ("sales.proposals.delete", "sales"),
+    ("sales.proposals.admin", "sales"),
+    ("sales.intelligence.read", "sales"),
+    ("sales.intelligence.manage", "sales"),
+    ("sales.intelligence.dismiss", "sales"),
+    ("sales.intelligence.sync", "sales"),
+    ("sales.team.read", "sales"),
+    ("sales.team.manage", "sales"),
+    ("sales.assign", "sales"),
+    ("sales.review", "sales"),
+    ("sales.comment", "sales"),
+    ("sales.mention", "sales"),
+    ("sales.transfer", "sales"),
 ]
 
 
@@ -115,14 +212,45 @@ def verify_password(password: str, password_hash: str) -> bool:
 def create_access_token(data: dict[str, Any], expires_minutes: int = 60 * 24 * 7) -> str:
     payload = data.copy()
     payload["exp"] = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    issuer = (getattr(settings, "elfis_jwt_issuer", "") or "").strip()
+    audience = (getattr(settings, "elfis_jwt_audience", "") or "").strip()
+    if issuer:
+        payload["iss"] = issuer
+    if audience:
+        payload["aud"] = audience
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
 def decode_token(token: str) -> dict[str, Any] | None:
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+        kwargs: dict[str, Any] = {
+            "algorithms": ["HS256"],
+        }
+        issuer = (getattr(settings, "elfis_jwt_issuer", "") or "").strip()
+        audience = (getattr(settings, "elfis_jwt_audience", "") or "").strip()
+        enforce = bool(getattr(settings, "elfis_jwt_enforce_issuer_audience", False))
+        if enforce and issuer:
+            kwargs["issuer"] = issuer
+        if enforce and audience:
+            kwargs["audience"] = audience
+        options: dict[str, Any] = {}
+        if not enforce:
+            options["verify_aud"] = False
+        # python-jose : pas de kwarg leeway — tolérance via options si supportée
+        skew = int(getattr(settings, "elfis_jwt_clock_skew_seconds", 30) or 0)
+        if skew > 0:
+            options["leeway"] = skew
+        if options:
+            kwargs["options"] = options
+        return jwt.decode(token, settings.jwt_secret, **kwargs)
     except JWTError:
         return None
+    except TypeError:
+        # Fallback si options.leeway non supporté
+        try:
+            return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], options={"verify_aud": False})
+        except JWTError:
+            return None
 
 
 def ensure_rbac_catalog(db: Session) -> dict[str, Role]:

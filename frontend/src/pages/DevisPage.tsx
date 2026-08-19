@@ -2,13 +2,21 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, formatEuro, type BillingOverview, type SalesDoc } from '../api'
 import { useAuth } from '../auth'
+import SalesDocLinesEditor from '../components/SalesDocLinesEditor'
 import SalesDocPreviewModal from '../components/SalesDocPreviewModal'
+import {
+  emptySalesLine,
+  linesTotalHt,
+  normalizeSalesLines,
+  salesLinesFromDoc,
+  type SalesLineDraft,
+} from '../salesDocLines'
+import { buildDuplicateSalesDocPayload } from '../salesDocDuplicate'
 
 const emptyForm = {
   customer_name: '',
   customer_email: '',
   customer_id: null as number | null,
-  amount_ht: 0,
   vat_rate: 20,
   notes: '',
 }
@@ -21,6 +29,7 @@ export default function DevisPage() {
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [form, setForm] = useState(emptyForm)
+  const [lines, setLines] = useState<SalesLineDraft[]>([emptySalesLine()])
   const [editingId, setEditingId] = useState<number | null>(null)
   const [previewDoc, setPreviewDoc] = useState<SalesDoc | null>(null)
 
@@ -58,30 +67,42 @@ export default function DevisPage() {
       customer_name: doc.customer_name,
       customer_email: doc.customer_email || '',
       customer_id: null,
-      amount_ht: doc.amount_ht,
       vat_rate: doc.vat_rate,
       notes: doc.notes || '',
     })
+    setLines(salesLinesFromDoc(doc.lines, doc.amount_ht))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const resetForm = () => {
     setEditingId(null)
     setForm(emptyForm)
+    setLines([emptySalesLine()])
   }
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setMessage('')
     setError('')
+    const normalized = normalizeSalesLines(lines)
+    if (normalized.length === 0) {
+      setError('Ajoutez au moins une ligne avec une désignation.')
+      return
+    }
+    const amount_ht = linesTotalHt(normalized)
+    const payload = {
+      ...form,
+      amount_ht,
+      lines: normalized,
+    }
     try {
       if (editingId) {
-        await api.updateSalesDoc(editingId, form, token, orgId)
+        await api.updateSalesDoc(editingId, payload, token, orgId)
         setMessage('Devis mis à jour.')
         resetForm()
       } else {
         const created = await api.createSalesDoc(
-          { ...form, doc_type: 'devis' },
+          { ...payload, doc_type: 'devis' },
           token,
           orgId,
         )
@@ -139,6 +160,19 @@ export default function DevisPage() {
     }
   }
 
+  const duplicate = async (doc: SalesDoc) => {
+    setMessage('')
+    setError('')
+    try {
+      const created = await api.createSalesDoc(buildDuplicateSalesDocPayload(doc), token, orgId)
+      setMessage(`Devis ${created.number} créé (copie de ${doc.number}).`)
+      startEdit(created)
+      load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Duplication impossible')
+    }
+  }
+
   if (error && !data) return <div className="panel form-error">{error}</div>
   if (!data) return <div className="loading">Chargement des devis…</div>
 
@@ -152,8 +186,8 @@ export default function DevisPage() {
             aussi disponible dans <Link to="/facturation">Facturation</Link>.
           </p>
           <p className="muted" style={{ marginTop: '0.5rem' }}>
-            À l’envoi : ouvrez le devis, puis <strong>Ouvrir ma messagerie</strong> — joignez le PDF
-            téléchargé et envoyez depuis votre boîte.
+            À l’envoi : ouvrez le devis, renseignez le destinataire, puis envoyez via le serveur
+            (SMTP) ou votre messagerie si l’envoi plateforme n’est pas configuré.
           </p>
         </div>
       </div>
@@ -199,16 +233,6 @@ export default function DevisPage() {
             />
           </div>
           <div className="field">
-            <label>Montant HT</label>
-            <input
-              type="number"
-              step="0.01"
-              value={form.amount_ht}
-              onChange={(e) => setForm({ ...form, amount_ht: Number(e.target.value) })}
-              required
-            />
-          </div>
-          <div className="field">
             <label>TVA %</label>
             <input
               type="number"
@@ -224,6 +248,7 @@ export default function DevisPage() {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
+          <SalesDocLinesEditor lines={lines} onChange={setLines} token={token} orgId={orgId} />
         </div>
         <div className="actions">
           <button className="btn" type="submit">
@@ -279,6 +304,7 @@ export default function DevisPage() {
                     {doc.customer_email ? ` · ${doc.customer_email}` : ''} · {doc.issue_date} ·{' '}
                     {doc.status}
                     {doc.signature_status !== 'none' ? ` · signature ${doc.signature_status}` : ''}
+                    {doc.lines && doc.lines.length > 0 ? ` · ${doc.lines.length} ligne(s)` : ''}
                   </span>
                 </div>
                 <div>
@@ -305,6 +331,13 @@ export default function DevisPage() {
                   </button>
                   <button className="btn secondary" type="button" onClick={() => startEdit(doc)}>
                     Modifier
+                  </button>
+                  <button
+                    className="btn secondary"
+                    type="button"
+                    onClick={() => void duplicate(doc)}
+                  >
+                    Dupliquer
                   </button>
                   <button
                     className="btn danger-outline"
@@ -344,8 +377,8 @@ export default function DevisPage() {
           onSent={(document, log) => {
             setPreviewDoc(document)
             setMessage(
-              log.status === 'sent'
-                ? `E-mail envoyé à ${log.recipient}`
+              log.status === 'sent' || log.status === 'mailto_opened'
+                ? `E-mail traité pour ${log.recipient}`
                 : `Envoi ${log.status} pour ${document.number}`,
             )
             load()

@@ -1,0 +1,63 @@
+{
+  "started_at": "2026-07-22T13:37:01.175717+00:00",
+  "alembic": false,
+  "migration_strategy": "orm_create_all_plus_sql_scripts",
+  "status": "PASS",
+  "results": {
+    "connection": "PASS",
+    "empty_migration": "PASS",
+    "idempotent_migration": "PASS",
+    "critical_indexes": "PASS",
+    "postgres_pytest": "PASS",
+    "fastapi": "OK",
+    "frontend": "OK"
+  },
+  "environment": "staging",
+  "database_url_masked": "postgresql+psycopg://postgres:***@db.stckzlalxrupgawgrojk.supabase.co:5432/postgres?sslmode=require",
+  "driver": "psycopg 3.2.6",
+  "postgresql": {
+    "version": "17.6",
+    "extensions": [
+      "pg_stat_statements",
+      "pgcrypto",
+      "plpgsql",
+      "supabase_vault",
+      "uuid-ossp"
+    ]
+  },
+  "migration_1": {
+    "strategy": "orm_create_all_plus_sql_scripts",
+    "alembic": false,
+    "version_marker": "elfis_schema_version=rc1-sql-head",
+    "tables_count": 61,
+    "missing_expected": [],
+    "search_gin": {
+      "index": "ix_elfis_search_vector_gin",
+      "definition": "CREATE INDEX ix_elfis_search_vector_gin ON public.elfis_search_documents USING gin (search_vector)",
+      "ok": true
+    },
+    "ok": true
+  },
+  "migration_2_ok": true,
+  "indexes": {
+    "indexes_checked": {
+      "uq_document_email_org_idempotency": true,
+      "uq_elfis_billing_provider_event": true,
+      "uq_vault_org_checksum_active": true,
+      "ix_elfis_jobs_claim": true,
+      "ix_elfis_events_claim": true,
+      "ix_elfis_search_vector_gin": true
+    },
+    "gin_present": true,
+    "search_gin": {
+      "index": "ix_elfis_search_vector_gin",
+      "definition": "CREATE INDEX ix_elfis_search_vector_gin ON public.elfis_search_documents USING gin (search_vector)",
+      "ok": true
+    },
+    "ok": true,
+    "index_count": 354
+  },
+  "failures": [],
+  "finished_at": "2026-07-22T13:37:48.012827+00:00",
+  "real_external_calls": 0
+}

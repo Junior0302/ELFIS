@@ -396,7 +396,14 @@ class StripeBillingTests(unittest.TestCase):
             read_only.exception.detail["code"],
             "subscription_past_due_read_only",
         )
+        # Grâce Billing unifiée = 7 jours : J+4 encore en grâce, J+8 hors grâce
         subscription.past_due_since = datetime.utcnow() - timedelta(days=4)
+        self.db.commit()
+        self.assertIs(
+            require_active_subscription(request=self.request(), auth=auth, db=self.db),
+            auth,
+        )
+        subscription.past_due_since = datetime.utcnow() - timedelta(days=8)
         self.db.commit()
         with self.assertRaises(HTTPException) as raised:
             require_active_subscription(request=self.request(), auth=auth, db=self.db)
