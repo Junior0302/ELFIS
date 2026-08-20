@@ -1,0 +1,30 @@
+﻿---
+description: ELFIS Core architecture and development guardrails
+alwaysApply: true
+---
+
+# ELFIS Core Development Rules
+
+ELFIS Core is an existing modular SaaS platform, not a greenfield prototype.
+
+Before changing code:
+
+- inspect existing implementation
+- inspect tests
+- inspect related documentation
+- reuse existing platform primitives
+- preserve backward compatibility where reasonable
+- preserve organization/tenant isolation
+- preserve auditability and security
+
+Do not introduce duplicate sources of truth.
+
+Do not replace production implementations with mocks, placeholders or development shortcuts.
+
+For sensitive functionality such as authentication, billing, accounting, documents, permissions, subscriptions and admin operations, favor explicit validation and traceable behavior.
+
+Frontend changes should use the existing Design System, Unified Platform and Platform Shell architecture whenever applicable.
+
+Backend changes should respect existing domain boundaries, services, events and job infrastructure.
+
+Run appropriate tests after changes and report failures rather than hiding them.
