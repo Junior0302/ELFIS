@@ -7,6 +7,7 @@ import {
 } from '../insight-framework'
 import type { HomeSignal } from './homeSignals'
 import { mapHomeSignalsToInsights } from './homeInsights'
+import { PlatformHomeSection } from './PlatformHomeSection'
 
 type ElfisIntelligenceCardProps = {
   signals: HomeSignal[]
@@ -47,33 +48,29 @@ export function ElfisIntelligenceCard({
   const insights = mapHomeSignalsToInsights(signals)
 
   return (
-    <section
-      className={`cockpit-intel ${embedded ? 'cockpit-intel--embedded' : ''}`.trim()}
+    <PlatformHomeSection
       id="home-intel"
-      aria-labelledby="home-intel-title"
-      data-cockpit-intel="v1"
-    >
-      <div className="elfis-home__section-head elfis-home__section-head--compact">
-        <h2 id="home-intel-title">ELFIS Intelligence</h2>
-        <p>Conseils déterministes — Insight Framework.</p>
-      </div>
-      <InsightList
-        insights={insights}
-        variant="inline"
-        className="cockpit-intel__insights"
-        emptyMessage="Aucun signal prioritaire."
-        renderAction={renderInsightAction}
-      />
-      <p className="cockpit-intel__disclaimer">
-        Pas d’IA générative sur Home — recommandations à partir de signaux réels uniquement.
-      </p>
-      <div className="cockpit-intel__actions">
-        {unreadNotifications > 0 ? (
-          <ElfisButtonLink to="/notifications" variant="primary">
-            Tout traiter
+      title="ELFIS Intelligence"
+      description="Signaux déterministes — pas d’IA générative inventée."
+      level={3}
+      className={`cockpit-intel ph-intel ${embedded ? 'cockpit-intel--embedded' : ''}`.trim()}
+      actions={
+        unreadNotifications > 0 ? (
+          <ElfisButtonLink to="/notifications" variant="secondary">
+            Notifications
           </ElfisButtonLink>
-        ) : null}
+        ) : undefined
+      }
+    >
+      <div data-cockpit-intel="v1">
+        <InsightList
+          insights={insights}
+          variant="inline"
+          className="cockpit-intel__insights"
+          emptyMessage="Aucun élément prioritaire détecté."
+          renderAction={renderInsightAction}
+        />
       </div>
-    </section>
+    </PlatformHomeSection>
   )
 }

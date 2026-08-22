@@ -1,0 +1,558 @@
+/**
+ * Surfaces métier workspace — polish sous [data-workspace].
+ * Phase 4–6 Finance · Commercial · Documents.
+ * Accents via --workspace-accent* (pas PRODUCT_PALETTES).
+ * Accent workspace ≠ couleurs sémantiques (--ok / danger / warn).
+ */
+
+/* ——— Token bridges ——— */
+[data-workspace='finance'] {
+  --ps-accent: var(--workspace-finance);
+  --fp-accent: var(--workspace-finance);
+  --cmp-accent: var(--workspace-finance);
+  --wiz-accent: var(--workspace-finance);
+
+  --pilot-accent: var(--workspace-finance);
+  --pilot-focus: var(--workspace-finance);
+  --pilot-secondary: var(--workspace-finance-soft);
+  --pilot-primary: var(--workspace-finance);
+  --pilot-primary-hover: var(--workspace-finance-dark);
+  --pilot-primary-active: var(--workspace-finance-dark);
+
+  --workspace-page-bg: #f6f8f7;
+  --workspace-card-bg: #ffffff;
+  --workspace-card-border: rgba(15, 23, 42, 0.08);
+  --workspace-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+[data-workspace='commercial'] {
+  --ps-accent: var(--workspace-commercial);
+  --cmp-accent: var(--workspace-commercial);
+  --wiz-accent: var(--workspace-commercial);
+
+  --pilot-accent: var(--workspace-commercial);
+  --pilot-focus: var(--workspace-commercial);
+  --pilot-secondary: var(--workspace-commercial-soft);
+  --pilot-primary: var(--workspace-commercial);
+  --pilot-primary-hover: var(--workspace-commercial-dark);
+  --pilot-primary-active: var(--workspace-commercial-dark);
+
+  --workspace-page-bg: #f5f7fb;
+  --workspace-card-bg: #ffffff;
+  --workspace-card-border: rgba(15, 23, 42, 0.08);
+  --workspace-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+[data-workspace='documents'] {
+  --ps-accent: var(--workspace-documents);
+  --cmp-accent: var(--workspace-documents);
+  --wiz-accent: var(--workspace-documents);
+
+  --pilot-accent: var(--workspace-documents);
+  --pilot-focus: var(--workspace-documents);
+  --pilot-secondary: var(--workspace-documents-soft);
+  --pilot-primary: var(--workspace-documents);
+  --pilot-primary-hover: var(--workspace-documents-dark);
+  --pilot-primary-active: var(--workspace-documents-dark);
+
+  --workspace-page-bg: #f7f5fb;
+  --workspace-card-bg: #ffffff;
+  --workspace-card-border: rgba(15, 23, 42, 0.08);
+  --workspace-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+/* ——— Shared surface language ——— */
+[data-workspace='finance'] .ps-shell__body,
+[data-workspace='finance'] .ps-viewport,
+[data-workspace='finance'] .workspace-page-frame,
+[data-workspace='commercial'] .ps-shell__body,
+[data-workspace='commercial'] .ps-viewport,
+[data-workspace='commercial'] .workspace-page-frame,
+[data-workspace='documents'] .ps-shell__body,
+[data-workspace='documents'] .ps-viewport,
+[data-workspace='documents'] .workspace-page-frame {
+  background: var(--workspace-page-bg);
+}
+
+[data-workspace='finance'] .workspace-page-header,
+[data-workspace='finance'] .page-head,
+[data-workspace='finance'] .fp-header,
+[data-workspace='finance'] .up-page-header,
+[data-workspace='commercial'] .workspace-page-header,
+[data-workspace='commercial'] .page-head,
+[data-workspace='commercial'] .up-page-header,
+[data-workspace='commercial'] .ds-page-header,
+[data-workspace='documents'] .workspace-page-header,
+[data-workspace='documents'] .page-head,
+[data-workspace='documents'] .up-page-header,
+[data-workspace='documents'] .ds-page-header {
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.15rem;
+}
+
+[data-workspace='finance'] .ds-page-header__eyebrow,
+[data-workspace='finance'] .workspace-page-header .ds-page-header__eyebrow,
+[data-workspace='commercial'] .ds-page-header__eyebrow,
+[data-workspace='commercial'] .workspace-page-header .ds-page-header__eyebrow,
+[data-workspace='documents'] .ds-page-header__eyebrow,
+[data-workspace='documents'] .workspace-page-header .ds-page-header__eyebrow {
+  color: var(--workspace-accent);
+  letter-spacing: 0.07em;
+}
+
+[data-workspace='finance'] .ds-page-header__title,
+[data-workspace='finance'] .page-head h1,
+[data-workspace='finance'] .page-head h2,
+[data-workspace='finance'] .fp-header h2,
+[data-workspace='commercial'] .ds-page-header__title,
+[data-workspace='commercial'] .page-head h1,
+[data-workspace='commercial'] .page-head h2,
+[data-workspace='documents'] .ds-page-header__title,
+[data-workspace='documents'] .page-head h1,
+[data-workspace='documents'] .page-head h2 {
+  color: var(--ps-navy, #0b1f3a);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+[data-workspace='finance'] .ds-page-header__description,
+[data-workspace='finance'] .page-head p,
+[data-workspace='finance'] .fp-header__lede,
+[data-workspace='commercial'] .ds-page-header__description,
+[data-workspace='commercial'] .page-head p,
+[data-workspace='documents'] .ds-page-header__description,
+[data-workspace='documents'] .page-head p {
+  color: color-mix(in srgb, var(--ps-navy, #0b1f3a) 58%, transparent);
+  max-width: 42rem;
+}
+
+[data-workspace='finance'] .workspace-page-header__actions,
+[data-workspace='commercial'] .workspace-page-header__actions,
+[data-workspace='documents'] .workspace-page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+[data-workspace='finance'] .panel,
+[data-workspace='finance'] .ui-card,
+[data-workspace='finance'] .ds-metric-card,
+[data-workspace='finance'] .widget-container,
+[data-workspace='finance'] .fcc-card,
+[data-workspace='commercial'] .panel,
+[data-workspace='commercial'] .ui-card,
+[data-workspace='commercial'] .ds-metric-card,
+[data-workspace='commercial'] .widget-container,
+[data-workspace='commercial'] .sales-pipe-column,
+[data-workspace='commercial'] .sales-pipe-card,
+[data-workspace='commercial'] .sales-workspace__card,
+[data-workspace='documents'] .panel,
+[data-workspace='documents'] .ui-card,
+[data-workspace='documents'] .ds-metric-card {
+  background: var(--workspace-card-bg);
+  border: 1px solid var(--workspace-card-border);
+  box-shadow: var(--workspace-card-shadow);
+  border-radius: 0.75rem;
+}
+
+[data-workspace='finance'] .ui-card-link:hover,
+[data-workspace='commercial'] .ui-card-link:hover,
+[data-workspace='documents'] .ui-card-link:hover {
+  border-color: color-mix(in srgb, var(--workspace-accent) 35%, transparent);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+/* ——— KPI ——— */
+[data-workspace='finance'] .workspace-kpi-card-wrap,
+[data-workspace='commercial'] .workspace-kpi-card-wrap,
+[data-workspace='documents'] .workspace-kpi-card-wrap {
+  height: 100%;
+  border-radius: 0.75rem;
+  background: var(--workspace-card-bg);
+  border: 1px solid var(--workspace-card-border);
+  box-shadow: var(--workspace-card-shadow);
+  overflow: hidden;
+}
+
+[data-workspace='finance'] .workspace-kpi-card-wrap .workspace-kpi-card,
+[data-workspace='commercial'] .workspace-kpi-card-wrap .workspace-kpi-card,
+[data-workspace='documents'] .workspace-kpi-card-wrap .workspace-kpi-card {
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  height: 100%;
+  min-height: 6.5rem;
+  padding: 0.95rem 1rem;
+}
+
+[data-workspace='finance'] .workspace-kpi-card,
+[data-workspace='commercial'] .workspace-kpi-card,
+[data-workspace='documents'] .workspace-kpi-card {
+  height: 100%;
+  min-height: 6.5rem;
+  padding: 0.95rem 1rem;
+}
+
+[data-workspace='finance'] .workspace-kpi-card--accent-bar,
+[data-workspace='commercial'] .workspace-kpi-card--accent-bar,
+[data-workspace='documents'] .workspace-kpi-card--accent-bar {
+  border-left: 3px solid var(--workspace-accent);
+}
+
+[data-workspace='finance'] .workspace-kpi-card .ds-metric-card__title,
+[data-workspace='commercial'] .workspace-kpi-card .ds-metric-card__title,
+[data-workspace='documents'] .workspace-kpi-card .ds-metric-card__title,
+[data-workspace='finance'] .up-metric-card .ds-metric-card__title,
+[data-workspace='commercial'] .up-metric-card .ds-metric-card__title,
+[data-workspace='documents'] .up-metric-card .ds-metric-card__title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ps-navy, #0b1f3a) 55%, transparent);
+}
+
+[data-workspace='finance'] .workspace-kpi-card .ds-metric-card__value,
+[data-workspace='commercial'] .workspace-kpi-card .ds-metric-card__value,
+[data-workspace='documents'] .workspace-kpi-card .ds-metric-card__value,
+[data-workspace='finance'] .up-metric-card .ds-metric-card__value,
+[data-workspace='commercial'] .up-metric-card .ds-metric-card__value,
+[data-workspace='documents'] .up-metric-card .ds-metric-card__value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ps-navy, #0b1f3a);
+  margin: 0.35rem 0 0;
+}
+
+[data-workspace='finance'] .up-metric-card,
+[data-workspace='commercial'] .up-metric-card,
+[data-workspace='documents'] .up-metric-card {
+  min-height: 6.5rem;
+  padding: 0.95rem 1rem;
+}
+
+[data-workspace='finance'] .workspace-kpi-card__status,
+[data-workspace='commercial'] .workspace-kpi-card__status,
+[data-workspace='documents'] .workspace-kpi-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+[data-workspace='finance'] .workspace-kpi-card__icon,
+[data-workspace='commercial'] .workspace-kpi-card__icon,
+[data-workspace='documents'] .workspace-kpi-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 0.4rem;
+  background: var(--workspace-accent-soft);
+  color: var(--workspace-accent-dark);
+  font-size: 0.85rem;
+}
+
+[data-workspace='finance'] .workspace-kpi-grid,
+[data-workspace='commercial'] .workspace-kpi-grid,
+[data-workspace='documents'] .workspace-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  [data-workspace='finance'] .workspace-kpi-grid,
+  [data-workspace='commercial'] .workspace-kpi-grid,
+  [data-workspace='documents'] .workspace-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  [data-workspace='finance'] .workspace-kpi-grid,
+  [data-workspace='commercial'] .workspace-kpi-grid,
+  [data-workspace='documents'] .workspace-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  [data-workspace='finance'] .workspace-kpi-grid,
+  [data-workspace='commercial'] .workspace-kpi-grid,
+  [data-workspace='documents'] .workspace-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ——— Tabs ——— */
+[data-workspace='finance'] .billing-tabs,
+[data-workspace='commercial'] .billing-tabs,
+[data-workspace='documents'] .billing-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.25rem;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--workspace-accent) 8%, transparent);
+}
+
+[data-workspace='finance'] .billing-tab,
+[data-workspace='commercial'] .billing-tab,
+[data-workspace='documents'] .billing-tab,
+[data-workspace='finance'] .fp-spaces__link,
+[data-workspace='documents'] [role='tab'].billing-tab {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.55rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--ps-navy, #0b1f3a) 72%, transparent);
+}
+
+[data-workspace='finance'] .billing-tab.active,
+[data-workspace='finance'] .fp-product-tabs button.is-active,
+[data-workspace='finance'] .fp-spaces__link.is-active,
+[data-workspace='commercial'] .billing-tab.active,
+[data-workspace='commercial'] [role='tab'][aria-selected='true'],
+[data-workspace='documents'] .billing-tab.active,
+[data-workspace='documents'] [role='tab'][aria-selected='true'] {
+  color: #fff;
+  background: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+}
+
+[data-workspace='finance'] .billing-tab:hover:not(.active),
+[data-workspace='finance'] .fp-product-tabs button:hover:not(.is-active),
+[data-workspace='finance'] .fp-spaces__link:hover:not(.is-active),
+[data-workspace='commercial'] [role='tab']:hover:not([aria-selected='true']),
+[data-workspace='documents'] .billing-tab:hover:not(.active),
+[data-workspace='documents'] [role='tab']:hover:not([aria-selected='true']) {
+  background: var(--workspace-accent-soft);
+  color: var(--workspace-accent-dark);
+}
+
+[data-workspace='finance'] .billing-tab:focus-visible,
+[data-workspace='finance'] .fp-product-tabs button:focus-visible,
+[data-workspace='finance'] .fp-spaces__link:focus-visible,
+[data-workspace='commercial'] [role='tab']:focus-visible,
+[data-workspace='documents'] .billing-tab:focus-visible,
+[data-workspace='documents'] [role='tab']:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+[data-workspace='finance'] .up-tabs [aria-selected='true'],
+[data-workspace='finance'] .ds-tabs [data-state='active'],
+[data-workspace='commercial'] .up-tabs [aria-selected='true'],
+[data-workspace='commercial'] .ds-tabs [data-state='active'],
+[data-workspace='documents'] .up-tabs [aria-selected='true'],
+[data-workspace='documents'] .ds-tabs [data-state='active'] {
+  color: var(--ps-navy, #0b1f3a);
+  box-shadow: inset 0 -2px 0 var(--workspace-accent);
+}
+
+/* ——— Tables ——— */
+[data-workspace='finance'] .billing-table,
+[data-workspace='finance'] .data-table,
+[data-workspace='finance'] table.ui-table,
+[data-workspace='commercial'] .billing-table,
+[data-workspace='commercial'] .data-table,
+[data-workspace='commercial'] table.ui-table,
+[data-workspace='commercial'] .sales-workspace table,
+[data-workspace='documents'] .billing-table,
+[data-workspace='documents'] .data-table,
+[data-workspace='documents'] table.ui-table,
+[data-workspace='documents'] .elfis-lines-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  background: var(--workspace-card-bg);
+  border: 1px solid var(--workspace-card-border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+[data-workspace='finance'] .billing-table th,
+[data-workspace='finance'] .data-table th,
+[data-workspace='finance'] table.ui-table th,
+[data-workspace='commercial'] .billing-table th,
+[data-workspace='commercial'] .data-table th,
+[data-workspace='commercial'] table.ui-table th,
+[data-workspace='commercial'] .sales-workspace table th,
+[data-workspace='documents'] .billing-table th,
+[data-workspace='documents'] .data-table th,
+[data-workspace='documents'] table.ui-table th,
+[data-workspace='documents'] .elfis-lines-table th {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ps-navy, #0b1f3a) 48%, transparent);
+  background: color-mix(in srgb, var(--ps-navy, #0b1f3a) 2.5%, #fff);
+  border-bottom: 1px solid var(--workspace-card-border);
+  padding: 0.65rem 0.85rem;
+}
+
+[data-workspace='finance'] .billing-table td,
+[data-workspace='finance'] .data-table td,
+[data-workspace='finance'] table.ui-table td,
+[data-workspace='commercial'] .billing-table td,
+[data-workspace='commercial'] .data-table td,
+[data-workspace='commercial'] table.ui-table td,
+[data-workspace='commercial'] .sales-workspace table td,
+[data-workspace='documents'] .billing-table td,
+[data-workspace='documents'] .data-table td,
+[data-workspace='documents'] table.ui-table td,
+[data-workspace='documents'] .elfis-lines-table td {
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  font-size: 0.9rem;
+}
+
+[data-workspace='finance'] .billing-table tbody tr:hover,
+[data-workspace='finance'] .data-table tbody tr:hover,
+[data-workspace='finance'] table.ui-table tbody tr:hover,
+[data-workspace='commercial'] .billing-table tbody tr:hover,
+[data-workspace='commercial'] .data-table tbody tr:hover,
+[data-workspace='commercial'] table.ui-table tbody tr:hover,
+[data-workspace='commercial'] .sales-workspace table tbody tr:hover,
+[data-workspace='documents'] .billing-table tbody tr:hover,
+[data-workspace='documents'] .data-table tbody tr:hover,
+[data-workspace='documents'] table.ui-table tbody tr:hover,
+[data-workspace='documents'] .elfis-lines-table tbody tr:hover {
+  background: color-mix(in srgb, var(--workspace-accent) 5%, #fff);
+}
+
+[data-workspace='finance'] .table-scroll,
+[data-workspace='finance'] .billing-table-wrap,
+[data-workspace='commercial'] .table-scroll,
+[data-workspace='commercial'] .sales-workspace__table-wrap,
+[data-workspace='documents'] .table-scroll,
+[data-workspace='documents'] .elfis-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ——— Empty states ——— */
+[data-workspace='finance'] .ui-empty,
+[data-workspace='finance'] .ds-empty,
+[data-workspace='commercial'] .ui-empty,
+[data-workspace='commercial'] .ds-empty,
+[data-workspace='documents'] .ui-empty,
+[data-workspace='documents'] .ds-empty {
+  text-align: center;
+  padding: 2rem 1.25rem;
+  background: var(--workspace-card-bg);
+  border: 1px dashed color-mix(in srgb, var(--workspace-accent) 28%, transparent);
+  border-radius: 0.85rem;
+}
+
+[data-workspace='finance'] .ui-empty-title,
+[data-workspace='commercial'] .ui-empty-title,
+[data-workspace='documents'] .ui-empty-title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: var(--ps-navy, #0b1f3a);
+}
+
+[data-workspace='finance'] .ui-empty-action,
+[data-workspace='commercial'] .ui-empty-action,
+[data-workspace='documents'] .ui-empty-action {
+  margin-top: 0.85rem;
+}
+
+/* ——— Focus / links ——— */
+[data-workspace='finance'] a:focus-visible,
+[data-workspace='finance'] button:focus-visible,
+[data-workspace='finance'] .btn:focus-visible,
+[data-workspace='finance'] .ds-input:focus-visible,
+[data-workspace='commercial'] a:focus-visible,
+[data-workspace='commercial'] button:focus-visible,
+[data-workspace='commercial'] .btn:focus-visible,
+[data-workspace='commercial'] .ds-input:focus-visible,
+[data-workspace='documents'] a:focus-visible,
+[data-workspace='documents'] button:focus-visible,
+[data-workspace='documents'] .btn:focus-visible,
+[data-workspace='documents'] .ds-input:focus-visible {
+  outline-color: color-mix(in srgb, var(--workspace-accent) 70%, transparent);
+}
+
+[data-workspace='finance'] .linkish,
+[data-workspace='finance'] .billing-doc-number,
+[data-workspace='commercial'] .linkish,
+[data-workspace='documents'] .linkish {
+  color: var(--workspace-accent-dark);
+}
+
+[data-workspace='finance'] .fp-chip--ok,
+[data-workspace='finance'] .up-dash-chip--ok,
+[data-workspace='finance'] .fcc-header__badge--ready,
+[data-workspace='commercial'] .up-dash-chip--ok,
+[data-workspace='documents'] .up-dash-chip--ok {
+  background: var(--workspace-accent-soft);
+  color: var(--workspace-accent-dark);
+  border-color: color-mix(in srgb, var(--workspace-accent) 28%, transparent);
+}
+
+/* Finance-only */
+[data-workspace='finance'] .dropzone {
+  border-color: color-mix(in srgb, var(--workspace-accent) 35%, transparent);
+  background: linear-gradient(180deg, #fff, var(--workspace-accent-soft));
+}
+
+[data-workspace='finance'] .dropzone.active {
+  border-color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 10%, #fff);
+}
+
+[data-workspace='finance'] .platform-surface-banner {
+  border: 1px solid var(--workspace-card-border);
+  border-left: 3px solid var(--workspace-accent);
+  background: #fff;
+  box-shadow: var(--workspace-card-shadow);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+}
+
+/* Commercial — pipeline accents (statuts métier inchangés) */
+[data-workspace='commercial'] .sales-pipeline__banner {
+  border-color: color-mix(in srgb, var(--workspace-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--workspace-accent) 8%, #fff);
+}
+
+[data-workspace='commercial'] .sales-pipe-card__hit:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent) 55%, transparent);
+}
+
+[data-workspace='commercial'] .sales-pipe-column__head h3 {
+  color: var(--ps-navy, #0b1f3a);
+}
+
+[data-workspace='commercial'] .sales-pipe-card:hover {
+  border-color: color-mix(in srgb, var(--workspace-accent) 30%, transparent);
+}
+
+/* Documents — dropzone / banner Vault */
+[data-workspace='documents'] .dropzone {
+  border-color: color-mix(in srgb, var(--workspace-accent) 35%, transparent);
+  background: linear-gradient(180deg, #fff, var(--workspace-accent-soft));
+}
+
+[data-workspace='documents'] .dropzone.active {
+  border-color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 10%, #fff);
+}
+
+[data-workspace='documents'] .platform-surface-banner {
+  border: 1px solid var(--workspace-card-border);
+  border-left: 3px solid var(--workspace-accent);
+  background: #fff;
+  box-shadow: var(--workspace-card-shadow);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+}

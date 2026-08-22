@@ -230,9 +230,9 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
   })
 
   it('EH15 — accents domaines distincts', () => {
-    expect(getSpaceById('finance').accent).toBe('#0B3D2E')
-    expect(getSpaceById('commercial').accent).toBe('#1D4ED8')
-    expect(getSpaceById('documents').accent).toBe('#6D28D9')
+    expect(getSpaceById('finance').accent).toBe('#16A34A')
+    expect(getSpaceById('commercial').accent).toBe('#2563EB')
+    expect(getSpaceById('documents').accent).toBe('#7C3AED')
     expect(getSpaceById('rh').accent).toBe('#C2410C')
   })
 

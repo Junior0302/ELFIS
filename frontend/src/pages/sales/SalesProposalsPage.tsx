@@ -52,9 +52,9 @@ export default function SalesProposalsPage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Propositions commerciales"
-        description="Devis et offres versionnés — source de vérité backend."
+        description="Devis et offres versionnés — propositions SalesPilot."
         actions={
           <Link to="/sales/proposals/new" className="ds-btn btn">
             Nouvelle proposition

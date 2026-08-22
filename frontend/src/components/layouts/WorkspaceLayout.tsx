@@ -42,7 +42,6 @@ export default function WorkspaceLayout() {
     showLauncher: Boolean(user) && !trialOnboarding,
     showSearch: Boolean(user) && !trialOnboarding && !fullFocus,
     showNotifications: Boolean(user) && !trialOnboarding,
-    showWorkspaceSwitcher: false,
   })
 
   useEffect(() => {
@@ -66,6 +65,7 @@ export default function WorkspaceLayout() {
   return (
     <PilotWorkspace
       pilotId={config.productId}
+      dataWorkspace="finance"
       chrome={config.chrome}
       sidebarCollapsed={!fullFocus && sidebarCollapsed}
       className={cx(

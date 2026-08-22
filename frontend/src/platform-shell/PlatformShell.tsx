@@ -24,6 +24,8 @@ export type PlatformShellProps = {
   children: ReactNode
   className?: string
   chrome?: Partial<ProductShellChromeOptions>
+  /** Espace métier (finance / commercial / documents) — tokens --workspace-*. */
+  dataWorkspace?: string
 }
 
 /**
@@ -39,6 +41,7 @@ export function PlatformShell({
   children,
   className,
   chrome: chromeOverrides,
+  dataWorkspace,
 }: PlatformShellProps) {
   const chrome: ProductShellChromeOptions = { ...DEFAULT_SHELL_CHROME, ...chromeOverrides }
   const [globalNavOpen, setGlobalNavOpen] = useState(false)
@@ -76,6 +79,7 @@ export function PlatformShell({
       data-platform-shell="v1"
       data-product={productId}
       data-sidebar-collapsed={hasSidebar && sidebarCollapsed ? 'true' : 'false'}
+      data-workspace={dataWorkspace}
     >
       <PlatformTopBar
         productId={productId}
@@ -133,6 +137,5 @@ export { PlatformLauncher } from './PlatformLauncher'
 export { PlatformSearch } from './PlatformSearch'
 export { NotificationCenter } from './NotificationCenter'
 export { OrganizationSwitcher } from './OrganizationSwitcher'
-export { WorkspaceSwitcher } from './WorkspaceSwitcher'
 export { UserMenu } from './UserMenu'
 export { ProductIndicator } from './ProductIndicator'

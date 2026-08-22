@@ -8,6 +8,7 @@ export default function SalesTasksPage() {
     <CrmResourceListPage<SalesTaskRow>
       title="Tâches"
       description="Actions commerciales à suivre."
+      contextLabel="Commercial · Activité"
       createKind="task"
       bulkResource="tasks"
       emptyTitle="Aucune tâche"

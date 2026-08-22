@@ -7,7 +7,8 @@ export default function SalesActivitiesPage() {
   return (
     <CrmResourceListPage<SalesActivityRow>
       title="Activités"
-      description="Appels, emails, réunions, visites."
+      description="Appels, emails, réunions et visites commerciales."
+      contextLabel="Commercial · Activité"
       createKind="activity"
       bulkResource="activities"
       emptyTitle="Aucune activité"

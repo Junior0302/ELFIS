@@ -202,17 +202,6 @@ export const navCategories: readonly NavCategory[] = [
   },
 ] as const
 
-/** Sous-pages dont le préfixe chevauche d’autres enfants → match exact dans NavLink. */
-export const NAV_EXACT_MATCH_PATHS = new Set([
-  '/accounting',
-  '/documents',
-  '/facturation',
-  '/facturation/documents',
-  '/settings',
-  '/platform/aura',
-  '/home',
-])
-
 export function normalizePathname(pathname: string): string {
   const trimmed = pathname.replace(/\/+$/, '')
   return trimmed || '/'

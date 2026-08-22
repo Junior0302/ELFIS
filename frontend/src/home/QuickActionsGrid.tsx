@@ -1,43 +1,59 @@
-import { QuickActionCard } from '../design-system'
-import { GridItem, PlatformGrid } from '../unified-platform'
+import { WORKSPACE_ACCENTS } from '../workspaces'
+import { PlatformActionItem } from './PlatformActionItem'
+import { PlatformHomeSection } from './PlatformHomeSection'
 
-/** Routes existantes uniquement — pas de faux liens. */
+/**
+ * Actions rapides — routes SPA existantes + label d’espace.
+ * Deposit comptable = Finance ; Vault = Documents.
+ */
 export const HOME_QUICK_ACTIONS = [
   {
     id: 'facture',
     title: 'Facture',
-    description: 'Composer une facture',
+    description: 'Créer une facture',
     href: '/facturation/documents/new',
+    workspaceLabel: 'Finance',
+    accent: WORKSPACE_ACCENTS.finance.primary,
   },
   {
     id: 'devis',
     title: 'Devis',
     description: 'Ouvrir les devis',
     href: '/devis',
+    workspaceLabel: 'Finance',
+    accent: WORKSPACE_ACCENTS.finance.primary,
   },
   {
     id: 'prospect',
     title: 'Prospect',
-    description: 'Leads commerciaux',
+    description: 'Créer / voir les leads',
     href: '/sales/leads',
+    workspaceLabel: 'Commercial',
+    accent: WORKSPACE_ACCENTS.commercial.primary,
   },
   {
     id: 'import-doc',
-    title: 'Import doc',
-    description: 'Déposer un document',
-    href: '/deposit',
+    title: 'Document',
+    description: 'Déposer dans le coffre',
+    href: '/platform/documents',
+    workspaceLabel: 'Documents',
+    accent: WORKSPACE_ACCENTS.documents.primary,
   },
   {
     id: 'tache',
     title: 'Tâche',
     description: 'File de travail',
     href: '/work-queue',
+    workspaceLabel: 'Plateforme',
+    accent: undefined,
   },
   {
     id: 'relation',
     title: 'Relation',
-    description: 'Relations plateforme',
+    description: 'Relations entreprise',
     href: '/platform/relations',
+    workspaceLabel: 'Plateforme',
+    accent: undefined,
   },
 ] as const
 
@@ -47,30 +63,25 @@ type QuickActionsGridProps = {
 
 export function QuickActionsGrid({ embedded = false }: QuickActionsGridProps) {
   return (
-    <section
-      className={`cockpit-quick ${embedded ? 'cockpit-quick--embedded' : ''}`.trim()}
+    <PlatformHomeSection
       id="home-quick"
-      aria-labelledby="home-quick-title"
-      data-cockpit-quick="v1"
+      title="Actions rapides"
+      description="Gestes transverses — l’espace cible est indiqué."
+      level={3}
+      className={`cockpit-quick ph-quick ${embedded ? 'cockpit-quick--embedded' : ''}`.trim()}
     >
-      <div className="elfis-home__section-head elfis-home__section-head--compact">
-        <h2 id="home-quick-title">Quick Actions</h2>
-        <p>Gestes OS — routes existantes.</p>
-      </div>
-      <PlatformGrid columns={12} gap={3} className="cockpit-quick__grid">
+      <div className="ph-quick__grid" data-cockpit-quick="v1">
         {HOME_QUICK_ACTIONS.map((action) => (
-          <GridItem key={action.id} span={6} spanMd={4} spanLg={2}>
-            <QuickActionCard
-              title={action.title}
-              description={action.description}
-              href={action.href}
-              compact
-              accent={false}
-              className="cockpit-quick__card"
-            />
-          </GridItem>
+          <PlatformActionItem
+            key={action.id}
+            title={action.title}
+            description={action.description}
+            href={action.href}
+            workspaceLabel={action.workspaceLabel}
+            accent={'accent' in action ? action.accent : undefined}
+          />
         ))}
-      </PlatformGrid>
-    </section>
+      </div>
+    </PlatformHomeSection>
   )
 }

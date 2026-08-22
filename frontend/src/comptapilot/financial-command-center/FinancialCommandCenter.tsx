@@ -185,7 +185,7 @@ function ForecastEmptyIllustration() {
       <svg viewBox="0 0 160 88" className="fcc-forecast-empty__svg" role="presentation">
         <defs>
           <linearGradient id="fcc-fc-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="var(--ps-accent, #2d5a43)" stopOpacity="0.22" />
+            <stop offset="0%" stopColor="var(--ps-accent, var(--workspace-accent, #16a34a))" stopOpacity="0.22" />
             <stop offset="100%" stopColor="var(--ps-navy, #0b1f3a)" stopOpacity="0.06" />
           </linearGradient>
         </defs>
@@ -193,12 +193,12 @@ function ForecastEmptyIllustration() {
         <path
           d="M24 58 C44 48, 52 62, 72 44 C88 30, 102 52, 136 28"
           fill="none"
-          stroke="var(--ps-accent, #2d5a43)"
+          stroke="var(--ps-accent, var(--workspace-accent, #16a34a))"
           strokeWidth="2.5"
           strokeLinecap="round"
           opacity="0.55"
         />
-        <circle cx="136" cy="28" r="4" fill="var(--ps-accent, #2d5a43)" opacity="0.7" />
+        <circle cx="136" cy="28" r="4" fill="var(--ps-accent, var(--workspace-accent, #16a34a))" opacity="0.7" />
         <rect x="28" y="68" width="28" height="4" rx="2" fill="rgba(15,23,42,0.08)" />
         <rect x="66" y="68" width="40" height="4" rx="2" fill="rgba(15,23,42,0.06)" />
       </svg>
@@ -397,7 +397,7 @@ export default function FinancialCommandCenter() {
       data-unified-fcc={unified ? '1' : '0'}
       header={{
         title: 'Tableau de bord',
-        description: 'Vue d’ensemble financière et priorités — source : Financial Engine.',
+        description: 'Pilotage financier et trésorerie en temps réel — source : Financial Engine.',
         eyebrow: 'Finance',
         meta: (
           <div className="up-dash-meta" data-fcc-header-meta="true">

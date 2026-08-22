@@ -61,10 +61,12 @@ export default function SalesImportPage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Import CSV"
         description="Simulation obligatoire avant import. Aucune fusion automatique de doublons."
-      />
+      >
+        <p className="muted">Commercial · Prospection</p>
+      </PageHeader>
       <Stack gap={4}>
         <Section title="Source" spacing="compact">
           <label>

@@ -237,6 +237,7 @@ export default function CopilotePage() {
             Copilote ComptaPilot — TVA, trésorerie, écritures. Le LLM explique, les moteurs
             calculent. Réponses structurées, explicables, avec sources et actions proposées.
           </p>
+          <p className="muted">Finance · Assistance</p>
           <p className="muted">
             <Link to="/platform/aura">Ouvrir Aura dans ELFIS Core</Link>
           </p>

@@ -1,9 +1,10 @@
 /**
  * Signaux Home — uniquement sources plateforme réelles.
  * Aucune invention de KPI métier (factures, prospects, etc.).
+ * Espaces : WORKSPACE_REGISTRY (même SoT que le launcher).
  */
 
-import { HOME_APP_CARDS } from './homeCatalog'
+import { WORKSPACE_REGISTRY } from '../workspaces'
 import { getLastProductAt, getLastProductId } from './lastProduct'
 
 export type HomeSignal = {
@@ -32,6 +33,27 @@ export type DayDomainCard = {
   lastActivity: string
 }
 
+export type HomeSpaceSummary = {
+  id: string
+  title: string
+  summary: string
+  available: boolean
+  to: string | null
+  poweredBy?: string | null
+  statusLabel: string
+  accent: string
+  productId?: string | null
+  resumeHint?: string | null
+}
+
+export type HomeWatchItem = {
+  id: string
+  title: string
+  context: string
+  href?: string
+  tone: 'attention' | 'info'
+}
+
 function formatLastSeen(iso: string | null): string {
   if (!iso) return ''
   try {
@@ -58,6 +80,11 @@ export function relativeCheckLabel(iso?: string): string {
   } catch {
     return 'à l’instant'
   }
+}
+
+/** Badge header — uniquement états observés (connexion / org / sync). */
+export function platformStatusLabel(allObservedOk: boolean): string {
+  return allObservedOk ? 'Plateforme opérationnelle' : 'Attention requise'
 }
 
 export function buildDetectionSignals(input: {
@@ -118,6 +145,20 @@ export function buildDetectionSignals(input: {
   }
 
   return signals
+}
+
+/** Éléments actionnables pour « À surveiller » (max 6). */
+export function buildWatchItems(signals: HomeSignal[]): HomeWatchItem[] {
+  return signals
+    .filter((s) => s.tone === 'attention')
+    .slice(0, 6)
+    .map((s) => ({
+      id: s.id,
+      title: s.label,
+      context: s.href ? 'Action requise' : 'État plateforme',
+      href: s.href,
+      tone: 'attention' as const,
+    }))
 }
 
 export function buildDayDomainCards(input: {
@@ -236,65 +277,41 @@ export function buildHealthLamps(input: {
   return lamps
 }
 
-export function resolveSpaceSummaries(lastProductId: string | null, lastAt: string | null) {
+/**
+ * Cartes « Vos espaces » — dérivées du WORKSPACE_REGISTRY.
+ * Même source que le launcher Espaces.
+ */
+export function resolveSpaceSummaries(
+  lastProductId: string | null,
+  lastAt: string | null,
+): HomeSpaceSummary[] {
   const stamp = formatLastSeen(lastAt)
-  const finance = HOME_APP_CARDS.find((a) => a.id === 'comptapilot')
-  const commercial = HOME_APP_CARDS.find((a) => a.id === 'salespilot')
-  const docs = HOME_APP_CARDS.find((a) => a.id === 'docpilot')
-  const hr = HOME_APP_CARDS.find((a) => a.id === 'hrpilot')
 
-  return [
-    {
-      id: 'finance' as const,
-      title: 'Finance',
-      summary:
-        lastProductId === 'comptapilot' && stamp
-          ? `Reprise possible · dernière activité ${stamp}`
-          : finance?.description ?? 'Pilotage financier.',
-      available: Boolean(finance?.available && finance.to),
-      to: finance?.to ?? null,
-      poweredBy: 'Moteur ComptaPilot',
-      statusLabel: finance?.statusLabel ?? 'Disponible',
-      accent: finance?.accent ?? '#0B3D2E',
-      productId: finance?.productId,
-    },
-    {
-      id: 'commercial' as const,
-      title: 'Commercial',
-      summary:
-        lastProductId === 'salespilot' && stamp
-          ? `Reprise possible · dernière activité ${stamp}`
-          : commercial?.description ?? 'Pipeline et relations.',
-      available: Boolean(commercial?.available && commercial.to),
-      to: commercial?.to ?? null,
-      poweredBy: 'Moteur SalesPilot',
-      statusLabel: commercial?.statusLabel ?? 'Disponible',
-      accent: commercial?.accent ?? '#1D4ED8',
-      productId: commercial?.productId,
-    },
-    {
-      id: 'documents' as const,
-      title: 'Documents',
-      summary: 'Coffre et flux documentaires — accès plateforme.',
-      available: true,
-      to: '/platform/documents',
-      poweredBy: docs?.available ? 'Moteur DocPilot' : undefined,
-      statusLabel: docs?.available ? 'Disponible' : 'Accès plateforme',
-      accent: docs?.accent ?? '#C2410C',
-      productId: docs?.productId,
-    },
-    {
-      id: 'rh' as const,
-      title: 'RH',
-      summary: hr?.description ?? 'Équipes et processus RH.',
-      available: Boolean(hr?.available && hr.to),
-      to: hr?.to ?? null,
-      poweredBy: undefined,
-      statusLabel: hr?.statusLabel ?? 'Bientôt disponible',
-      accent: hr?.accent ?? '#6D28D9',
-      productId: hr?.productId,
-    },
-  ]
+  return WORKSPACE_REGISTRY.map((workspace) => {
+    const available = workspace.availability === 'available' && Boolean(workspace.rootPath)
+    const isResume =
+      Boolean(lastProductId) &&
+      workspace.engineProductId === lastProductId &&
+      Boolean(stamp)
+
+    return {
+      id: workspace.id,
+      title: workspace.label,
+      summary: workspace.description,
+      available,
+      to: workspace.rootPath,
+      poweredBy: workspace.engineLabel,
+      statusLabel:
+        workspace.availability === 'available'
+          ? 'Disponible'
+          : workspace.availability === 'locked'
+            ? 'Verrouillé'
+            : 'Bientôt',
+      accent: workspace.accent.primary,
+      productId: workspace.engineProductId,
+      resumeHint: isResume ? `Reprise possible · ${stamp}` : null,
+    }
+  })
 }
 
 /** Relecture locale des derniers produits (sans inventer d’entités métier). */

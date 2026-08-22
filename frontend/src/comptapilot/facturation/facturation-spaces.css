@@ -11,7 +11,7 @@
 
 .fp-spaces {
   --fp-navy: var(--ps-navy, #0b1f3a);
-  --fp-accent: var(--ps-accent, #2d5a43);
+  --fp-accent: var(--workspace-accent, var(--ps-accent, #16a34a));
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -100,7 +100,7 @@
   padding: 0.85rem 1rem;
   border-radius: 0.65rem;
   border: 1px solid color-mix(in srgb, var(--fp-navy, #0b1f3a) 10%, transparent);
-  background: color-mix(in srgb, var(--fp-accent, #2d5a43) 5%, #fff);
+  background: color-mix(in srgb, var(--fp-accent, #16a34a) 5%, #fff);
 }
 
 .fp-composer-client-meta {
@@ -206,7 +206,7 @@
   margin: 0 0 0.55rem;
   padding: 0.4rem 0.65rem;
   border-radius: 0.45rem;
-  background: color-mix(in srgb, #2d5a43 12%, #fff);
+  background: color-mix(in srgb, #16a34a 12%, #fff);
   color: #1f3d2e;
   font-size: 0.88rem;
 }
@@ -279,7 +279,7 @@
 }
 
 .fp-overview-card:hover {
-  border-color: color-mix(in srgb, var(--fp-accent, #2d5a43) 35%, transparent);
+  border-color: color-mix(in srgb, var(--fp-accent, #16a34a) 35%, transparent);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
@@ -317,18 +317,18 @@
 }
 
 .fp-doc-card:hover {
-  border-color: color-mix(in srgb, var(--fp-accent, #2d5a43) 40%, transparent);
+  border-color: color-mix(in srgb, var(--fp-accent, #16a34a) 40%, transparent);
 }
 
 .fp-doc-card:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--fp-accent, #2d5a43) 55%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--fp-accent, #16a34a) 55%, transparent);
   outline-offset: 2px;
 }
 
 .fp-doc-card.is-selected {
-  border-color: var(--fp-accent, #2d5a43);
-  background: color-mix(in srgb, var(--fp-accent, #2d5a43) 7%, #fff);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fp-accent, #2d5a43) 25%, transparent);
+  border-color: var(--fp-accent, #16a34a);
+  background: color-mix(in srgb, var(--fp-accent, #16a34a) 7%, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fp-accent, #16a34a) 25%, transparent);
 }
 
 .fp-doc-card__icon {
@@ -415,8 +415,8 @@
 
 .fp-wizard-results button:hover,
 .fp-wizard-results button.is-selected {
-  border-color: color-mix(in srgb, var(--fp-accent, #2d5a43) 40%, transparent);
-  background: color-mix(in srgb, var(--fp-accent, #2d5a43) 6%, #fff);
+  border-color: color-mix(in srgb, var(--fp-accent, #16a34a) 40%, transparent);
+  background: color-mix(in srgb, var(--fp-accent, #16a34a) 6%, #fff);
 }
 
 .fp-wizard-results__meta {
@@ -494,8 +494,8 @@
 }
 
 .fp-product-tabs button.is-active {
-  border-color: var(--fp-accent, #2d5a43);
-  background: color-mix(in srgb, var(--fp-accent, #2d5a43) 8%, #fff);
+  border-color: var(--fp-accent, #16a34a);
+  background: color-mix(in srgb, var(--fp-accent, #16a34a) 8%, #fff);
   font-weight: 600;
 }
 
@@ -549,17 +549,17 @@
 }
 
 .fp-new-doc-option:hover {
-  border-color: color-mix(in srgb, var(--fp-accent, #2d5a43) 45%, transparent);
+  border-color: color-mix(in srgb, var(--fp-accent, #16a34a) 45%, transparent);
 }
 
 .fp-new-doc-option.is-selected {
-  border-color: var(--fp-accent, #2d5a43);
-  background: color-mix(in srgb, var(--fp-accent, #2d5a43) 6%, #fff);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fp-accent, #2d5a43) 35%, transparent);
+  border-color: var(--fp-accent, #16a34a);
+  background: color-mix(in srgb, var(--fp-accent, #16a34a) 6%, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--fp-accent, #16a34a) 35%, transparent);
 }
 
 .fp-new-doc-option:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--fp-accent, #2d5a43) 55%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--fp-accent, #16a34a) 55%, transparent);
   outline-offset: 2px;
 }
 

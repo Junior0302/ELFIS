@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { formatNotificationDate, type AppNotification } from '../notificationFormat'
 import { ElfisEmptyState } from '../unified-platform'
 import { relativeCheckLabel } from './homeSignals'
+import { PlatformHomeSection } from './PlatformHomeSection'
 
 export type TimelineEntry = {
   id: string
@@ -13,12 +14,15 @@ export type TimelineEntry = {
   at: string
   source: 'notification' | 'session' | 'sync'
   href?: string
+  spaceLabel?: string
+  accent?: string
 }
 
 type GlobalTimelineProps = {
   lastProductLabel?: string | null
   lastProductAt?: string | null
   lastProductTo?: string | null
+  lastProductAccent?: string | null
   syncTickAt?: string
   syncMode?: string
   embedded?: boolean
@@ -32,6 +36,7 @@ function mapNotif(n: AppNotification): TimelineEntry {
     at: formatNotificationDate(n.created_at) || '—',
     source: 'notification',
     href: '/notifications',
+    spaceLabel: 'Plateforme',
   }
 }
 
@@ -39,6 +44,7 @@ export function GlobalTimeline({
   lastProductLabel,
   lastProductAt,
   lastProductTo,
+  lastProductAccent,
   syncTickAt,
   syncMode,
   embedded = false,
@@ -80,6 +86,8 @@ export function GlobalTimeline({
       at: relativeCheckLabel(lastProductAt),
       source: 'session',
       href: lastProductTo ?? undefined,
+      spaceLabel: lastProductLabel,
+      accent: lastProductAccent ?? undefined,
     })
   }
   if (syncTickAt) {
@@ -89,48 +97,59 @@ export function GlobalTimeline({
       detail: syncMode ? `Pulse ${syncMode}` : 'Pulse notifications',
       at: relativeCheckLabel(syncTickAt),
       source: 'sync',
+      spaceLabel: 'Plateforme',
     })
   }
 
   const items = [...notifs, ...extras].slice(0, 8)
 
   return (
-    <section
-      className={`cockpit-timeline ${embedded ? 'cockpit-timeline--embedded' : ''}`.trim()}
+    <PlatformHomeSection
       id="home-activity"
-      aria-labelledby="home-timeline-title"
-      data-cockpit-timeline="v1"
+      title="Activité récente"
+      description="Notifications, session et synchronisation — sources réelles."
+      level={4}
+      className={`cockpit-timeline ph-activity ${embedded ? 'cockpit-timeline--embedded' : ''}`.trim()}
     >
-      <div className="elfis-home__section-head elfis-home__section-head--compact">
-        <h2 id="home-timeline-title">Timeline globale</h2>
-        <p>Sources réelles (notifications, session, sync).</p>
+      <div data-cockpit-timeline="v1">
+        {!loaded ? (
+          <p className="cockpit-timeline__loading">Chargement…</p>
+        ) : items.length === 0 ? (
+          <ElfisEmptyState
+            title="Aucune activité récente"
+            description="Dès qu’une notification, une session ou un pulse sync arrive, elle apparaîtra ici."
+          />
+        ) : (
+          <ol className="cockpit-timeline__list ph-activity__list">
+            {items.map((item) => (
+              <li
+                key={item.id}
+                data-source={item.source}
+                style={
+                  item.accent
+                    ? ({ '--ph-activity-accent': item.accent } as CSSProperties)
+                    : undefined
+                }
+              >
+                <span className="cockpit-timeline__dot" aria-hidden />
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>{item.detail}</span>
+                  {item.spaceLabel ? (
+                    <span className="ph-activity__space">{item.spaceLabel}</span>
+                  ) : null}
+                  <time>{item.at}</time>
+                  {item.href ? (
+                    <Link className="cockpit-timeline__link" to={item.href}>
+                      Ouvrir
+                    </Link>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
-      {!loaded ? (
-        <p className="cockpit-timeline__loading">Chargement…</p>
-      ) : items.length === 0 ? (
-        <ElfisEmptyState
-          title="Aucune activité récente"
-          description="Dès qu’une notification, une session ou un pulse sync arrive, elle apparaîtra ici."
-        />
-      ) : (
-        <ol className="cockpit-timeline__list">
-          {items.map((item) => (
-            <li key={item.id} data-source={item.source}>
-              <span className="cockpit-timeline__dot" aria-hidden />
-              <div>
-                <strong>{item.title}</strong>
-                <span>{item.detail}</span>
-                <time>{item.at}</time>
-                {item.href ? (
-                  <Link className="cockpit-timeline__link" to={item.href}>
-                    Ouvrir
-                  </Link>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+    </PlatformHomeSection>
   )
 }

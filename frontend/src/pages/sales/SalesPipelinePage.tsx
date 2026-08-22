@@ -226,7 +226,7 @@ export default function SalesPipelinePage() {
   if (!token || orgId == null) {
     return (
       <Container>
-        <PageHeader title="Pipeline" description="Moteur commercial SalesPilot." />
+        <PageHeader title="Pipeline" description="Suivez l’avancement de vos opportunités" />
         <EmptyState title="Organisation requise" />
       </Container>
     )
@@ -266,8 +266,8 @@ export default function SalesPipelinePage() {
     <Container className="sales-pipeline" size="xl">
       <PageHeader
         title={board.pipeline_name}
-        description="Pipeline commercial — données serveur uniquement."
-        eyebrow="SalesPilot"
+        description="Suivez l’avancement de vos opportunités"
+        eyebrow="Commercial"
         actions={
           <div className="sales-deal__header-actions">
             <Button type="button" variant="primary" onClick={() => setQuickKind('opportunity')}>

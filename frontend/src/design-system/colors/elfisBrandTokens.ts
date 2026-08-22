@@ -46,12 +46,22 @@ export const ELFIS_BRAND_CSS_VARS = {
   info: '--elfis-info',
 } as const
 
-/** Accents métier — autorisés uniquement hors surfaces plateforme globales. */
+/** Accents métier — primaires officiels workspace (voir src/workspaces/accents.ts). */
 export const DEPARTMENT_ACCENTS = {
-  finance: '#0B3D2E',
-  commercial: '#1D4ED8',
-  documents: '#6D28D9',
+  finance: '#16A34A',
+  commercial: '#2563EB',
+  documents: '#7C3AED',
   hr: '#C2410C',
   analyse: '#0E7490',
   support: '#3730A3',
+} as const
+
+/** Variantes sombres (hover / contraste) — alignées WORKSPACE_ACCENTS.*.dark */
+export const DEPARTMENT_ACCENT_DARK = {
+  finance: '#0B3D2E',
+  commercial: '#1D4ED8',
+  documents: '#6D28D9',
+  hr: '#9A3412',
+  analyse: '#155E75',
+  support: '#312E81',
 } as const

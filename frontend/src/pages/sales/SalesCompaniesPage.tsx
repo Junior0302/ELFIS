@@ -7,7 +7,8 @@ export default function SalesCompaniesPage() {
   return (
     <CrmResourceListPage<SalesCompany>
       title="Entreprises"
-      description="Fiches entreprises SalesPilot — identité commerciale. Identité partagée : ELFIS Relations."
+      description="Fiches entreprises — identité commerciale partagée avec ELFIS Relations."
+      contextLabel="Commercial · Prospection"
       createKind="company"
       bulkResource="companies"
       emptyTitle="Aucune entreprise"

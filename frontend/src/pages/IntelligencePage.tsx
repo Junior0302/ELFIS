@@ -70,6 +70,7 @@ export default function IntelligencePage() {
         <div>
           <h2>Intelligence</h2>
           <p>Synthèse d’entreprise, alertes, prévisions prudentes et discussion avec ELFIS.</p>
+          <p className="muted">Finance · Assistance</p>
         </div>
         <select
           value={period}

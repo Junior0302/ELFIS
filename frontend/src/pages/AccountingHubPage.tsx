@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import { accountingIntelligenceApi } from '../services/accountingIntelligenceApi'
 import { EmptyState, ErrorState, Skeleton, UiBadge } from '../ui/UiStates'
+import { WorkspacePageHeader } from '../workspaces'
 
 type ProposalItem = {
   proposal_id: string
@@ -49,15 +50,11 @@ export default function AccountingHubPage() {
 
   return (
     <div className="page">
-      <header className="page-head">
-        <div>
-          <h1>Comptabilité</h1>
-          <p className="muted">
-            Propositions, intelligence et historique — données API uniquement, aucune écriture
-            automatique.
-          </p>
-        </div>
-      </header>
+      <WorkspacePageHeader
+        eyebrow="Finance"
+        title="Comptabilité"
+        description="Contrôle et validation des opérations comptables"
+      />
 
       <div className="ui-card-grid">
         <Link className="ui-card ui-card-link" to="/accounting/proposals">

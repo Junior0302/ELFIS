@@ -76,7 +76,7 @@ export default function SalesTeamDashboardPage() {
   return (
     <Container className="sales-workspace" size="xl">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Équipe commerciale"
         description="Pipeline, charge et revues — données serveur uniquement. Pas de chat."
         actions={

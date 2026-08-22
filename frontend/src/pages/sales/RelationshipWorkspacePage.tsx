@@ -112,7 +112,7 @@ export default function RelationshipWorkspacePage() {
 
   const eyebrow = useMemo(() => {
     if (!entityOk) return 'Workspace'
-    return `SalesPilot · ${entityLabel(entityParam)}`
+    return `Commercial · ${entityLabel(entityParam)}`
   }, [entityOk, entityParam])
 
   if (!entityOk || !Number.isFinite(entityId)) {

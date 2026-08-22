@@ -34,7 +34,7 @@ export default function SalesJournalPage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Mon journal"
         description="Historique opérationnel — activités, tâches, notes, propositions."
         actions={

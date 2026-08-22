@@ -2,20 +2,26 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { useSync } from '../sync/SyncProvider'
-import { HOME_APP_CARDS } from './homeCatalog'
-import { ContinueWorkCard, type ContinueWorkItem } from './ContinueWorkCard'
+import { getWorkspaceByProductId } from '../workspaces'
+import {
+  ContinueWorkCard,
+  buildContinueItemsFromRegistry,
+} from './ContinueWorkCard'
 import { CockpitHero } from './CockpitHero'
-import { DaySummarySection } from './DaySummarySection'
 import { SpacesSection } from './SpacesSection'
 import { GlobalTimeline } from './GlobalTimeline'
 import { ElfisIntelligenceCard } from './ElfisIntelligenceCard'
 import { QuickActionsGrid } from './QuickActionsGrid'
 import { HealthCenter } from './HealthCenter'
+import { PlatformHomeSection } from './PlatformHomeSection'
+import { PlatformWatchItem } from './PlatformWatchItem'
+import { PlatformOrgContext } from './PlatformOrgContext'
 import { getLastProductAt, getLastProductId } from './lastProduct'
 import {
-  buildDayDomainCards,
   buildDetectionSignals,
   buildHealthLamps,
+  buildWatchItems,
+  platformStatusLabel,
   relativeCheckLabel,
 } from './homeSignals'
 import {
@@ -24,6 +30,7 @@ import {
   isUnifiedPlatformUiEnabled,
 } from '../unified-platform'
 import './home.css'
+import './platform-home.css'
 
 function formatLastSeen(iso: string | null): string {
   if (!iso) return '—'
@@ -43,33 +50,24 @@ function historyRouteFor(productId: string | undefined): string | null {
   return null
 }
 
-function buildContinueItems(
-  lastId: string | null,
-  lastAt: string | null,
-): ContinueWorkItem[] {
-  if (!lastId || !lastAt) return []
-  const primary =
-    HOME_APP_CARDS.find((a) => a.id === lastId && a.available && a.to) ??
-    HOME_APP_CARDS.find((a) => a.available && a.to)
-  if (!primary?.to) return []
-
-  return [
-    {
-      id: `resume-${primary.id}`,
-      letter: primary.name.charAt(0).toUpperCase(),
-      accent: primary.accent,
-      title: primary.id === 'comptapilot' ? 'Finance' : primary.id === 'salespilot' ? 'Commercial' : primary.name,
-      meta: `Dernière session · ${primary.description}`,
-      status: 'En cours',
-      statusTone: 'neutral',
-      timeLabel: formatLastSeen(lastAt),
-      to: primary.to,
-      historyTo: historyRouteFor(primary.productId),
-      productId: primary.productId,
-    },
-  ]
+function greetingForNow(now = new Date()): string {
+  const h = now.getHours()
+  if (h < 18) return 'Bonjour'
+  return 'Bonsoir'
 }
 
+function dateLabelForNow(now = new Date()): string {
+  return now.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+/**
+ * Accueil plateforme ELFIS — cockpit OS premium.
+ * Pas de duplication des dashboards métier.
+ */
 export default function ElfisHomePage() {
   const { user, memberships, orgId, token } = useAuth()
   const { unreadNotifications, lastTickAt, mode } = useSync()
@@ -98,17 +96,7 @@ export default function ElfisHomePage() {
     [connected, orgName, orgOk, unreadNotifications, unreadKnown, syncOk, lastId],
   )
 
-  const dayCards = useMemo(
-    () =>
-      buildDayDomainCards({
-        orgName,
-        orgRole,
-        lastProductId: lastId,
-        lastProductAt: lastAt,
-        unreadNotifications: unreadKnown ? unreadNotifications : 0,
-      }),
-    [orgName, orgRole, lastId, lastAt, unreadNotifications, unreadKnown],
-  )
+  const watchItems = useMemo(() => buildWatchItems(signals), [signals])
 
   const healthLamps = useMemo(
     () =>
@@ -123,27 +111,19 @@ export default function ElfisHomePage() {
   )
 
   const continueItems = useMemo(
-    () => buildContinueItems(lastId, lastAt),
+    () => buildContinueItemsFromRegistry(lastId, lastAt, formatLastSeen, historyRouteFor),
     [lastId, lastAt],
   )
 
-  const emptyActions = useMemo(
-    () =>
-      HOME_APP_CARDS.filter((a) => a.available && a.to).map((a) => ({
-        label: a.id === 'comptapilot' ? 'Ouvrir Finance' : a.id === 'salespilot' ? 'Ouvrir Commercial' : `Ouvrir ${a.name}`,
-        to: a.to!,
-        productId: a.productId,
-        accent: a.accent,
-      })),
-    [],
-  )
-
-  const lastProductCard = HOME_APP_CARDS.find((a) => a.id === lastId)
-  const healthOk = healthLamps.every((l) => l.tone === 'green')
-  const healthLabel = healthOk ? 'Santé plateforme OK' : 'Attention requise'
+  const lastWorkspace = getWorkspaceByProductId(lastId)
+  const healthOk = healthLamps
+    .filter((l) => l.id === 'connection' || l.id === 'org' || l.id === 'sync')
+    .every((l) => l.tone === 'green')
+  const healthLabel = platformStatusLabel(healthOk)
   const lastCheck = relativeCheckLabel(
     lastTickAt.notifications || (mode ? new Date().toISOString() : undefined),
   )
+  const attentionCount = signals.filter((s) => s.tone === 'attention').length
 
   const hero = (
     <CockpitHero
@@ -152,26 +132,81 @@ export default function ElfisHomePage() {
       healthLabel={healthLabel}
       healthOk={healthOk}
       signals={signals}
+      dateLabel={dateLabelForNow()}
+      greeting={greetingForNow()}
     />
   )
 
-  /** Glance domaines — bande mince sous le hero. */
-  const dayBand = (
-    <div className="up-dash-band up-dash-band--metrics cockpit-band cockpit-band--pulse cockpit-band--v3">
-      <DaySummarySection cards={dayCards} />
+  /** Bande métriques plateforme (pas de KPI métier inventés). */
+  const metrics = (
+    <div className="up-dash-band up-dash-band--metrics ph-metrics-band">
+      <ul className="ph-metrics" aria-label="Signaux plateforme">
+        <li>
+          <span className="ph-metrics__label">Organisation</span>
+          <strong className="ph-metrics__value">{orgOk ? orgName : 'À configurer'}</strong>
+        </li>
+        <li>
+          <span className="ph-metrics__label">À traiter</span>
+          <strong className="ph-metrics__value">{attentionCount}</strong>
+        </li>
+        <li>
+          <span className="ph-metrics__label">Notifications</span>
+          <strong className="ph-metrics__value">
+            {unreadKnown ? unreadNotifications : '—'}
+          </strong>
+        </li>
+        <li>
+          <span className="ph-metrics__label">État</span>
+          <strong className="ph-metrics__value">{healthLabel}</strong>
+        </li>
+      </ul>
     </div>
   )
 
-  /**
-   * Hiérarchie V3 : Command (conseil + gestes) → Continuer → Espaces.
-   * Pas de stack de panels ; peu d’excellentes surfaces.
-   */
+  const watchSection = (
+    <PlatformHomeSection
+      id="home-watch"
+      title="À surveiller"
+      description="Éléments actionnables uniquement."
+      level={1}
+      className="ph-watch"
+    >
+      {watchItems.length === 0 ? (
+        <p className="ph-empty-compact" role="status">
+          Aucune action prioritaire.
+        </p>
+      ) : (
+        <ul className="ph-watch__list">
+          {watchItems.map((item) => (
+            <li key={item.id}>
+              <PlatformWatchItem
+                id={item.id}
+                title={item.title}
+                context={item.context}
+                href={item.href}
+                tone={item.tone}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </PlatformHomeSection>
+  )
+
   const primary = (
     <div
-      className="up-dash-band up-dash-band--primary cockpit-primary"
-      data-home-layout="cockpit-signature-v3"
+      className="up-dash-band up-dash-band--primary cockpit-primary ph-home"
+      data-home-layout="platform-home-v4"
+      data-ph-home="v4"
     >
-      <div className="cockpit-command cockpit-command--signature" data-cockpit-command="v3">
+      <div className="ph-home__row ph-home__row--priority">
+        <ContinueWorkCard items={continueItems} />
+        {watchSection}
+      </div>
+
+      <SpacesSection lastProductId={lastId} lastProductAt={lastAt} />
+
+      <div className="ph-home__row ph-home__row--tools">
         <ElfisIntelligenceCard
           signals={signals}
           unreadNotifications={unreadKnown ? unreadNotifications : 0}
@@ -179,35 +214,38 @@ export default function ElfisHomePage() {
         />
         <QuickActionsGrid embedded />
       </div>
-      <ContinueWorkCard items={continueItems} emptyActions={emptyActions} />
-      <SpacesSection lastProductId={lastId} lastProductAt={lastAt} />
+
+      <GlobalTimeline
+        embedded
+        lastProductLabel={lastWorkspace?.label ?? null}
+        lastProductAt={lastAt}
+        lastProductTo={lastWorkspace?.rootPath ?? null}
+        lastProductAccent={lastWorkspace?.accent.primary ?? null}
+        syncTickAt={lastTickAt.notifications}
+        syncMode={mode}
+      />
     </div>
   )
 
   const secondary = (
-    <div className="up-dash-band up-dash-band--secondary cockpit-secondary cockpit-system-rail cockpit-system-rail--v3">
-      <GlobalTimeline
+    <div className="up-dash-band up-dash-band--secondary cockpit-secondary ph-home-rail">
+      <HealthCenter
         embedded
-        lastProductLabel={
-          lastProductCard
-            ? lastProductCard.id === 'comptapilot'
-              ? 'Espace Finance'
-              : lastProductCard.id === 'salespilot'
-                ? 'Espace Commercial'
-                : lastProductCard.name
-            : null
-        }
-        lastProductAt={lastAt}
-        lastProductTo={lastProductCard?.to ?? null}
-        syncTickAt={lastTickAt.notifications}
-        syncMode={mode}
+        lamps={healthLamps}
+        lastCheckLabel={lastCheck}
+        allOk={healthOk}
       />
-      <HealthCenter embedded lamps={healthLamps} lastCheckLabel={lastCheck} allOk={healthOk} />
+      <PlatformOrgContext
+        orgName={orgName}
+        orgRole={orgRole}
+        memberCount={memberships.length}
+        connected={connected}
+      />
     </div>
   )
 
   const operations = (
-    <nav className="cockpit-ops cockpit-ops--v3" aria-label="Raccourcis plateforme">
+    <nav className="cockpit-ops cockpit-ops--v4" aria-label="Raccourcis plateforme">
       <span className="cockpit-ops__label">OS</span>
       <Link to="/platform/organization">Organisation</Link>
       <Link to="/platform/documents">Documents</Link>
@@ -218,8 +256,8 @@ export default function ElfisHomePage() {
 
   if (unified) {
     return (
-      <MotionPage className="cockpit-os cockpit-os--signature">
-        <div data-cockpit-os="signature-v3">
+      <MotionPage className="cockpit-os cockpit-os--signature ph-shell">
+        <div data-cockpit-os="platform-home-v4" data-ph-home-root="v4">
           <ElfisDashboardTemplate
             dashboardId="home"
             header={
@@ -228,7 +266,7 @@ export default function ElfisHomePage() {
                 {hero}
               </>
             }
-            metrics={dayBand}
+            metrics={metrics}
             primaryAnalysis={primary}
             secondaryAnalysis={secondary}
             operations={operations}
@@ -240,13 +278,13 @@ export default function ElfisHomePage() {
 
   return (
     <div
-      className="elfis-home elfis-home--hybrid cockpit-os cockpit-os--signature"
-      data-home="cockpit-signature-v3"
-      data-cockpit-os="signature-v3"
+      className="elfis-home elfis-home--hybrid cockpit-os cockpit-os--signature ph-shell"
+      data-home="platform-home-v4"
+      data-cockpit-os="platform-home-v4"
       data-unified-home="0"
     >
       {hero}
-      {dayBand}
+      {metrics}
       {primary}
       {secondary}
       {operations}

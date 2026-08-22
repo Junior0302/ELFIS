@@ -149,7 +149,7 @@ export default function DealWorkspacePage() {
       ) : (
         <>
           <PageHeader
-            eyebrow="SalesPilot · Deal Workspace"
+            eyebrow="Commercial · Opportunité"
             title={data.header.name}
             description={
               [data.header.company_name, data.header.pipeline_name, data.header.stage_name]

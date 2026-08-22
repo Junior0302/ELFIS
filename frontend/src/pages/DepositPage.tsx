@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { WorkspacePageHeader } from '../workspaces'
 
 const STEPS = [
   'Lecture du document',
@@ -82,15 +83,11 @@ export default function DepositPage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Déposer une facture</h2>
-          <p>
-            Glissez un PDF ou une photo : lecture automatique, extraction des montants et
-            proposition d’écritures.
-          </p>
-        </div>
-      </div>
+      <WorkspacePageHeader
+        eyebrow="Finance"
+        title="Déposer une facture"
+        description="Glissez un PDF ou une photo : lecture automatique, extraction des montants et proposition d’écritures."
+      />
 
       <div
         className={`dropzone ${active ? 'active' : ''} ${loading ? 'busy' : ''}`}

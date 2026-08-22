@@ -9,7 +9,6 @@ export { PlatformLauncher } from './PlatformLauncher'
 export { PlatformSearch } from './PlatformSearch'
 export { NotificationCenter } from './NotificationCenter'
 export { OrganizationSwitcher } from './OrganizationSwitcher'
-export { WorkspaceSwitcher } from './WorkspaceSwitcher'
 export { UserMenu } from './UserMenu'
 export { ProductIndicator } from './ProductIndicator'
 export {
@@ -21,6 +20,7 @@ export {
 } from './ProductNavigation'
 export { SalesProductNav } from './SalesProductNav'
 export { ComptaProductNav } from './ComptaProductNav'
+export { DocumentsProductNav } from './DocumentsProductNav'
 export {
   getProductShellConfiguration,
   withChromeOverrides,

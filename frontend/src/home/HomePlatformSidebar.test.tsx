@@ -35,7 +35,7 @@ describe('HomePlatformSidebar', () => {
     )
     expect(screen.getByRole('navigation', { name: /navigation plateforme/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /accueil/i })).toHaveAttribute('href', '/home')
-    expect(screen.getByRole('link', { name: /favoris/i })).toHaveAttribute('href', '/home#home-apps')
+    expect(screen.getByRole('link', { name: /favoris/i })).toHaveAttribute('href', '/home#home-spaces')
     expect(screen.getByRole('link', { name: /activité/i })).toHaveAttribute(
       'href',
       '/home#home-activity',

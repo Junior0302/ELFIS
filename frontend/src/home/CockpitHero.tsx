@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { ElfisButtonLink } from '../unified-platform'
-import { CockpitHeroVisual } from './CockpitHeroVisual'
 import type { HomeSignal } from './homeSignals'
 
 type CockpitHeroProps = {
@@ -9,71 +8,88 @@ type CockpitHeroProps = {
   healthLabel: string
   healthOk: boolean
   signals: HomeSignal[]
+  /** Date affichée — réelle (navigateur). */
+  dateLabel: string
+  greeting: string
 }
 
+/**
+ * Header exécutif compact — Accueil plateforme.
+ * Pas d’illustration orbitale ; pas de faux indicateurs.
+ */
 export function CockpitHero({
   firstName,
   orgName,
   healthLabel,
   healthOk,
   signals,
+  dateLabel,
+  greeting,
 }: CockpitHeroProps) {
   const primarySignal = signals.find((s) => s.tone === 'attention') ?? signals[0]
-  const calm = signals.length === 0
+  const attentionCount = signals.filter((s) => s.tone === 'attention').length
 
   return (
     <section
-      className="cockpit-hero home-hero cockpit-hero--os cockpit-hero--signature"
+      className="ph-hero"
       aria-labelledby="home-welcome-title"
-      data-cockpit-hero="v3"
+      data-cockpit-hero="v4"
+      data-ph-hero="executive"
     >
-      <div className="cockpit-hero__atmosphere" aria-hidden />
-      <div className="home-hero__copy">
-        <p className="cockpit-hero__brand">ELFIS</p>
-        <h1 id="home-welcome-title">Bonjour {firstName}</h1>
-        <p className="home-hero__lede">
+      <div className="ph-hero__main">
+        <p className="ph-hero__brand">ELFIS</p>
+        <h1 id="home-welcome-title" className="ph-hero__title">
+          {greeting} {firstName}
+        </h1>
+        <p className="ph-hero__org">
           {orgName && orgName !== '—' ? orgName : 'Organisation non sélectionnée'}
-          <span className="cockpit-hero__sep" aria-hidden>
-            ·
-          </span>
-          <span className={healthOk ? 'cockpit-hero__health is-ok' : 'cockpit-hero__health is-warn'}>
-            {healthLabel}
-          </span>
         </p>
-
-        <div className="cockpit-hero__detect" aria-live="polite">
-          <p className="cockpit-hero__detect-label">Aujourd’hui ELFIS a détecté</p>
-          {calm ? (
-            <p className="cockpit-hero__detect-empty">
-              Rien d’urgent — la plateforme est calme.
-            </p>
-          ) : (
-            <ul className="cockpit-hero__signals">
-              {signals.slice(0, 3).map((s) => (
-                <li key={s.id} data-tone={s.tone}>
-                  {s.href ? <Link to={s.href}>{s.label}</Link> : s.label}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="cockpit-hero__cta">
+        <p className="ph-hero__lede">
+          {attentionCount > 0
+            ? 'Voici ce qui mérite votre attention aujourd’hui.'
+            : 'Tout est à jour — vous pouvez reprendre votre travail.'}
+        </p>
+        <div className="ph-hero__cta">
           <ElfisButtonLink to="#home-continue" variant="primary">
             Commencer ma journée
           </ElfisButtonLink>
           {primarySignal?.href ? (
-            <ElfisButtonLink to={primarySignal.href} variant="secondary" className="cockpit-hero__cta-secondary">
+            <ElfisButtonLink to={primarySignal.href} variant="secondary">
               Traiter l’essentiel
             </ElfisButtonLink>
           ) : (
-            <ElfisButtonLink to="#home-intel" variant="secondary" className="cockpit-hero__cta-secondary">
-              Voir les conseils
+            <ElfisButtonLink to="#home-activity" variant="secondary">
+              Voir l’activité
             </ElfisButtonLink>
           )}
         </div>
       </div>
-      <CockpitHeroVisual className="cockpit-hero-visual--signature" />
+      <aside className="ph-hero__aside" aria-label="Contexte plateforme">
+        <p
+          className={
+            healthOk ? 'ph-hero__badge ph-hero__badge--ok' : 'ph-hero__badge ph-hero__badge--warn'
+          }
+          role="status"
+        >
+          {healthLabel}
+        </p>
+        <p className="ph-hero__date">
+          <time dateTime={new Date().toISOString().slice(0, 10)}>{dateLabel}</time>
+        </p>
+        {attentionCount > 0 ? (
+          <p className="ph-hero__meta">
+            {attentionCount} point{attentionCount > 1 ? 's' : ''} à traiter
+            {primarySignal?.href ? (
+              <>
+                {' · '}
+                <Link to={primarySignal.href}>Voir</Link>
+              </>
+            ) : null}
+          </p>
+        ) : (
+          <p className="ph-hero__meta">Aucune action prioritaire</p>
+        )}
+      </aside>
     </section>
   )
 }

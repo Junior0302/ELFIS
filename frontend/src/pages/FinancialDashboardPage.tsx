@@ -8,6 +8,7 @@ import {
   type FinancialOverview,
   type Kpi,
 } from '../services/financialApi'
+import { WorkspaceKpiCard, WorkspacePageHeader } from '../workspaces'
 
 const REFRESH_INTERVAL_MS = 60_000
 
@@ -49,19 +50,17 @@ function TrendBadge({ kpi }: { kpi: Kpi }) {
 
 function KpiCard({ kpi }: { kpi: Kpi }) {
   return (
-    <div className="panel" style={{ borderLeft: `3px solid ${STATUS_COLORS[kpi.status]}` }}>
-      <p className="muted" style={{ margin: 0 }}>
-        {kpi.label}
-      </p>
-      <strong style={{ fontSize: '1.4rem' }}>{formatKpiValue(kpi)}</strong>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <TrendBadge kpi={kpi} />
-        {kpi.hint ? (
-          <span className="muted" style={{ fontSize: '0.8rem' }}>
-            {kpi.hint}
-          </span>
-        ) : null}
-      </div>
+    <div
+      className="workspace-kpi-card-wrap"
+      style={{ borderLeft: `3px solid ${STATUS_COLORS[kpi.status]}` }}
+    >
+      <WorkspaceKpiCard
+        title={kpi.label}
+        value={formatKpiValue(kpi)}
+        accentBar={false}
+        supportingText={kpi.hint || undefined}
+        footer={<TrendBadge kpi={kpi} />}
+      />
     </div>
   )
 }
@@ -271,23 +270,21 @@ export default function FinancialDashboardPage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>Finance</h2>
-          <p>
-            Tableau de bord temps réel — tous les indicateurs sont calculés par le Financial
-            Engine, unique source de vérité.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn secondary"
-          disabled={refreshing}
-          onClick={() => void load(true)}
-        >
-          {refreshing ? 'Actualisation…' : 'Actualiser'}
-        </button>
-      </div>
+      <WorkspacePageHeader
+        eyebrow="Finance"
+        title="Trésorerie"
+        description="Pilotage financier et trésorerie en temps réel"
+        actions={
+          <button
+            type="button"
+            className="btn secondary"
+            disabled={refreshing}
+            onClick={() => void load(true)}
+          >
+            {refreshing ? 'Actualisation…' : 'Actualiser'}
+          </button>
+        }
+      />
 
       {error ? <div className="panel form-error">{error}</div> : null}
       {loading ? <div className="loading">Chargement des indicateurs financiers…</div> : null}
@@ -305,14 +302,7 @@ export default function FinancialDashboardPage() {
       {!loading && data && data.has_data ? (
         <>
           {/* KPI principaux */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-              gap: '0.75rem',
-              marginBottom: '1rem',
-            }}
-          >
+          <div className="workspace-kpi-grid" style={{ marginBottom: '1rem' }}>
             {data.kpis.map((kpi) => (
               <KpiCard key={kpi.id} kpi={kpi} />
             ))}

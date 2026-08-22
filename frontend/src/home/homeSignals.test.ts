@@ -6,6 +6,7 @@ import {
   buildDetectionSignals,
   buildDayDomainCards,
   buildHealthLamps,
+  platformStatusLabel,
 } from './homeSignals'
 
 describe('homeSignals honesty', () => {
@@ -57,5 +58,10 @@ describe('homeSignals honesty', () => {
     expect(ids).not.toContain('storage')
     expect(ids).not.toContain('ai')
     expect(ids).not.toContain('email')
+  })
+
+  it('platformStatusLabel n’utilise pas un wording mock', () => {
+    expect(platformStatusLabel(true)).toBe('Plateforme opérationnelle')
+    expect(platformStatusLabel(false)).toBe('Attention requise')
   })
 })

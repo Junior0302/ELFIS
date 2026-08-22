@@ -1,0 +1,105 @@
+/**
+ * Accents workspace sur la sidebar produit (navy shell inchangé).
+ * Tokens : --workspace-accent* injectés par WorkspaceSidebar.
+ */
+
+.workspace-sidebar.ps-product-nav,
+.workspace-sidebar {
+  --ws-accent: var(--workspace-accent, var(--pilot-accent, #3d7eff));
+  --ws-accent-soft: var(--workspace-accent-soft, transparent);
+  --ws-accent-dark: var(--workspace-accent-dark, var(--ws-accent));
+}
+
+.workspace-sidebar__accent-scope {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.workspace-sidebar__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.35rem 0.5rem 0.15rem;
+}
+
+/* Groupe ouvert / route active — teinte métier + barre verticale */
+.workspace-sidebar .nav-group.is-route-active,
+.workspace-sidebar .nav-group.is-expanded {
+  background: color-mix(in srgb, var(--ws-accent) 10%, transparent);
+  border-radius: 10px;
+}
+
+.workspace-sidebar .nav-category-btn.active,
+.workspace-sidebar .nav-group.is-route-active > .nav-category-btn,
+.workspace-sidebar .nav a.active {
+  background: color-mix(in srgb, var(--ws-accent) 22%, transparent);
+  color: #fff;
+  font-weight: 650;
+  box-shadow: inset 3px 0 0 var(--ws-accent);
+}
+
+.workspace-sidebar .nav-category-btn:focus-visible,
+.workspace-sidebar .nav a:focus-visible,
+.workspace-sidebar .nav-sublink:focus-visible,
+.workspace-sidebar .sidebar-collapse-btn:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+.workspace-sidebar .nav-icon {
+  background: color-mix(in srgb, var(--ws-accent) 22%, transparent);
+  border-radius: 8px;
+}
+
+.workspace-sidebar .nav a.active .nav-icon,
+.workspace-sidebar .nav-category-btn.active .nav-icon,
+.workspace-sidebar .nav a:hover .nav-icon,
+.workspace-sidebar .nav-category-btn:hover .nav-icon {
+  background: color-mix(in srgb, var(--ws-accent) 35%, transparent);
+  color: #fff;
+}
+
+.workspace-sidebar .nav-sublink.is-active {
+  color: #fff;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ws-accent) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--ws-accent);
+  border-radius: 8px;
+}
+
+/* Documents (shell plateforme) — même langage actif que Finance/Commercial */
+.ps-shell--documents-workspace .workspace-sidebar .nav a.active,
+.ps-shell--documents-workspace .workspace-sidebar .nav-category-btn.active,
+.ps-shell--documents-workspace .workspace-sidebar .nav-group.is-route-active > .nav-category-btn,
+.ps-shell--documents-workspace .workspace-sidebar .nav-sublink.is-active {
+  box-shadow: inset 3px 0 0 var(--ws-accent);
+}
+
+.workspace-sidebar .sidebar-collapse-btn {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ws-accent) 18%, transparent);
+  color: #e8eef6;
+}
+
+.workspace-sidebar .sidebar-collapse-btn:hover {
+  background: color-mix(in srgb, var(--ws-accent) 28%, transparent);
+  color: #fff;
+}
+
+/* Collapse — masquer labels / sous-menus (parité Sales/Compta) */
+.workspace-sidebar.is-collapsed .nav-text,
+.workspace-sidebar.is-collapsed .nav-chevron,
+.workspace-sidebar.is-collapsed .nav-submenu-wrap {
+  display: none;
+}
+
+.workspace-sidebar.is-collapsed .nav a,
+.workspace-sidebar.is-collapsed .nav-category-btn {
+  justify-content: center;
+  padding-inline: 0.5rem;
+}
+
+.workspace-sidebar.is-collapsed .nav-icon {
+  margin-inline: 0;
+}

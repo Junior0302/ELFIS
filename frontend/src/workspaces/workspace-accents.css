@@ -1,0 +1,49 @@
+/**
+ * Accents workspace — variables CSS (--workspace-*).
+ * Consommées par la future WorkspaceSidebar ; shell navy inchangé.
+ */
+
+:root {
+  --workspace-finance: #16a34a;
+  --workspace-finance-soft: #ecfdf5;
+  --workspace-finance-dark: #0b3d2e;
+
+  --workspace-commercial: #2563eb;
+  --workspace-commercial-soft: #eff6ff;
+  --workspace-commercial-dark: #1d4ed8;
+
+  --workspace-documents: #7c3aed;
+  --workspace-documents-soft: #f5f3ff;
+  --workspace-documents-dark: #6d28d9;
+
+  --workspace-rh: #c2410c;
+  --workspace-rh-soft: #fff7ed;
+  --workspace-rh-dark: #9a3412;
+
+  --workspace-analyse: #0e7490;
+  --workspace-analyse-soft: #ecfeff;
+  --workspace-analyse-dark: #155e75;
+
+  --workspace-support: #3730a3;
+  --workspace-support-soft: #eef2ff;
+  --workspace-support-dark: #312e81;
+}
+
+/** Scope optionnel quand un layout pose data-workspace. */
+[data-workspace='finance'] {
+  --workspace-accent: var(--workspace-finance);
+  --workspace-accent-soft: var(--workspace-finance-soft);
+  --workspace-accent-dark: var(--workspace-finance-dark);
+}
+
+[data-workspace='commercial'] {
+  --workspace-accent: var(--workspace-commercial);
+  --workspace-accent-soft: var(--workspace-commercial-soft);
+  --workspace-accent-dark: var(--workspace-commercial-dark);
+}
+
+[data-workspace='documents'] {
+  --workspace-accent: var(--workspace-documents);
+  --workspace-accent-soft: var(--workspace-documents-soft);
+  --workspace-accent-dark: var(--workspace-documents-dark);
+}

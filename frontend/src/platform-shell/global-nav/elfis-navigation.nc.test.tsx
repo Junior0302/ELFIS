@@ -110,7 +110,7 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     renderSidebar()
     expect(within(getSidebarNav()).getByRole('link', { name: /^favoris$/i })).toHaveAttribute(
       'href',
-      '/home#home-apps',
+      '/home#home-spaces',
     )
   })
 
@@ -321,8 +321,8 @@ describe('NAV.CORE.1 NC01–NC30', () => {
 
     expect(activeOn('/home', '')).toEqual(['home'])
     expect(activeOn('/home', '#')).toEqual(['home'])
-    expect(activeOn('/home', 'home-apps')).toEqual(['favorites'])
-    expect(activeOn('/home', '#home-apps')).toEqual(['favorites'])
+    expect(activeOn('/home', 'home-spaces')).toEqual(['favorites'])
+    expect(activeOn('/home', '#home-spaces')).toEqual(['favorites'])
     expect(activeOn('/home', 'home-activity')).toEqual(['activity'])
     expect(activeOn('/home', 'home-status')).toEqual(['help'])
     expect(activeOn('/home', 'unknown')).toEqual([])
@@ -332,7 +332,7 @@ describe('NAV.CORE.1 NC01–NC30', () => {
   it('NC25c — UI : un seul aria-current sur /home et hashes', () => {
     const cases: { path: string; activeName: RegExp }[] = [
       { path: '/home', activeName: /^accueil$/i },
-      { path: '/home#home-apps', activeName: /^favoris$/i },
+      { path: '/home#home-spaces', activeName: /^favoris$/i },
       { path: '/home#home-activity', activeName: /^activité$/i },
       { path: '/home#home-status', activeName: /aide et support/i },
     ]

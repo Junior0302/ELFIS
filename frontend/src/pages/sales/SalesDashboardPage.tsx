@@ -9,11 +9,11 @@ import {
   ElfisDashboardTemplate,
   ElfisEmptyState,
   ElfisLoadingState,
-  ElfisMetricCard,
   GridItem,
   MotionPage,
   PlatformGrid,
 } from '../../unified-platform'
+import { WorkspaceKpiCard } from '../../workspaces/WorkspaceKpiCard'
 import {
   activityTypeLabel,
   formatSalesMoney,
@@ -138,8 +138,8 @@ export default function SalesDashboardPage() {
 
   const headerBase = {
     title: 'Tableau de bord',
-    description: 'Vue d’ensemble commerciale SalesPilot.',
-    eyebrow: 'SalesPilot',
+    description: 'Suivi des ventes et de l’activité commerciale',
+    eyebrow: 'Commercial',
   } as const
 
   if (!token || orgId == null) {
@@ -201,46 +201,48 @@ export default function SalesDashboardPage() {
     data.tasks.upcoming.length === 0
 
   const metrics = (
-    <PlatformGrid columns={12} gap={6} className="up-dash-band up-dash-band--metrics">
+    <PlatformGrid columns={12} gap={6} className="up-dash-band up-dash-band--metrics workspace-kpi-grid">
       <GridItem span={6} spanMd={4} spanLg={2}>
         <Link to="/sales/leads" className="up-dash-metric-link">
-          <ElfisMetricCard title="Leads ouverts" value={String(s.open_leads)} />
+          <WorkspaceKpiCard title="Leads ouverts" value={String(s.open_leads)} accentBar />
         </Link>
       </GridItem>
       <GridItem span={6} spanMd={4} spanLg={2}>
         <Link to="/sales/pipeline" className="up-dash-metric-link">
-          <ElfisMetricCard title="Opportunités ouvertes" value={String(s.open_opportunities)} />
+          <WorkspaceKpiCard title="Opportunités ouvertes" value={String(s.open_opportunities)} accentBar />
         </Link>
       </GridItem>
       <GridItem span={6} spanMd={4} spanLg={2}>
         <Link to="/sales/pipeline" className="up-dash-metric-link">
-          <ElfisMetricCard
+          <WorkspaceKpiCard
             title="Valeur pipeline"
             value={formatSalesMoney(s.pipeline_value)}
-            subtitle={`Pondérée ${formatSalesMoney(s.weighted_pipeline_value)}`}
+            supportingText={`Pondérée ${formatSalesMoney(s.weighted_pipeline_value)}`}
+            accentBar
           />
         </Link>
       </GridItem>
       <GridItem span={6} spanMd={4} spanLg={2}>
         <Link to="/sales/pipeline" className="up-dash-metric-link">
-          <ElfisMetricCard
+          <WorkspaceKpiCard
             title="Gagnées / Perdues"
             value={`${s.won_opportunities} / ${s.lost_opportunities}`}
+            accentBar
           />
         </Link>
       </GridItem>
       <GridItem span={6} spanMd={4} spanLg={2}>
         <Link to="/sales/tasks" className="up-dash-metric-link">
-          <ElfisMetricCard
+          <WorkspaceKpiCard
             title="Tâches en retard"
             value={String(s.overdue_tasks)}
-            variant={s.overdue_tasks > 0 ? 'accent' : 'default'}
+            accentBar={s.overdue_tasks > 0}
           />
         </Link>
       </GridItem>
       <GridItem span={6} spanMd={4} spanLg={2}>
         <Link to="/sales/activities" className="up-dash-metric-link">
-          <ElfisMetricCard title="Activités aujourd’hui" value={String(s.activities_today)} />
+          <WorkspaceKpiCard title="Activités aujourd’hui" value={String(s.activities_today)} accentBar />
         </Link>
       </GridItem>
     </PlatformGrid>
@@ -255,8 +257,8 @@ export default function SalesDashboardPage() {
         dashboardId="sales"
         header={{
           title: 'Tableau de bord',
-          description: 'Indicateurs CRM calculés côté serveur — une seule source de vérité.',
-          eyebrow: 'SalesPilot',
+          description: 'Suivi des ventes et de l’activité commerciale',
+          eyebrow: 'Commercial',
         }}
         metrics={
           <Section title="Résumé" description="KPIs live — aucun calcul navigateur." spacing="compact">

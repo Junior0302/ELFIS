@@ -172,7 +172,7 @@ export default function ProposalWorkspacePage() {
       ) : (
         <>
           <PageHeader
-            eyebrow="SalesPilot · Proposal Workspace"
+            eyebrow="Commercial · Proposition"
             title={data.header.proposal_number}
             description={[data.header.title, data.header.company_name, data.header.opportunity_name]
               .filter(Boolean)

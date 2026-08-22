@@ -119,10 +119,11 @@ export default function FournisseursPage() {
       <div className="page-head">
         <div>
           <h2>{fromLaunch ? 'Ajouter votre premier fournisseur' : 'Fournisseurs'}</h2>
+          <p>Vue comptable fournisseurs — fiscalité, factures et échéances.</p>
+          <p className="muted">Finance · Clients & fournisseurs</p>
           <p className="muted">Données issues d’ELFIS Relations</p>
-          <p>
-            Vue comptable — fiscalité, factures fournisseurs, échéances. Pas d’activités commerciales
-            générales.
+          <p className="muted">
+            Pas d’activités commerciales générales.
           </p>
           <p className="muted">
             <Link to="/platform/relations?tab=supplier">Ouvrir la fiche dans ELFIS Relations</Link>

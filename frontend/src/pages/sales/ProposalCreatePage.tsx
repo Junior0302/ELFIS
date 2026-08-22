@@ -45,7 +45,7 @@ export default function ProposalCreatePage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Nouvelle proposition"
         description={
           opportunityId

@@ -7,6 +7,7 @@ import { PilotWorkspace, WorkspacePageFrame } from '../../unified-platform'
 /**
  * SalesPilot — shell unifié + nav métier.
  * Collapse UI.P1 (mêmes dimensions que Compta). Thème via RuntimeThemeSync.
+ * Espaces = seul sélecteur global.
  */
 export default function SalesWorkspaceLayout() {
   const config = getProductShellConfiguration('salespilot')
@@ -16,6 +17,7 @@ export default function SalesWorkspaceLayout() {
   return (
     <PilotWorkspace
       pilotId={config.productId}
+      dataWorkspace="commercial"
       chrome={config.chrome}
       sidebarCollapsed={sidebarCollapsed}
       nav={({ closeMobileNav }) => (

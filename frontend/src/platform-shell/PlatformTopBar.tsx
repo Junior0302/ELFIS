@@ -10,7 +10,6 @@ import { PlatformLauncher } from './PlatformLauncher'
 import { PlatformSearch } from './PlatformSearch'
 import { ProductIndicator } from './ProductIndicator'
 import { UserMenu } from './UserMenu'
-import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 import { ELFIS_GLOBAL_NAV_ID } from './global-nav/GlobalNavigationDrawer'
 import { notifyProductShellViewportResize } from './productSidebarCollapse'
 
@@ -68,7 +67,6 @@ export function PlatformTopBar({
       </div>
       <div className="ps-topbar__right">
         {chrome.showOrganizationSwitcher ? <OrganizationSwitcher /> : null}
-        {chrome.showWorkspaceSwitcher ? <WorkspaceSwitcher /> : null}
         {chrome.showNotifications ? (
           <div className="ps-topbar__notif">
             <NotificationBell />

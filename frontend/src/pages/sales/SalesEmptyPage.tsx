@@ -5,14 +5,14 @@ type SalesEmptyPageProps = {
   description: string
 }
 
-/** Page coquille SalesPilot — aucune logique métier. */
+/** Page coquille Commercial — aucune logique métier. */
 export function SalesEmptyPage({ title, description }: SalesEmptyPageProps) {
   return (
     <Container>
-      <PageHeader title={title} description={description} />
+      <PageHeader eyebrow="Commercial" title={title} description={description} />
       <EmptyState
         title="Bientôt disponible"
-        description="Fondation CRM SalesPilot — les écrans métier arriveront dans les prochaines phases."
+        description="Cet écran Commercial n’est pas encore disponible."
       />
     </Container>
   )

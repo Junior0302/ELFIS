@@ -317,16 +317,14 @@
   font-size: 0.88rem;
 }
 
-/* Org / Workspace panels */
+/* Org / User / Notif panels */
 .ps-org,
-.ps-ws,
 .ps-user,
 .ps-notif {
   position: relative;
 }
 
 .ps-org__trigger,
-.ps-ws__trigger,
 .ps-user__trigger {
   display: flex;
   flex-direction: column;
@@ -342,8 +340,7 @@
   text-align: left;
 }
 
-.ps-org__label,
-.ps-ws__label {
+.ps-org__label {
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -351,7 +348,6 @@
 }
 
 .ps-org__trigger strong,
-.ps-ws__trigger strong,
 .ps-user__meta strong {
   font-size: 0.8rem;
   color: var(--ps-navy);
@@ -362,7 +358,6 @@
 }
 
 .ps-org__panel,
-.ps-ws__panel,
 .ps-user__panel,
 .ps-notif__panel {
   position: absolute;
@@ -387,7 +382,6 @@
 }
 
 .ps-org__option,
-.ps-ws__option,
 .ps-user__item {
   display: block;
   width: 100%;
@@ -403,13 +397,11 @@
 }
 
 .ps-org__option:hover,
-.ps-ws__option:hover,
 .ps-user__item:hover {
   background: var(--ps-surface);
 }
 
-.ps-org__option.is-current,
-.ps-ws__option.is-current {
+.ps-org__option.is-current {
   background: var(--ps-surface);
   font-weight: 700;
 }
@@ -998,7 +990,6 @@
 @media (prefers-reduced-motion: reduce) {
   .ps-search__panel,
   .ps-org__panel,
-  .ps-ws__panel,
   .ps-user__panel,
   .ps-notif__panel {
     animation: none;
@@ -1011,10 +1002,6 @@
 }
 
 @media (max-width: 1100px) {
-  .ps-ws {
-    display: none;
-  }
-
   .ps-user__meta {
     display: none;
   }
@@ -1192,19 +1179,16 @@
 }
 
 .ps-shell > .ps-topbar .ps-org__trigger,
-.ps-shell > .ps-topbar .ps-ws__trigger,
 .ps-shell > .ps-topbar .ps-user__trigger {
   background: var(--platform-shell-surface);
   border-color: var(--platform-shell-border);
 }
 
-.ps-shell > .ps-topbar .ps-org__label,
-.ps-shell > .ps-topbar .ps-ws__label {
+.ps-shell > .ps-topbar .ps-org__label {
   color: var(--platform-shell-muted);
 }
 
 .ps-shell > .ps-topbar .ps-org__trigger strong,
-.ps-shell > .ps-topbar .ps-ws__trigger strong,
 .ps-shell > .ps-topbar .ps-user__meta strong {
   color: #fff;
 }

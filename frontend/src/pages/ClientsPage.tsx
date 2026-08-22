@@ -155,6 +155,7 @@ export default function ClientsPage() {
         <div>
           <h2>{copy.title}</h2>
           <p>{copy.lead}</p>
+          <p className="muted">Finance · Clients & fournisseurs</p>
           <p className="muted">Données issues d’ELFIS Relations</p>
           <p className="muted">
             Vue comptable — identité, fiscalité, factures et solde. Pas de pipeline commercial.

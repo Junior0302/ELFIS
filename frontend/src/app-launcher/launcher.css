@@ -452,8 +452,8 @@
 }
 
 .launcher-card--active {
-  border-color: color-mix(in srgb, var(--launcher-card-accent, #0b3d2e) 45%, rgba(11, 31, 58, 0.08));
-  box-shadow: inset 3px 0 0 var(--launcher-card-accent, #0b3d2e);
+  border-color: color-mix(in srgb, var(--launcher-card-accent, #3d7eff) 45%, rgba(11, 31, 58, 0.08));
+  box-shadow: inset 3px 0 0 var(--launcher-card-accent, #3d7eff);
 }
 
 .launcher-card--disabled,

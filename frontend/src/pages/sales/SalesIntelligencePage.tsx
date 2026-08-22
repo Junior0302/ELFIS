@@ -102,9 +102,9 @@ export default function SalesIntelligencePage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Priorités commerciales"
-        description="Recommandations déterministes — aucune IA générative."
+        description="Recommandations déterministes — états réels, aucune IA simulée."
         actions={
           <Button type="button" variant="secondary" onClick={load}>
             Actualiser

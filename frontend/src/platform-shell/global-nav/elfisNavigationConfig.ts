@@ -134,7 +134,7 @@ export const ELFIS_NAVIGATION_CONFIG: readonly ElfisNavSectionConfig[] = [
 
         icon: 'star',
 
-        to: '/home#home-apps',
+        to: '/home#home-spaces',
 
         match: 'hash',
 

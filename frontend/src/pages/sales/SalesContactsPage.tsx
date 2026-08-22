@@ -7,7 +7,8 @@ export default function SalesContactsPage() {
   return (
     <CrmResourceListPage<SalesPerson>
       title="Contacts"
-      description="Personnes / décideurs."
+      description="Personnes et décideurs rattachés aux opportunités."
+      contextLabel="Commercial · Prospection"
       createKind="person"
       bulkResource="people"
       emptyTitle="Aucun contact"

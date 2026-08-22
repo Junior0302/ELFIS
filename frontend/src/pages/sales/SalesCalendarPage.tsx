@@ -57,9 +57,9 @@ export default function SalesCalendarPage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Calendrier commercial"
-        description="Rendez-vous, tâches, closings et échéances de propositions — pas de sync Google."
+        description="Rendez-vous, tâches, closings et échéances de propositions."
         actions={
           <div className="sales-deal__header-actions">
             <Button type="button" variant="secondary" onClick={() => setView('day')}>

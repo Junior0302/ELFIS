@@ -11,10 +11,10 @@ import {
   Container,
   EmptyState,
   Input,
-  PageHeader,
   Section,
 } from '../design-system'
 import { ConfirmDialog } from '../design-system/overlays'
+import { WorkspacePageHeader } from '../workspaces/WorkspacePageHeader'
 import { QuickCreateDrawer } from './QuickCreateDrawer'
 import { SavedViewsBar } from './SavedViewsBar'
 import type { QuickCreateKind } from './salesOps'
@@ -28,6 +28,8 @@ type Column<T> = {
 type Props<T extends { id: number }> = {
   title: string
   description: string
+  /** Contexte sous-eyebrow (ex. Prospection). */
+  contextLabel?: string
   createKind: QuickCreateKind
   columns: Column<T>[]
   load: (
@@ -46,6 +48,7 @@ type Props<T extends { id: number }> = {
 export function CrmResourceListPage<T extends { id: number }>({
   title,
   description,
+  contextLabel,
   createKind,
   columns,
   load,
@@ -157,10 +160,11 @@ export function CrmResourceListPage<T extends { id: number }>({
 
   return (
     <Container className="sales-workspace">
-      <PageHeader
-        eyebrow="SalesPilot"
+      <WorkspacePageHeader
+        eyebrow="Commercial"
         title={title}
         description={description}
+        meta={contextLabel ? <p className="muted">{contextLabel}</p> : undefined}
         actions={
           <div className="sales-deal__header-actions">
             <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>

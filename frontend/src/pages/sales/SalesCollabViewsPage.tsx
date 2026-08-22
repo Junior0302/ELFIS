@@ -57,7 +57,7 @@ export default function SalesCollabViewsPage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Vues collaboratives"
         description="Filtres backend : mes éléments, équipe, assignés, observés, à revoir."
         actions={

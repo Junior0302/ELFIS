@@ -387,7 +387,7 @@ export default function FacturationPage() {
     fromLaunch && invoiceCount === 0 ? 'Créer votre première facture' : 'Facturation'
   const pageLede = fromLaunch
     ? copy.formLead
-    : 'Créez devis et factures, suivez les encaissements et relances.'
+    : 'Créez et pilotez vos documents commerciaux'
   const unpaidEmphasis = data.stats.unpaid > 0 || data.stats.unpaid_amount > 0
 
   return (

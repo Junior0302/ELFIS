@@ -92,6 +92,8 @@ export type PilotWorkspaceProps = {
   sidebarCollapsed?: boolean
   /** Si true (défaut), applique classes accent PilotTheme. */
   applyPilotAccent?: boolean
+  /** Pose data-workspace sur le shell (tokens Phase 2). */
+  dataWorkspace?: string
   className?: string
   sidebarClassName?: string
   children: ReactNode
@@ -104,6 +106,7 @@ export function PilotWorkspace({
   chrome,
   sidebarCollapsed,
   applyPilotAccent = true,
+  dataWorkspace,
   className,
   sidebarClassName,
   children,
@@ -116,6 +119,7 @@ export function PilotWorkspace({
       chrome={chrome}
       sidebar={nav}
       sidebarCollapsed={sidebarCollapsed}
+      dataWorkspace={dataWorkspace}
       className={cx(applyPilotAccent && theme.shellAccentClass, className)}
       sidebarClassName={cx(
         applyPilotAccent && 'ps-sidebar--product',

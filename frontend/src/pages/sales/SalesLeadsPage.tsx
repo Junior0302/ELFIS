@@ -7,10 +7,11 @@ export default function SalesLeadsPage() {
   return (
     <CrmResourceListPage<SalesLead>
       title="Leads"
-      description="Prospects commerciaux — CRUD complet, filtres et actions groupées."
+      description="Centralisez et qualifiez vos opportunités commerciales"
+      contextLabel="Commercial · Prospection"
       createKind="lead"
       bulkResource="leads"
-      emptyTitle="Aucun lead"
+      emptyTitle="Aucun prospect pour le moment"
       emptyDescription="Créez un lead pour démarrer le pipeline commercial."
       rowHref={(row) => `/sales/workspace/lead/${row.id}`}
       load={(token, orgId, page, q) => api.listSalesLeads(token, orgId, { page, q })}

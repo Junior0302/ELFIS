@@ -59,7 +59,7 @@ export default function SalesDuplicatesPage() {
   return (
     <Container className="sales-workspace">
       <PageHeader
-        eyebrow="SalesPilot"
+        eyebrow="Commercial"
         title="Revue des doublons"
         description="Détection déterministe. Aucune fusion automatique."
         actions={

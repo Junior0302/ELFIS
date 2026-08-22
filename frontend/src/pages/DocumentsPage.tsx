@@ -17,6 +17,7 @@ import {
   markLaunchDashboardStale,
 } from '../firstExperience'
 import { EmptyState } from '../ui/UiStates'
+import { WorkspacePageHeader } from '../workspaces/WorkspacePageHeader'
 import {
   formatVaultAmount,
   formatVaultDate,
@@ -200,8 +201,8 @@ export default function DocumentsPage({ surface = 'accounting' }: DocumentsPageP
   }
 
   useEffect(() => {
-    if (tab === 'list') void loadList()
-  }, [tab, loadList])
+    if (tab === 'list' || isPlatform) void loadList()
+  }, [tab, loadList, isPlatform])
 
   useEffect(() => {
     if (!highlightDocumentId || tab !== 'list') return
@@ -229,22 +230,49 @@ export default function DocumentsPage({ surface = 'accounting' }: DocumentsPageP
     : documentsPageCopy({ fromLaunch }).title.replace(/Documents?/i, 'Documents comptables') ||
       'Documents comptables'
   const headLead = isPlatform
-    ? 'ELFIS Vault — tous les documents de l’organisation (permissions existantes).'
+    ? 'Centralisez et sécurisez les documents de votre entreprise.'
     : 'Vue filtrée des documents comptables. Le fichier appartient à ELFIS Vault.'
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h2>{isPlatform ? 'Documents' : headTitle}</h2>
-          <p>{headLead}</p>
-          {fromLaunch ? (
-            <p className="muted first-experience-back">
-              <Link to="/dashboard">Retour au Dashboard</Link>
-            </p>
-          ) : null}
-        </div>
-      </div>
+      {isPlatform ? (
+        <WorkspacePageHeader
+          eyebrow="Documents"
+          title="Documents"
+          description={headLead}
+          meta={
+            totalItems > 0 ? (
+              <p className="muted">{totalItems} document{totalItems === 1 ? '' : 's'} dans le coffre</p>
+            ) : null
+          }
+          actions={
+            <button type="button" className="btn" onClick={() => setTab('deposit')}>
+              Déposer un document
+            </button>
+          }
+        />
+      ) : (
+        <WorkspacePageHeader
+          eyebrow="Finance"
+          title={headTitle}
+          description={headLead}
+          meta={
+            <>
+              <p className="muted">Documents comptables · projection Vault</p>
+              {fromLaunch ? (
+                <p className="muted first-experience-back">
+                  <Link to="/dashboard">Retour au Dashboard</Link>
+                </p>
+              ) : null}
+            </>
+          }
+          actions={
+            <button type="button" className="btn" onClick={() => setTab('deposit')}>
+              Importer un document
+            </button>
+          }
+        />
+      )}
 
       {!isPlatform ? (
         <div className="platform-surface-banner" style={{ marginBottom: '1rem' }}>
@@ -262,12 +290,10 @@ export default function DocumentsPage({ surface = 'accounting' }: DocumentsPageP
       ) : (
         <div className="platform-surface-banner" style={{ marginBottom: '1rem' }}>
           <strong>ELFIS Vault</strong>
-          <p>Stockage unique. Les Pilots consomment des projections filtrées.</p>
-          <div className="platform-surface-banner__actions">
-            <Link className="btn secondary" to="/documents">
-              Vue documents comptables
-            </Link>
-          </div>
+          <p>
+            Coffre documentaire unique de l’organisation. Stockage sécurisé, permissions existantes —
+            aucune copie locale.
+          </p>
         </div>
       )}
 
@@ -303,38 +329,56 @@ export default function DocumentsPage({ surface = 'accounting' }: DocumentsPageP
 
       {tab === 'hub' ? (
         <div className="ui-card-grid">
-          <a className="ui-card ui-card-link" href="#/" onClick={(e) => { e.preventDefault(); setTab('list') }}>
+          <a
+            className="ui-card ui-card-link"
+            href="#/"
+            onClick={(e) => {
+              e.preventDefault()
+              setTab('list')
+            }}
+          >
             <h3>Liste & filtres</h3>
             <p className="muted">Recherche, type, statut, pagination Vault.</p>
           </a>
-          <a className="ui-card ui-card-link" href="#/" onClick={(e) => { e.preventDefault(); setTab('deposit') }}>
-            <h3>Dépôt / archive</h3>
-            <p className="muted">Archivage PDF sécurisé (Vault API).</p>
+          <a
+            className="ui-card ui-card-link"
+            href="#/"
+            onClick={(e) => {
+              e.preventDefault()
+              setTab('deposit')
+            }}
+          >
+            <h3>Déposer un document</h3>
+            <p className="muted">Archivage PDF sécurisé dans ELFIS Vault.</p>
           </a>
-          <Link className="ui-card ui-card-link" to="/deposit">
-            <h3>Analyse documentaire</h3>
-            <p className="muted">Flux dépôt + analyse AI existant.</p>
-          </Link>
-          <Link className="ui-card ui-card-link" to="/history">
-            <h3>Extraction & historique</h3>
-            <p className="muted">Documents traités, exports, audit métier.</p>
-          </Link>
-          <Link className="ui-card ui-card-link" to="/migration">
-            <h3>Validation / import</h3>
-            <p className="muted">Migration Center — validation et import API.</p>
-          </Link>
-          <Link className="ui-card ui-card-link" to="/accounting">
-            <h3>Proposition comptable</h3>
-            <p className="muted">Hub comptabilité & moteur V2.</p>
-          </Link>
-          <Link className="ui-card ui-card-link" to="/search">
-            <h3>Recherche</h3>
-            <p className="muted">Search Engine global.</p>
-          </Link>
-          <Link className="ui-card ui-card-link" to="/cockpit">
-            <h3>Audit / monitoring</h3>
-            <p className="muted">Cockpit jobs & notifications.</p>
-          </Link>
+          {!isPlatform ? (
+            <>
+              <Link className="ui-card ui-card-link" to="/deposit">
+                <h3>Analyse documentaire</h3>
+                <p className="muted">Flux dépôt + analyse AI existant.</p>
+              </Link>
+              <Link className="ui-card ui-card-link" to="/history">
+                <h3>Extraction & historique</h3>
+                <p className="muted">Documents traités, exports, audit métier.</p>
+              </Link>
+              <Link className="ui-card ui-card-link" to="/migration">
+                <h3>Validation / import</h3>
+                <p className="muted">Migration Center — validation et import API.</p>
+              </Link>
+              <Link className="ui-card ui-card-link" to="/accounting">
+                <h3>Proposition comptable</h3>
+                <p className="muted">Hub comptabilité & moteur V2.</p>
+              </Link>
+              <Link className="ui-card ui-card-link" to="/search">
+                <h3>Recherche</h3>
+                <p className="muted">Search Engine global.</p>
+              </Link>
+              <Link className="ui-card ui-card-link" to="/cockpit">
+                <h3>Audit / monitoring</h3>
+                <p className="muted">Cockpit jobs & notifications.</p>
+              </Link>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -562,11 +606,15 @@ export default function DocumentsPage({ surface = 'accounting' }: DocumentsPageP
 
             {!listLoading && !listError && items.length === 0 && (
               <EmptyState
-                title="Aucun document importé"
-                description="Ajoutez vos justificatifs et factures fournisseurs dans votre espace documentaire sécurisé."
+                title="Aucun document"
+                description={
+                  isPlatform
+                    ? 'Ajoutez votre premier document pour le retrouver dans votre espace documentaire.'
+                    : 'Ajoutez vos justificatifs et factures fournisseurs dans votre espace documentaire sécurisé.'
+                }
                 action={
                   <button type="button" className="btn" onClick={() => setTab('deposit')}>
-                    Importer un document
+                    {isPlatform ? 'Déposer un document' : 'Importer un document'}
                   </button>
                 }
               />

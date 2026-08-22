@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, formatEuro, type BillingOverview } from '../../api'
 import { useAuth } from '../../auth'
+import { WorkspacePageHeader } from '../../workspaces'
 import '../../comptapilot/facturation/facturation-premium.css'
 import '../../comptapilot/facturation/facturation-spaces.css'
 
@@ -46,12 +47,11 @@ export default function FacturationOverviewPage() {
 
   return (
     <div className="billing-page" data-billing-layout="fp05" data-fp-space="overview">
-      <header className="fp-header">
-        <div className="fp-header__intro">
-          <h2>Facturation</h2>
-          <p className="fp-header__lede">
-            Vue d’ensemble des documents commerciaux. Créez un document depuis Documents.
-          </p>
+      <WorkspacePageHeader
+        eyebrow="Finance"
+        title="Facturation"
+        description="Créez et pilotez vos documents commerciaux"
+        meta={
           <div className="fp-header__meta" aria-label="Métadonnées facturation">
             <span className="fp-chip">ComptaPilot</span>
             {data?.smtp_configured != null ? (
@@ -60,8 +60,13 @@ export default function FacturationOverviewPage() {
               </span>
             ) : null}
           </div>
-        </div>
-      </header>
+        }
+        actions={
+          <Link className="btn" to="/facturation/documents/new">
+            Nouveau document
+          </Link>
+        }
+      />
 
       {error ? <p className="error">{error}</p> : null}
 
@@ -95,7 +100,7 @@ export default function FacturationOverviewPage() {
 
       <section className="fp-section" aria-labelledby="fp-overview-spaces">
         <h3 className="fp-section__title" id="fp-overview-spaces">
-          Espaces
+          Parcours facturation
         </h3>
         <div className="fp-overview-cards">
           {LINKS.map((link) => (

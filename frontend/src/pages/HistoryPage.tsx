@@ -68,11 +68,11 @@ export default function HistoryPage() {
     <>
       <div className="page-head">
         <div>
-          <h2>Comptabilité</h2>
+          <h2>Historique</h2>
           <p>
-            Vos factures fournisseur traitées par l’OCR — contrôlez, exportez en Excel, FEC ou vers
-            votre logiciel.
+            Documents comptables traités — contrôlez, exportez en Excel, FEC ou vers votre logiciel.
           </p>
+          <p className="muted">Finance · Comptabilité</p>
         </div>
         <button className="btn secondary" type="button" onClick={() => void download('/exports/history/excel')}>
           Excel
