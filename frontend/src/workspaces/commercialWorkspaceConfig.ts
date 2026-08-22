@@ -9,8 +9,8 @@ import type { WorkspaceConfig } from './types'
 export const commercialWorkspaceConfig: WorkspaceConfig = {
   id: 'commercial',
   label: 'Commercial',
-  description: 'Suivi des ventes et relation client.',
-  engineLabel: 'Moteur SalesPilot',
+  description: 'Ventes et relation client.',
+  engineLabel: null,
   engineProductId: 'salespilot',
   icon: 'handshake',
   accent: WORKSPACE_ACCENTS.commercial,

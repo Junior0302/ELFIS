@@ -1,5 +1,5 @@
 /**
- * Espaces roadmap (launcher « Bientôt ») — maquette Lucide.
+ * Espaces roadmap (launcher « À venir ») — maquette Lucide.
  */
 
 import { WORKSPACE_ACCENTS } from './accents'
@@ -57,7 +57,7 @@ export const rhWorkspaceConfig = soon({
   id: 'rh',
   label: 'Ressources Humaines',
   description: 'Gestion des équipes et talents.',
-  engineLabel: 'Moteur HRPilot',
+  engineLabel: null,
   engineProductId: 'hrpilot',
   icon: 'user-circle',
   accent: WORKSPACE_ACCENTS.rh,

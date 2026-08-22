@@ -75,7 +75,10 @@ describe('ElfisHomePage platform home V4', () => {
 
     expect(screen.getByRole('heading', { name: /à reprendre/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /à surveiller/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /vos espaces/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /retrouvez tous les espaces de votre entreprise/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/accédez à vos métiers depuis un environnement elfis unique/i)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /vos applications/i })).toBeNull()
     expect(screen.queryByRole('heading', { name: /résumé journée/i })).toBeNull()
 

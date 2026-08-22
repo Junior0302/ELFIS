@@ -125,7 +125,7 @@ describe('P2.3.1 navigation & identity', () => {
     )
     expect(screen.getByRole('link', { name: 'Retour à ELFIS Home' })).toBeInTheDocument()
     expect(screen.getByText('Finance')).toBeInTheDocument()
-    expect(screen.getByText('Moteur ComptaPilot')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur ComptaPilot')).toBeNull()
   })
 
   it('4. Home Paramètres → /platform/settings (pas /settings Compta)', () => {

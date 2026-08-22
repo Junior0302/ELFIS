@@ -39,11 +39,11 @@ export type SpaceDefinition = {
   accent: string
   /** Fond pastel icône. */
   accentSoft?: string
-  /** Signature discrète — ex. « Moteur ComptaPilot ». */
+  /** Signature moteur interne — non affichée en Phase A. */
   engineLabel: string | null
   /** Produit moteur associé (lastProduct / thème) — null si aucun. */
   engineProductId: ProductId | null
-  /** Route d’entrée réelle SPA, ou null → badge Bientôt. */
+  /** Route d’entrée réelle SPA, ou null → badge À venir. */
   entryRoute: string | null
   shortcuts: readonly SpaceShortcut[]
   /** Alias recherche métier (facture, TVA, pipeline…). */

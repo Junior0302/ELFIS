@@ -10,7 +10,7 @@ export const documentsWorkspaceConfig: WorkspaceConfig = {
   id: 'documents',
   label: 'Documents',
   description: 'Centralisation et intelligence documentaire.',
-  engineLabel: 'Moteur DocPilot',
+  engineLabel: null,
   engineProductId: 'docpilot',
   icon: 'file-text',
   accent: WORKSPACE_ACCENTS.documents,

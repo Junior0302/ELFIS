@@ -193,9 +193,9 @@ describe('NAV.DOMAIN.1 — routes & chrome (ND25–ND28)', () => {
       </MemoryRouter>,
     )
     expect(screen.getByText('Finance')).toBeInTheDocument()
-    expect(screen.getByText('Moteur ComptaPilot')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur ComptaPilot')).toBeNull()
     expect(screen.getByText('Commercial')).toBeInTheDocument()
-    expect(screen.getByText('Moteur SalesPilot')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur SalesPilot')).toBeNull()
     expect(APP_TSX).toContain('path="sales/pipeline"')
     expect(APP_TSX).toContain('path="facturation"')
   })

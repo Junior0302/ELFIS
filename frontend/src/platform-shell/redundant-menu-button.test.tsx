@@ -268,7 +268,7 @@ describe('UI.P2 redundant menu button MB01–MB20', () => {
     renderShell('/dashboard', { productId: 'comptapilot', withComptaNav: true })
     expect(document.querySelector('[data-product="comptapilot"]')).toBeTruthy()
     expect(document.querySelector('.ps-product__text strong')?.textContent).toBe('Finance')
-    expect(screen.getByText('Moteur ComptaPilot')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur ComptaPilot')).toBeNull()
   })
 
   it('MB11 — shell Finance / home sans 2e hamburger', () => {

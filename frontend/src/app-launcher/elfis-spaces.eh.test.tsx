@@ -158,14 +158,18 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     expect(screen.getAllByRole('link', { name: /Accueil ELFIS/i }).length).toBeGreaterThan(0)
   })
 
-  it('EH07 — signatures moteurs discrètes', async () => {
+  it('EH07 — cartes ouvertes sans signature moteur', async () => {
     const user = userEvent.setup()
     renderLauncher()
     await user.click(screen.getByRole('button', { name: /Espaces/i }))
     await screen.findByText('Finance')
-    expect(screen.getByText('Moteur ComptaPilot')).toBeInTheDocument()
-    expect(screen.getByText('Moteur SalesPilot')).toBeInTheDocument()
-    expect(screen.getByText('Moteur DocPilot')).toBeInTheDocument()
+    expect(screen.getByText('Pilotage financier et trésorerie.')).toBeInTheDocument()
+    expect(screen.getByText('Ventes et relation client.')).toBeInTheDocument()
+    expect(screen.getByText('Centralisation et intelligence documentaire.')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur ComptaPilot')).toBeNull()
+    expect(screen.queryByText('Moteur SalesPilot')).toBeNull()
+    expect(screen.queryByText('Moteur DocPilot')).toBeNull()
+    expect(screen.queryByText('Moteur HRPilot')).toBeNull()
   })
 
   it('EH08 — Continuer = Reprendre dans Finance (fallback)', async () => {
@@ -260,12 +264,12 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     expect(sections.available.every((s) => s.canOpen && s.route)).toBe(true)
   })
 
-  it('EH18 — badge Bientôt sur espaces sans route', async () => {
+  it('EH18 — badge À venir sur espaces sans route', async () => {
     const user = userEvent.setup()
     renderLauncher()
     await user.click(screen.getByRole('button', { name: /Espaces/i }))
-    await screen.findByRole('heading', { name: /bientôt disponibles/i })
-    expect(screen.getAllByText('Bientôt').length).toBeGreaterThanOrEqual(12)
+    await screen.findByRole('heading', { name: /espaces à venir/i })
+    expect(screen.getAllByText('À venir').length).toBeGreaterThanOrEqual(12)
     expect(screen.queryByRole('button', { name: /Ouvrir RH/i })).toBeNull()
   })
 

@@ -14,8 +14,8 @@ export function SpacesSection({ lastProductId, lastProductAt }: SpacesSectionPro
   return (
     <PlatformHomeSection
       id="home-spaces"
-      title="Vos espaces"
-      description="Applications métier de l’entreprise — ouverture via la même logique que Espaces."
+      title="Retrouvez tous les espaces de votre entreprise."
+      description="Accédez à vos métiers depuis un environnement ELFIS unique."
       level={3}
       className="ph-spaces"
     >

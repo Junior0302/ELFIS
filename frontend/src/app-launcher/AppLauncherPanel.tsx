@@ -334,7 +334,7 @@ export function AppLauncherPanel({
 
             <h3 id="launcher-soon-heading" className="app-launcher-section__title">
 
-              Bientôt disponibles
+              Espaces à venir
 
             </h3>
 

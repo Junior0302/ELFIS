@@ -108,11 +108,11 @@ describe('PlatformShell V1', () => {
   })
   afterEach(() => cleanup())
 
-  it('affiche ProductIndicator Commercial + Moteur SalesPilot', () => {
+  it('affiche ProductIndicator Commercial sans signature moteur', () => {
     renderShell()
     expect(screen.getByRole('link', { name: 'Retour à ELFIS Home' })).toHaveAttribute('href', '/home')
     expect(screen.getByText('Commercial')).toBeInTheDocument()
-    expect(screen.getByText('Moteur SalesPilot')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur SalesPilot')).toBeNull()
   })
 
   it('ouvre le Command Center depuis la recherche TopBar', async () => {

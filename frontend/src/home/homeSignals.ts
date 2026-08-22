@@ -309,7 +309,7 @@ export function resolveSpaceSummaries(
           ? 'Disponible'
           : workspace.availability === 'locked'
             ? 'Verrouillé'
-            : 'Bientôt',
+            : 'À venir',
       accent: workspace.accent.primary,
       accentSoft: workspace.accent.soft,
       productId: workspace.engineProductId,

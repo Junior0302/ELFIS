@@ -77,7 +77,7 @@ describe('PlatformShell migration chrome', () => {
       </MemoryRouter>,
     )
     expect(screen.getByText('Commercial')).toBeInTheDocument()
-    expect(screen.getByText('Moteur SalesPilot')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur SalesPilot')).toBeNull()
     expect(screen.getByRole('button', { name: /launcher/i })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /rechercher/i }))
     const dialog = screen.getByRole('dialog', { name: /elfis command center/i })
@@ -94,7 +94,7 @@ describe('PlatformShell migration chrome', () => {
       </MemoryRouter>,
     )
     expect(screen.getByText('Finance')).toBeInTheDocument()
-    expect(screen.getByText('Moteur ComptaPilot')).toBeInTheDocument()
+    expect(screen.queryByText('Moteur ComptaPilot')).toBeNull()
   })
 
   it('UserMenu contient Déconnexion', async () => {

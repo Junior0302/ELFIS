@@ -66,7 +66,7 @@ export type WorkspaceConfig = {
   /** Clé icône Lucide / registry (ex. chart-column, handshake, file-text). */
   icon: string
   accent: WorkspaceAccentTokens
-  /** Route d’entrée SPA, ou null → Bientôt. */
+  /** Route d’entrée SPA, ou null → À venir. */
   rootPath: string | null
   availability: WorkspaceAvailability
   /** Raccourcis launcher (routes réelles). */

@@ -152,7 +152,7 @@ export function buildContinueItemsFromRegistry(
       letter: workspace.label.charAt(0).toUpperCase(),
       accent: workspace.accent.primary,
       title: workspace.label,
-      meta: `Dernière session · ${workspace.engineLabel}`,
+      meta: 'Dernière session',
       status: 'En cours',
       statusTone: 'neutral',
       timeLabel: formatLastSeen(lastAt),

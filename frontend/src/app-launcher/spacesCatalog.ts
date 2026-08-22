@@ -15,7 +15,7 @@ import type { SpaceDefinition, SpaceId } from './spaces.types'
 /**
  * Mapping entrée :
  * Finance → /dashboard · Commercial → /sales
- * Documents → /platform/documents · 12 espaces roadmap → Bientôt
+ * Documents → /platform/documents · 12 espaces roadmap → À venir
  */
 export const ELFIS_SPACES: readonly SpaceDefinition[] = buildElfisSpacesFromWorkspaces()
 

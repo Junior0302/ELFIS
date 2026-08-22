@@ -95,7 +95,7 @@ export function LauncherProductCard({
 
     state === 'coming_soon'
 
-      ? 'Bientôt'
+      ? 'À venir'
 
       : state === 'active'
 
@@ -230,7 +230,7 @@ export function LauncherProductCard({
 
         <span className="launcher-card__action launcher-card__action--muted" aria-hidden>
 
-          Bientôt
+          À venir
 
         </span>
 

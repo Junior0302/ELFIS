@@ -10,7 +10,7 @@ export const financeWorkspaceConfig: WorkspaceConfig = {
   id: 'finance',
   label: 'Finance',
   description: 'Pilotage financier et trésorerie.',
-  engineLabel: 'Moteur ComptaPilot',
+  engineLabel: null,
   engineProductId: 'comptapilot',
   icon: 'trending-up',
   accent: WORKSPACE_ACCENTS.finance,

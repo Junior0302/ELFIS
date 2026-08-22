@@ -12,7 +12,7 @@ const SPACE_STATE_LABELS = {
   active: 'Espace actif',
   available: 'Ouvrir',
   locked: 'Non inclus dans votre abonnement',
-  coming_soon: 'Bientôt',
+  coming_soon: 'À venir',
   beta: 'Bêta',
   unavailable: 'Indisponible',
 } as const
@@ -35,7 +35,7 @@ export function resolveSpaceState(
       state: 'coming_soon',
       canOpen: false,
       label: SPACE_STATE_LABELS.coming_soon,
-      reason: 'Cet espace sera bientôt disponible.',
+      reason: 'Cet espace est à venir.',
     }
   }
 
@@ -68,7 +68,7 @@ export function resolveSpaceState(
       canOpen: false,
       route,
       label: SPACE_STATE_LABELS.coming_soon,
-      reason: 'Cet espace sera bientôt disponible.',
+      reason: 'Cet espace est à venir.',
     }
   }
 
