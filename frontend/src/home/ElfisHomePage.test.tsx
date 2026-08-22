@@ -78,7 +78,7 @@ describe('ElfisHomePage signature V3', () => {
     expect(screen.getByRole('heading', { name: /continuer votre travail/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /vos espaces/i })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /vos applications/i })).toBeNull()
-    expect(screen.getByText(/propulsé par comptapilot/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^finance$/i })).toBeInTheDocument()
 
     expect(screen.getByRole('heading', { name: /timeline globale/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /elfis intelligence/i })).toBeInTheDocument()

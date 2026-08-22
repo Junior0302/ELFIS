@@ -10,6 +10,7 @@ import FacturationLayout from '../../comptapilot/facturation/FacturationLayout'
 import { OverlayProvider, OverlayRouteBridge } from '../../design-system/overlays'
 import type { BillingOverview } from '../../api'
 import FacturationDocumentsPage from './FacturationDocumentsPage'
+import { goToComposerProductsStep as goToProducts, expectZeroSubtotalHt, expectZeroTotalTtc } from './facturation-composer-test-helpers'
 
 const billingOverviewMock = vi.fn()
 const listCatalogMock = vi.fn()
@@ -121,15 +122,6 @@ function renderDocs(path = '/facturation/documents/new?type=facture') {
   )
 }
 
-async function goToProducts(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: /\+ Ajouter un client/i }))
-  await user.type(screen.getByLabelText(/Nom du nouveau client/i), 'Dupont SAS')
-  const panel = screen.getByLabelText(/Nom du nouveau client/i).closest('.ps-picker__actions') as HTMLElement
-  await user.click(within(panel).getByRole('button', { name: 'Enregistrer' }))
-  await user.click(screen.getByRole('button', { name: 'Continuer' }))
-  expect(await screen.findByRole('heading', { name: /^Produits$/i })).toBeInTheDocument()
-}
-
 async function addCatalogAndClose(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('button', { name: /Parcourir le catalogue/i }))
   await screen.findByText(name)
@@ -228,7 +220,7 @@ describe('LDI01–LDI10 Catalogue delete immédiat', () => {
     await addCatalogAndClose(user, 'Audit annuel')
     await user.click(screen.getByRole('button', { name: /Supprimer ligne 1/i }))
     await waitFor(() => {
-      expect(screen.getByText(/HT\s*:/i).textContent).toMatch(/0/)
+      expectZeroSubtotalHt()
     })
   })
 
@@ -417,7 +409,7 @@ describe('LDI21–LDI30 Preview / validation', () => {
     await user.click(screen.getByRole('button', { name: /Supprimer ligne 1/i }))
     await waitFor(() => {
       const preview = document.querySelector('[data-live-preview="structured"]')
-      expect(preview?.textContent).toMatch(/Aucune ligne/)
+      expect(preview?.textContent).toMatch(/Les lignes apparaîtront ici/)
     })
   })
 
@@ -439,7 +431,7 @@ describe('LDI21–LDI30 Preview / validation', () => {
     await addCatalogAndClose(user, 'Audit annuel')
     await user.click(screen.getByRole('button', { name: /Supprimer ligne 1/i }))
     await waitFor(() => {
-      expect(screen.getByText(/TTC\s*:/i).textContent).toMatch(/0/)
+      expectZeroTotalTtc()
     })
   })
 

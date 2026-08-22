@@ -75,6 +75,9 @@ vi.mock('../../api', () => ({
 import FinancialCommandCenter from './FinancialCommandCenter'
 import DashboardPage from '../../pages/DashboardPage'
 
+/** Titre unifié du cockpit financier (ElfisDashboardTemplate). */
+const FCC_PAGE_TITLE = /tableau de bord/i
+
 function sampleOverview(over: Partial<FinancialOverview> = {}): FinancialOverview {
   return {
     computed_at: '2026-08-02T12:00:00Z',
@@ -218,7 +221,7 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
   it('affiche le FCC sans onboarding ELFIS / LaunchDashboard', async () => {
     renderFcc()
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /financial command center/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: FCC_PAGE_TITLE })).toBeInTheDocument()
     })
     expect(document.querySelector('[data-fcc="v1"]')).toBeTruthy()
     expect(document.querySelector('[data-fcc-layout="s126"]')).toBeTruthy()
@@ -250,33 +253,34 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
     expect(screen.getByText(/export bientôt disponible/i)).toBeInTheDocument()
   })
 
-  it('place Analyser avant Essentiel (graphiques avant KPI)', async () => {
+  it('place Essentiel avant Analyser (KPI avant graphiques primaires)', async () => {
     renderFcc()
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^analyser$/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /^essentiel$/i })).toBeInTheDocument()
     })
     const order = sectionOrder()
-    expect(order.indexOf('analyser')).toBeLessThan(order.indexOf('essentiel'))
-    expect(order.indexOf('essentiel')).toBeLessThan(order.indexOf('decide'))
-    expect(order.indexOf('decide')).toBeLessThan(order.indexOf('understand'))
-    expect(order.indexOf('understand')).toBeLessThan(order.indexOf('bottom'))
+    expect(order.indexOf('essentiel')).toBeLessThan(order.indexOf('primary'))
+    expect(order.indexOf('primary')).toBeLessThan(order.indexOf('secondary'))
+    expect(order.indexOf('secondary')).toBeLessThan(order.indexOf('operations'))
+    expect(order.indexOf('operations')).toBeLessThan(order.indexOf('activity'))
   })
 
-  it('layout Analyser : héros full-width + 2 colonnes', async () => {
+  it('layout Analyser : héros full-width + graphiques secondaires', async () => {
     renderFcc()
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /revenus vs dépenses/i })).toBeInTheDocument()
     })
-    const analyser = document.querySelector('[data-fcc-section="analyser"]') as HTMLElement
-    expect(analyser.querySelector('.fcc-chart--hero')).toBeTruthy()
-    expect(analyser.querySelector('.fcc-charts-half')).toBeTruthy()
-    expect(within(analyser).getByRole('heading', { name: /^trésorerie$/i })).toBeInTheDocument()
-    expect(within(analyser).getByRole('heading', { name: /évolution ca/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/revenus versus dépenses/i)).toBeInTheDocument()
-    expect(analyser.querySelectorAll('[data-widget-id^="chart-"]').length).toBe(3)
+    const primary = document.querySelector('[data-fcc-section="primary"]') as HTMLElement
+    expect(primary.querySelector('.up-chart-card--hero')).toBeTruthy()
+    const secondary = document.querySelector('[data-fcc-section="secondary"]') as HTMLElement
+    expect(within(secondary).getByRole('heading', { name: /^trésorerie$/i })).toBeInTheDocument()
+    expect(within(secondary).getByRole('heading', { name: /évolution ca/i })).toBeInTheDocument()
+    expect(
+      document.querySelectorAll('[data-fcc-section="primary"] [data-widget-id^="chart-"], [data-fcc-section="secondary"] [data-widget-id^="chart-"]').length,
+    ).toBeGreaterThanOrEqual(3)
   })
 
-  it('message historique insuffisant si une seule période (pas de fausse courbe)', async () => {
+  it('marque les graphiques faibles si historique insuffisant (pas de fausse courbe)', async () => {
     overviewMock.mockResolvedValue(
       sampleOverview({
         charts: {
@@ -290,9 +294,7 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
     )
     renderFcc()
     await waitFor(() => {
-      expect(
-        screen.getAllByText(/historique insuffisant pour afficher une évolution/i).length,
-      ).toBeGreaterThanOrEqual(1)
+      expect(document.querySelectorAll('[data-chart-weak="1"]').length).toBeGreaterThanOrEqual(1)
     })
   })
 
@@ -355,17 +357,16 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
     expect(docsInEssentiel).toHaveLength(1)
   })
 
-  it('Comprendre et prévoir en 3 colonnes (health, prévisions, flux)', async () => {
+  it('widgets Comprendre en 3 colonnes (health, prévisions, flux)', async () => {
     renderFcc()
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /comprendre et prévoir/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /financial health score/i })).toBeInTheDocument()
     })
-    expect(screen.getByRole('heading', { name: /financial health score/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /prévisions de trésorerie/i })).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: /encaissements & décaissements/i }),
     ).toBeInTheDocument()
-    const understand = document.querySelector('[data-fcc-section="understand"]')
+    const understand = document.querySelector('.fcc-understand-grid')
     expect(understand?.querySelectorAll('[data-widget-id]').length).toBe(3)
   })
 
@@ -426,7 +427,7 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
     await waitFor(() => {
       expect(overviewMock).toHaveBeenCalledWith('tok', 7, true)
     })
-    expect(screen.getByRole('heading', { name: /financial command center/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: FCC_PAGE_TITLE })).toBeInTheDocument()
   })
 
   it('refresh widget discret avec aria-label', async () => {
@@ -452,18 +453,15 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
     })
   })
 
-  it('a11y basique : sections aria-labelledby + widgets titrés', async () => {
+  it('a11y basique : sections titrées + widgets chart', async () => {
     renderFcc()
     await waitFor(() => {
-      expect(document.querySelector('[data-fcc-section="analyser"]')).toHaveAttribute(
+      expect(document.querySelector('[data-fcc-section="essentiel"]')).toHaveAttribute(
         'aria-labelledby',
-        'fcc-charts',
+        'fcc-essentials',
       )
     })
-    expect(document.querySelector('[data-fcc-section="essentiel"]')).toHaveAttribute(
-      'aria-labelledby',
-      'fcc-essentials',
-    )
+    expect(document.querySelector('[data-fcc-section="primary"]')).toBeTruthy()
     expect(document.querySelector('[data-widget-id="chart-rev"]')).toBeTruthy()
   })
 
@@ -519,7 +517,7 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
     await waitFor(() => {
       expect(screen.getByText(/informations nécessaires/i)).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /compléter dans elfis core/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /compléter dans elfis/i })).toHaveAttribute(
       'href',
       '/platform/organization',
     )

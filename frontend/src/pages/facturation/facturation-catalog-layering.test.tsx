@@ -14,6 +14,10 @@ import { FP_OVERLAY_Z } from '../../comptapilot/facturation/overlayLayers'
 import { ComposerDialog } from '../../comptapilot/facturation/ComposerDialog'
 import type { BillingOverview } from '../../api'
 import FacturationDocumentsPage from './FacturationDocumentsPage'
+import {
+  COMPOSER_PRODUCTS_STEP_HEADING,
+  goToComposerProductsStep as goToProducts,
+} from './facturation-composer-test-helpers'
 import { createRef } from 'react'
 
 const billingOverviewMock = vi.fn()
@@ -114,15 +118,6 @@ function renderDocs(path = '/facturation/documents/new?type=facture') {
       </MemoryRouter>
     </OverlayProvider>,
   )
-}
-
-async function goToProducts(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: /\+ Ajouter un client/i }))
-  await user.type(screen.getByLabelText(/Nom du nouveau client/i), 'Dupont SAS')
-  const panel = screen.getByLabelText(/Nom du nouveau client/i).closest('.ps-picker__actions') as HTMLElement
-  await user.click(within(panel).getByRole('button', { name: 'Enregistrer' }))
-  await user.click(screen.getByRole('button', { name: 'Continuer' }))
-  expect(await screen.findByRole('heading', { name: /^Produits$/i })).toBeInTheDocument()
 }
 
 beforeEach(() => {
@@ -552,6 +547,6 @@ describe('CL31–CL40 A11y / regress / close', () => {
     await screen.findByRole('heading', { name: /^Catalogue$/i })
     await user.keyboard('{Escape}')
     expect(screen.getByRole('heading', { name: 'Nouvelle facture' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /^Produits$/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: COMPOSER_PRODUCTS_STEP_HEADING })).toBeInTheDocument()
   })
 })

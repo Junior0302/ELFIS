@@ -27,7 +27,11 @@ describe('filterQuickActions', () => {
     expect(titles).toContain('Nouvelle facture')
     expect(titles).toContain('Factures')
     expect(titles).toContain('Importer une facture')
-    expect(items.every((i) => ['/facturation', '/deposit'].includes(i.href))).toBe(true)
+    expect(
+      items.every((i) =>
+        ['/facturation/nouveau?type=facture', '/facturation/documents', '/deposit'].includes(i.href),
+      ),
+    ).toBe(true)
   })
 
   it('mappe client → /clients', () => {
@@ -45,7 +49,7 @@ describe('filterCommands', () => {
   it('liste les commandes V1 navigables', () => {
     const all = filterCommands('')
     expect(all.map((c) => c.href).sort()).toEqual(
-      ['/dashboard', '/deposit', '/facturation', '/sales'].sort(),
+      ['/dashboard', '/deposit', '/facturation/nouveau?type=facture', '/sales'].sort(),
     )
   })
 

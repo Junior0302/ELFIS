@@ -14,6 +14,7 @@ import { ProductPicker } from '../../platform-search'
 import { createEmptyFacturationDraft } from '../../comptapilot/facturation/workflow'
 import type { BillingOverview } from '../../api'
 import FacturationDocumentsPage from './FacturationDocumentsPage'
+import { goToComposerProductsStep as goToProducts, expectZeroSubtotalHt } from './facturation-composer-test-helpers'
 import { createRef } from 'react'
 
 const billingOverviewMock = vi.fn()
@@ -118,15 +119,6 @@ function renderDocs(path = '/facturation/documents/new?type=facture') {
       </MemoryRouter>
     </OverlayProvider>,
   )
-}
-
-async function goToProducts(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: /\+ Ajouter un client/i }))
-  await user.type(screen.getByLabelText(/Nom du nouveau client/i), 'Dupont SAS')
-  const panel = screen.getByLabelText(/Nom du nouveau client/i).closest('.ps-picker__actions') as HTMLElement
-  await user.click(within(panel).getByRole('button', { name: 'Enregistrer' }))
-  await user.click(screen.getByRole('button', { name: 'Continuer' }))
-  expect(await screen.findByRole('heading', { name: /^Produits$/i })).toBeInTheDocument()
 }
 
 beforeEach(() => {
@@ -328,7 +320,7 @@ describe('PC11–PC20 Filtres / Escape / hiérarchie', () => {
     const user = userEvent.setup()
     renderDocs()
     await goToProducts(user)
-    expect(screen.getByText(/actions secondaires/i)).toBeInTheDocument()
+    expect(screen.getByText(/Construisez les lignes/i)).toBeInTheDocument()
   })
 
   it('PC19 — preview Aucune ligne au départ étape produits', async () => {
@@ -408,7 +400,7 @@ describe('PC21–PC30 Line state / suppression', () => {
     const user = userEvent.setup()
     renderDocs()
     await goToProducts(user)
-    expect(screen.getByText(/HT\s*:/i).textContent).toMatch(/0/)
+    expectZeroSubtotalHt()
   })
 
   it('PC27 — preview liste suit draft après ajout catalogue', async () => {

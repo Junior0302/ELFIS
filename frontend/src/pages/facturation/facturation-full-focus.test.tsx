@@ -247,7 +247,7 @@ describe('FF11–FF20 Header Focus', () => {
   it('FF17 — type document visible', async () => {
     renderComposer()
     await screen.findByRole('heading', { name: 'Nouvelle facture' })
-    expect(screen.getByText('Facture')).toBeInTheDocument()
+    expect(screen.getByText('Facture', { selector: '.elf-cmp-status__type' })).toBeInTheDocument()
   })
 
   it('FF18 — pas de Dashboard dans Focus', async () => {

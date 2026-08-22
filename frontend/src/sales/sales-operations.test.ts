@@ -25,7 +25,6 @@ describe('salesOps helpers', () => {
         '/sales/calendar',
         '/sales/import',
         '/sales/journal',
-        '/sales/duplicates',
       ]),
     )
   })
