@@ -111,14 +111,23 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     expect(screen.queryByText(/changer d’application/i)).toBeNull()
   })
 
-  it('EH03 — six espaces métier catalogue', () => {
+  it('EH03 — quinze espaces métier catalogue', () => {
     expect(ELFIS_SPACES.map((s) => s.id)).toEqual([
       'finance',
       'commercial',
       'documents',
+      'achats',
+      'stock',
+      'logistique',
       'rh',
-      'analyse',
-      'support',
+      'planning',
+      'projets',
+      'banque',
+      'comptabilite',
+      'facturation',
+      'conformite',
+      'rse',
+      'parametres',
     ])
   })
 
@@ -128,11 +137,11 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     expect(getSpaceById('documents').entryRoute).toBe('/platform/documents')
   })
 
-  it('EH05 — RH / Analyse / Support sans route → Bientôt', () => {
+  it('EH05 — espaces roadmap sans route → Bientôt', () => {
     const sections = buildSpaceSections(ctx())
     const soon = sections.comingSoon.map((s) => s.space.id)
-    expect(soon).toEqual(expect.arrayContaining(['rh', 'analyse', 'support']))
-    for (const id of ['rh', 'analyse', 'support'] as const) {
+    expect(soon).toEqual(expect.arrayContaining(['rh', 'achats', 'parametres']))
+    for (const id of ['rh', 'achats', 'planning', 'parametres'] as const) {
       expect(getSpaceById(id).entryRoute).toBeNull()
       expect(resolveSpaceState(getSpaceById(id), ctx()).state).toBe('coming_soon')
       expect(resolveSpaceState(getSpaceById(id), ctx()).canOpen).toBe(false)
@@ -226,14 +235,15 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     await screen.findByText('Espaces métier')
     const panel = document.querySelector('[data-launcher="spaces-hub-v1"]')
     expect(panel).toBeTruthy()
-    expect(panel?.querySelectorAll('[data-space]').length).toBeGreaterThanOrEqual(6)
+    expect(panel?.querySelectorAll('[data-space]').length).toBeGreaterThanOrEqual(15)
   })
 
   it('EH15 — accents domaines distincts', () => {
     expect(getSpaceById('finance').accent).toBe('#16A34A')
     expect(getSpaceById('commercial').accent).toBe('#2563EB')
     expect(getSpaceById('documents').accent).toBe('#7C3AED')
-    expect(getSpaceById('rh').accent).toBe('#C2410C')
+    expect(getSpaceById('rh').accent).toBe('#F97316')
+    expect(getSpaceById('achats').accent).toBe('#F59E0B')
   })
 
   it('EH16 — routes connues incluent coffre plateforme', () => {
@@ -255,7 +265,7 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     renderLauncher()
     await user.click(screen.getByRole('button', { name: /Espaces/i }))
     await screen.findByRole('heading', { name: /bientôt disponibles/i })
-    expect(screen.getAllByText('Bientôt').length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByText('Bientôt').length).toBeGreaterThanOrEqual(12)
     expect(screen.queryByRole('button', { name: /Ouvrir RH/i })).toBeNull()
   })
 
@@ -360,7 +370,7 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     const mod = await import('./index')
     expect(mod.AppLauncher).toBeTypeOf('function')
     expect(mod.buildSpaceSections).toBeTypeOf('function')
-    expect(mod.ELFIS_SPACES.length).toBe(6)
+    expect(mod.ELFIS_SPACES.length).toBe(15)
   })
 
   it('EH30 — build/tsc asserted via npm scripts (smoke module)', () => {

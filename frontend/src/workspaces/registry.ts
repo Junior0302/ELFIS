@@ -7,9 +7,18 @@ import type { ProductId } from '../design-system/types'
 import type { SpaceDefinition } from '../app-launcher/spaces.types'
 import { getProductById } from '../design-system/products/registry'
 import {
-  analyseWorkspaceConfig,
+  achatsWorkspaceConfig,
+  banqueWorkspaceConfig,
+  comptabiliteWorkspaceConfig,
+  conformiteWorkspaceConfig,
+  facturationWorkspaceConfig,
+  logistiqueWorkspaceConfig,
+  parametresWorkspaceConfig,
+  planningWorkspaceConfig,
+  projetsWorkspaceConfig,
   rhWorkspaceConfig,
-  supportWorkspaceConfig,
+  rseWorkspaceConfig,
+  stockWorkspaceConfig,
 } from './comingSoonWorkspaces'
 import { commercialWorkspaceConfig } from './commercialWorkspaceConfig'
 import { documentsWorkspaceConfig } from './documentsWorkspaceConfig'
@@ -20,9 +29,18 @@ export const WORKSPACE_REGISTRY: readonly WorkspaceConfig[] = [
   financeWorkspaceConfig,
   commercialWorkspaceConfig,
   documentsWorkspaceConfig,
+  achatsWorkspaceConfig,
+  stockWorkspaceConfig,
+  logistiqueWorkspaceConfig,
   rhWorkspaceConfig,
-  analyseWorkspaceConfig,
-  supportWorkspaceConfig,
+  planningWorkspaceConfig,
+  projetsWorkspaceConfig,
+  banqueWorkspaceConfig,
+  comptabiliteWorkspaceConfig,
+  facturationWorkspaceConfig,
+  conformiteWorkspaceConfig,
+  rseWorkspaceConfig,
+  parametresWorkspaceConfig,
 ] as const
 
 export function getWorkspaceById(id: WorkspaceId): WorkspaceConfig {
@@ -49,7 +67,9 @@ export function workspaceToSpaceDefinition(workspace: WorkspaceConfig): SpaceDef
     id: workspace.id,
     title: workspace.label,
     description: workspace.description,
+    icon: workspace.icon,
     accent: workspace.accent.primary,
+    accentSoft: workspace.accent.soft,
     engineLabel: workspace.engineLabel,
     engineProductId: workspace.engineProductId,
     entryRoute: workspace.rootPath,

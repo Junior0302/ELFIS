@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import type { ResolvedSpace } from './spaces.types'
 
 import { cx } from '../design-system/components/cx'
+import { WorkspaceSpaceIcon } from '../workspaces/WorkspaceSpaceIcon'
 
 
 
@@ -126,19 +127,12 @@ export function LauncherProductCard({
 
       <div className="launcher-card__top">
 
-        <span
-
+        <WorkspaceSpaceIcon
+          icon={space.icon}
+          accent={space.accent}
+          soft={space.accentSoft}
           className="launcher-card__mark"
-
-          style={{ background: `color-mix(in srgb, ${space.accent} 18%, transparent)`, color: space.accent }}
-
-          aria-hidden
-
-        >
-
-          {space.title.slice(0, 1)}
-
-        </span>
+        />
 
         <span className="launcher-card__identity">
 

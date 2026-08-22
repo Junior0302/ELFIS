@@ -10,9 +10,18 @@ export type SpaceId =
   | 'finance'
   | 'commercial'
   | 'documents'
+  | 'achats'
+  | 'stock'
+  | 'logistique'
   | 'rh'
-  | 'analyse'
-  | 'support'
+  | 'planning'
+  | 'projets'
+  | 'banque'
+  | 'comptabilite'
+  | 'facturation'
+  | 'conformite'
+  | 'rse'
+  | 'parametres'
 
 export type SpaceShortcut = {
   id: string
@@ -24,8 +33,12 @@ export type SpaceDefinition = {
   id: SpaceId
   title: string
   description: string
+  /** Clé icône Lucide (maquette espaces métiers). */
+  icon: string
   /** Accent discret carte (navy shell + teinte domaine). */
   accent: string
+  /** Fond pastel icône. */
+  accentSoft?: string
   /** Signature discrète — ex. « Moteur ComptaPilot ». */
   engineLabel: string | null
   /** Produit moteur associé (lastProduct / thème) — null si aucun. */

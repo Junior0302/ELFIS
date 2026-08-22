@@ -86,9 +86,9 @@ describe('App Launcher Espaces Hub integration', () => {
     renderLauncher()
     await user.click(screen.getByRole('button', { name: /Espaces/i }))
     expect(await screen.findByRole('dialog', { name: /hub espaces elfis/i })).toBeInTheDocument()
-    expect(screen.getByText('RH')).toBeInTheDocument()
+    expect(screen.getByText('Ressources Humaines')).toBeInTheDocument()
     expect(screen.getAllByText('Bientôt').length).toBeGreaterThan(0)
-    expect(screen.queryByRole('button', { name: /Ouvrir RH/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Ouvrir Ressources Humaines/i })).toBeNull()
     expect(screen.getByRole('button', { name: /Ouvrir Commercial/i })).toBeTruthy()
   })
 
@@ -105,14 +105,14 @@ describe('App Launcher Espaces Hub integration', () => {
     await waitFor(() => expect(trigger).toHaveFocus())
   })
 
-  it('coming soon : RH Analyse Support', async () => {
+  it('coming soon : roadmap espaces métiers', async () => {
     const user = userEvent.setup()
     renderLauncher()
     await user.click(screen.getByRole('button', { name: /Espaces/i }))
     expect(await screen.findByText('Bientôt disponibles')).toBeInTheDocument()
-    expect(screen.getByText('RH')).toBeInTheDocument()
-    expect(screen.getByText('Analyse')).toBeInTheDocument()
-    expect(screen.getByText('Support')).toBeInTheDocument()
+    expect(screen.getByText('Ressources Humaines')).toBeInTheDocument()
+    expect(screen.getByText('Achats')).toBeInTheDocument()
+    expect(screen.getByText('Planning')).toBeInTheDocument()
   })
 
   it('analytics opened / closed / searched', async () => {

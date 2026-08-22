@@ -1,0 +1,26 @@
+/**
+ * Marque icône espace métier — fond pastel, coins 12px, trait Lucide 2px.
+ */
+
+.workspace-space-icon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--ws-icon-soft, #f8fafc);
+  color: var(--ws-icon-accent, #0b1f3a);
+}
+
+.workspace-space-icon--sm {
+  width: 2rem;
+  height: 2rem;
+}
+
+.workspace-space-icon--md {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.workspace-space-icon__glyph {
+  display: block;
+}

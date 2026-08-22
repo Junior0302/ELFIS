@@ -52,7 +52,7 @@ describe('AppLauncherPanel spaces hub v1', () => {
     expect(screen.getByText('Finance')).toBeInTheDocument()
     expect(screen.getByText('Commercial')).toBeInTheDocument()
     expect(document.querySelector('[data-space="documents"]')).toBeTruthy()
-    expect(screen.getByText('RH')).toBeInTheDocument()
+    expect(screen.getByText('Ressources Humaines')).toBeInTheDocument()
     expect(screen.getByText('Moteur ComptaPilot')).toBeInTheDocument()
     expect(screen.queryByText('Marketplace')).toBeNull()
     expect(screen.getAllByRole('link', { name: /accueil elfis/i })[0]).toHaveAttribute('href', '/home')
@@ -95,7 +95,7 @@ describe('AppLauncherPanel spaces hub v1', () => {
     )
     await user.type(screen.getByPlaceholderText(/rechercher un espace, une fonction/i), 'Pipeline')
     expect(screen.getAllByText('Commercial').length).toBeGreaterThan(0)
-    expect(screen.queryByText('RH')).toBeNull()
+    expect(screen.queryByText('Ressources Humaines')).toBeNull()
   })
 
   it('continuer avec lastProduct réel uniquement', () => {

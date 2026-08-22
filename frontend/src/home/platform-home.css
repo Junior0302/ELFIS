@@ -297,15 +297,6 @@
 
 .ph-space__icon {
   flex: 0 0 auto;
-  width: 2rem;
-  height: 2rem;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--ph-space-accent, #0b1f3a);
-  background: color-mix(in srgb, var(--ph-space-accent, #0b1f3a) 12%, #fff);
 }
 
 .ph-space__identity {

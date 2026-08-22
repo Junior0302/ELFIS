@@ -5,6 +5,7 @@ import type { ResolvedSpace } from './spaces.types'
 import { formatSpaceActivity } from './spacesModel'
 
 import { cx } from '../design-system/components/cx'
+import { WorkspaceSpaceIcon } from '../workspaces/WorkspaceSpaceIcon'
 
 
 
@@ -88,19 +89,13 @@ export function LauncherContinueCard({ item, onSelect, isFallback = false }: Lau
 
     >
 
-      <span
-
+      <WorkspaceSpaceIcon
+        icon={space.icon}
+        accent={space.accent}
+        soft={space.accentSoft}
+        size="sm"
         className="launcher-continue__mark"
-
-        style={{ background: `color-mix(in srgb, ${space.accent} 18%, transparent)`, color: space.accent }}
-
-        aria-hidden
-
-      >
-
-        {space.title.slice(0, 1)}
-
-      </span>
+      />
 
       <span className="launcher-continue__body">
 

@@ -31,9 +31,18 @@ export { financeWorkspaceConfig } from './financeWorkspaceConfig'
 export { commercialWorkspaceConfig } from './commercialWorkspaceConfig'
 export { documentsWorkspaceConfig } from './documentsWorkspaceConfig'
 export {
+  achatsWorkspaceConfig,
+  banqueWorkspaceConfig,
+  comptabiliteWorkspaceConfig,
+  conformiteWorkspaceConfig,
+  facturationWorkspaceConfig,
+  logistiqueWorkspaceConfig,
+  parametresWorkspaceConfig,
+  planningWorkspaceConfig,
+  projetsWorkspaceConfig,
   rhWorkspaceConfig,
-  analyseWorkspaceConfig,
-  supportWorkspaceConfig,
+  rseWorkspaceConfig,
+  stockWorkspaceConfig,
 } from './comingSoonWorkspaces'
 
 export {
@@ -57,3 +66,8 @@ export type { WorkspacePageHeaderProps } from './WorkspacePageHeader'
 
 export { WorkspaceKpiCard } from './WorkspaceKpiCard'
 export type { WorkspaceKpiCardProps } from './WorkspaceKpiCard'
+
+export { WorkspaceSpaceIcon } from './WorkspaceSpaceIcon'
+export type { WorkspaceSpaceIconProps } from './WorkspaceSpaceIcon'
+export { resolveWorkspaceIcon } from './workspaceIcons'
+export type { WorkspaceIconKey } from './workspaceIcons'

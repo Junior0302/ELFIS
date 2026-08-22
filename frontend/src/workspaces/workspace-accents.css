@@ -6,7 +6,7 @@
 :root {
   --workspace-finance: #16a34a;
   --workspace-finance-soft: #ecfdf5;
-  --workspace-finance-dark: #0b3d2e;
+  --workspace-finance-dark: #15803d;
 
   --workspace-commercial: #2563eb;
   --workspace-commercial-soft: #eff6ff;
@@ -16,17 +16,53 @@
   --workspace-documents-soft: #f5f3ff;
   --workspace-documents-dark: #6d28d9;
 
-  --workspace-rh: #c2410c;
+  --workspace-achats: #f59e0b;
+  --workspace-achats-soft: #fffbeb;
+  --workspace-achats-dark: #d97706;
+
+  --workspace-stock: #ec4899;
+  --workspace-stock-soft: #fdf2f8;
+  --workspace-stock-dark: #db2777;
+
+  --workspace-logistique: #14b8a6;
+  --workspace-logistique-soft: #f0fdfa;
+  --workspace-logistique-dark: #0d9488;
+
+  --workspace-rh: #f97316;
   --workspace-rh-soft: #fff7ed;
-  --workspace-rh-dark: #9a3412;
+  --workspace-rh-dark: #ea580c;
 
-  --workspace-analyse: #0e7490;
-  --workspace-analyse-soft: #ecfeff;
-  --workspace-analyse-dark: #155e75;
+  --workspace-planning: #06b6d4;
+  --workspace-planning-soft: #ecfeff;
+  --workspace-planning-dark: #0891b2;
 
-  --workspace-support: #3730a3;
-  --workspace-support-soft: #eef2ff;
-  --workspace-support-dark: #312e81;
+  --workspace-projets: #ef4444;
+  --workspace-projets-soft: #fef2f2;
+  --workspace-projets-dark: #dc2626;
+
+  --workspace-banque: #059669;
+  --workspace-banque-soft: #ecfdf5;
+  --workspace-banque-dark: #047857;
+
+  --workspace-comptabilite: #6366f1;
+  --workspace-comptabilite-soft: #eef2ff;
+  --workspace-comptabilite-dark: #4f46e5;
+
+  --workspace-facturation: #eab308;
+  --workspace-facturation-soft: #fefce8;
+  --workspace-facturation-dark: #ca8a04;
+
+  --workspace-conformite: #3b82f6;
+  --workspace-conformite-soft: #eff6ff;
+  --workspace-conformite-dark: #2563eb;
+
+  --workspace-rse: #22c55e;
+  --workspace-rse-soft: #f0fdf4;
+  --workspace-rse-dark: #16a34a;
+
+  --workspace-parametres: #6b7280;
+  --workspace-parametres-soft: #f9fafb;
+  --workspace-parametres-dark: #4b5563;
 }
 
 /** Scope optionnel quand un layout pose data-workspace. */

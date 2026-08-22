@@ -9,7 +9,7 @@ import type { WorkspaceConfig } from './types'
 export const documentsWorkspaceConfig: WorkspaceConfig = {
   id: 'documents',
   label: 'Documents',
-  description: 'Centralisation et gestion documentaire de l’entreprise.',
+  description: 'Centralisation et intelligence documentaire.',
   engineLabel: 'Moteur DocPilot',
   engineProductId: 'docpilot',
   icon: 'file-text',

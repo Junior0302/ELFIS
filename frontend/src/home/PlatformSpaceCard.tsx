@@ -5,15 +5,18 @@
 import type { CSSProperties, MouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cx } from '../design-system'
+import { WorkspaceSpaceIcon } from '../workspaces/WorkspaceSpaceIcon'
 import { openWorkspaceSpace } from './openWorkspaceSpace'
 
 export type PlatformSpaceCardProps = {
   id: string
   title: string
   description: string
+  icon: string
   engineLabel?: string
   statusLabel: string
   accent: string
+  accentSoft?: string
   available: boolean
   to: string | null
   engineProductId?: string | null
@@ -23,9 +26,11 @@ export type PlatformSpaceCardProps = {
 export function PlatformSpaceCard({
   title,
   description,
+  icon,
   engineLabel,
   statusLabel,
   accent,
+  accentSoft,
   available,
   to,
   engineProductId,
@@ -33,15 +38,18 @@ export function PlatformSpaceCard({
 }: PlatformSpaceCardProps) {
   const navigate = useNavigate()
   const style = { '--ph-space-accent': accent } as CSSProperties
-  const letter = title.charAt(0).toUpperCase()
 
   const body = (
     <>
       <span className="ph-space__bar" aria-hidden />
       <div className="ph-space__top">
-        <span className="ph-space__icon" aria-hidden>
-          {letter}
-        </span>
+        <WorkspaceSpaceIcon
+          icon={icon}
+          accent={accent}
+          soft={accentSoft}
+          size="sm"
+          className="ph-space__icon"
+        />
         <div className="ph-space__identity">
           <strong className="ph-space__title">{title}</strong>
           {engineLabel ? <span className="ph-space__engine">{engineLabel}</span> : null}

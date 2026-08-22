@@ -37,11 +37,13 @@ export type HomeSpaceSummary = {
   id: string
   title: string
   summary: string
+  icon: string
   available: boolean
   to: string | null
   poweredBy?: string | null
   statusLabel: string
   accent: string
+  accentSoft?: string
   productId?: string | null
   resumeHint?: string | null
 }
@@ -298,6 +300,7 @@ export function resolveSpaceSummaries(
       id: workspace.id,
       title: workspace.label,
       summary: workspace.description,
+      icon: workspace.icon,
       available,
       to: workspace.rootPath,
       poweredBy: workspace.engineLabel,
@@ -308,6 +311,7 @@ export function resolveSpaceSummaries(
             ? 'Verrouillé'
             : 'Bientôt',
       accent: workspace.accent.primary,
+      accentSoft: workspace.accent.soft,
       productId: workspace.engineProductId,
       resumeHint: isResume ? `Reprise possible · ${stamp}` : null,
     }

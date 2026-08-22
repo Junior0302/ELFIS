@@ -9,10 +9,10 @@ import type { WorkspaceConfig } from './types'
 export const financeWorkspaceConfig: WorkspaceConfig = {
   id: 'finance',
   label: 'Finance',
-  description: 'Facturation, banque, TVA et pilotage comptable.',
+  description: 'Pilotage financier et trésorerie.',
   engineLabel: 'Moteur ComptaPilot',
   engineProductId: 'comptapilot',
-  icon: 'chart-column',
+  icon: 'trending-up',
   accent: WORKSPACE_ACCENTS.finance,
   rootPath: '/dashboard',
   availability: 'available',

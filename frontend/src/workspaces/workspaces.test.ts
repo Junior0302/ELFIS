@@ -21,14 +21,23 @@ import {
 } from './index'
 
 describe('workspaces Phase 2', () => {
-  it('registry contient les 6 espaces launcher', () => {
+  it('registry contient les 15 espaces maquette Lucide', () => {
     expect(WORKSPACE_REGISTRY.map((w) => w.id)).toEqual([
       'finance',
       'commercial',
       'documents',
+      'achats',
+      'stock',
+      'logistique',
       'rh',
-      'analyse',
-      'support',
+      'planning',
+      'projets',
+      'banque',
+      'comptabilite',
+      'facturation',
+      'conformite',
+      'rse',
+      'parametres',
     ])
   })
 
@@ -36,19 +45,28 @@ describe('workspaces Phase 2', () => {
     expect(WORKSPACE_ACCENTS.finance.primary).toBe('#16A34A')
     expect(WORKSPACE_ACCENTS.commercial.primary).toBe('#2563EB')
     expect(WORKSPACE_ACCENTS.documents.primary).toBe('#7C3AED')
+    expect(WORKSPACE_ACCENTS.rh.primary).toBe('#F97316')
+    expect(WORKSPACE_ACCENTS.achats.primary).toBe('#F59E0B')
     expect(DEPARTMENT_ACCENTS.finance).toBe('#16A34A')
     expect(DEPARTMENT_ACCENTS.commercial).toBe('#2563EB')
     expect(DEPARTMENT_ACCENTS.documents).toBe('#7C3AED')
   })
 
+  it('icônes Lucide officielles (3 espaces ouverts)', () => {
+    expect(getWorkspaceById('finance').icon).toBe('trending-up')
+    expect(getWorkspaceById('commercial').icon).toBe('handshake')
+    expect(getWorkspaceById('documents').icon).toBe('file-text')
+  })
+
   it('ELFIS_SPACES dérivé du workspace registry', () => {
-    expect(ELFIS_SPACES).toHaveLength(6)
+    expect(ELFIS_SPACES).toHaveLength(15)
     expect(getSpaceById('finance').accent).toBe('#16A34A')
     expect(getSpaceById('commercial').accent).toBe('#2563EB')
     expect(getSpaceById('documents').accent).toBe('#7C3AED')
     expect(getSpaceById('finance').entryRoute).toBe('/dashboard')
     expect(getSpaceById('commercial').entryRoute).toBe('/sales')
     expect(getSpaceById('documents').entryRoute).toBe('/platform/documents')
+    expect(getSpaceById('finance').icon).toBe('trending-up')
   })
 
   it('engineProductId compose Product Registry', () => {
@@ -89,6 +107,7 @@ describe('workspaces Phase 2', () => {
 
   it('coming_soon sans rootPath', () => {
     const soon = WORKSPACE_REGISTRY.filter((w) => w.availability === 'coming_soon')
+    expect(soon).toHaveLength(12)
     expect(soon.every((w) => w.rootPath === null)).toBe(true)
     expect(getAvailableWorkspaces().map((w) => w.id)).toEqual([
       'finance',
@@ -97,9 +116,11 @@ describe('workspaces Phase 2', () => {
     ])
   })
 
-  it('adapter SpaceDefinition conserve label/description', () => {
+  it('adapter SpaceDefinition conserve label/description/icon', () => {
     const space = workspaceToSpaceDefinition(getWorkspaceById('finance'))
     expect(space.title).toBe('Finance')
     expect(space.engineProductId).toBe('comptapilot')
+    expect(space.icon).toBe('trending-up')
+    expect(space.accentSoft).toBe('#ECFDF5')
   })
 })

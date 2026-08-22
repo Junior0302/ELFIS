@@ -26,9 +26,11 @@ export function SpacesSection({ lastProductId, lastProductAt }: SpacesSectionPro
             id={space.id}
             title={space.title}
             description={space.summary}
+            icon={space.icon}
             engineLabel={space.poweredBy ?? undefined}
             statusLabel={space.statusLabel}
             accent={space.accent}
+            accentSoft={space.accentSoft}
             available={space.available}
             to={space.to}
             engineProductId={space.productId}

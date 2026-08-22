@@ -1,7 +1,7 @@
 /**
- * Accents workspace officiels (maquette Espaces ELFIS).
+ * Accents workspace officiels (maquette Espaces métiers – Icônes Lucide).
  * Primary = CTA / item actif / tabs / focus.
- * Soft = fond léger. Dark = hover / contraste (anciens DEPARTMENT_ACCENTS).
+ * Soft = fond pastel. Dark = hover / contraste.
  */
 
 import type { WorkspaceAccentTokens, WorkspaceId } from './types'
@@ -10,7 +10,7 @@ export const WORKSPACE_ACCENTS = {
   finance: {
     primary: '#16A34A',
     soft: '#ECFDF5',
-    dark: '#0B3D2E',
+    dark: '#15803D',
     cssVar: '--workspace-finance',
     softCssVar: '--workspace-finance-soft',
     darkCssVar: '--workspace-finance-dark',
@@ -31,29 +31,101 @@ export const WORKSPACE_ACCENTS = {
     softCssVar: '--workspace-documents-soft',
     darkCssVar: '--workspace-documents-dark',
   },
+  achats: {
+    primary: '#F59E0B',
+    soft: '#FFFBEB',
+    dark: '#D97706',
+    cssVar: '--workspace-achats',
+    softCssVar: '--workspace-achats-soft',
+    darkCssVar: '--workspace-achats-dark',
+  },
+  stock: {
+    primary: '#EC4899',
+    soft: '#FDF2F8',
+    dark: '#DB2777',
+    cssVar: '--workspace-stock',
+    softCssVar: '--workspace-stock-soft',
+    darkCssVar: '--workspace-stock-dark',
+  },
+  logistique: {
+    primary: '#14B8A6',
+    soft: '#F0FDFA',
+    dark: '#0D9488',
+    cssVar: '--workspace-logistique',
+    softCssVar: '--workspace-logistique-soft',
+    darkCssVar: '--workspace-logistique-dark',
+  },
   rh: {
-    primary: '#C2410C',
+    primary: '#F97316',
     soft: '#FFF7ED',
-    dark: '#9A3412',
+    dark: '#EA580C',
     cssVar: '--workspace-rh',
     softCssVar: '--workspace-rh-soft',
     darkCssVar: '--workspace-rh-dark',
   },
-  analyse: {
-    primary: '#0E7490',
+  planning: {
+    primary: '#06B6D4',
     soft: '#ECFEFF',
-    dark: '#155E75',
-    cssVar: '--workspace-analyse',
-    softCssVar: '--workspace-analyse-soft',
-    darkCssVar: '--workspace-analyse-dark',
+    dark: '#0891B2',
+    cssVar: '--workspace-planning',
+    softCssVar: '--workspace-planning-soft',
+    darkCssVar: '--workspace-planning-dark',
   },
-  support: {
-    primary: '#3730A3',
+  projets: {
+    primary: '#EF4444',
+    soft: '#FEF2F2',
+    dark: '#DC2626',
+    cssVar: '--workspace-projets',
+    softCssVar: '--workspace-projets-soft',
+    darkCssVar: '--workspace-projets-dark',
+  },
+  banque: {
+    primary: '#059669',
+    soft: '#ECFDF5',
+    dark: '#047857',
+    cssVar: '--workspace-banque',
+    softCssVar: '--workspace-banque-soft',
+    darkCssVar: '--workspace-banque-dark',
+  },
+  comptabilite: {
+    primary: '#6366F1',
     soft: '#EEF2FF',
-    dark: '#312E81',
-    cssVar: '--workspace-support',
-    softCssVar: '--workspace-support-soft',
-    darkCssVar: '--workspace-support-dark',
+    dark: '#4F46E5',
+    cssVar: '--workspace-comptabilite',
+    softCssVar: '--workspace-comptabilite-soft',
+    darkCssVar: '--workspace-comptabilite-dark',
+  },
+  facturation: {
+    primary: '#EAB308',
+    soft: '#FEFCE8',
+    dark: '#CA8A04',
+    cssVar: '--workspace-facturation',
+    softCssVar: '--workspace-facturation-soft',
+    darkCssVar: '--workspace-facturation-dark',
+  },
+  conformite: {
+    primary: '#3B82F6',
+    soft: '#EFF6FF',
+    dark: '#2563EB',
+    cssVar: '--workspace-conformite',
+    softCssVar: '--workspace-conformite-soft',
+    darkCssVar: '--workspace-conformite-dark',
+  },
+  rse: {
+    primary: '#22C55E',
+    soft: '#F0FDF4',
+    dark: '#16A34A',
+    cssVar: '--workspace-rse',
+    softCssVar: '--workspace-rse-soft',
+    darkCssVar: '--workspace-rse-dark',
+  },
+  parametres: {
+    primary: '#6B7280',
+    soft: '#F9FAFB',
+    dark: '#4B5563',
+    cssVar: '--workspace-parametres',
+    softCssVar: '--workspace-parametres-soft',
+    darkCssVar: '--workspace-parametres-dark',
   },
 } as const satisfies Record<WorkspaceId, WorkspaceAccentTokens>
 
@@ -62,9 +134,18 @@ export const WORKSPACE_PRIMARY = {
   finance: WORKSPACE_ACCENTS.finance.primary,
   commercial: WORKSPACE_ACCENTS.commercial.primary,
   documents: WORKSPACE_ACCENTS.documents.primary,
+  achats: WORKSPACE_ACCENTS.achats.primary,
+  stock: WORKSPACE_ACCENTS.stock.primary,
+  logistique: WORKSPACE_ACCENTS.logistique.primary,
   hr: WORKSPACE_ACCENTS.rh.primary,
-  analyse: WORKSPACE_ACCENTS.analyse.primary,
-  support: WORKSPACE_ACCENTS.support.primary,
+  planning: WORKSPACE_ACCENTS.planning.primary,
+  projets: WORKSPACE_ACCENTS.projets.primary,
+  banque: WORKSPACE_ACCENTS.banque.primary,
+  comptabilite: WORKSPACE_ACCENTS.comptabilite.primary,
+  facturation: WORKSPACE_ACCENTS.facturation.primary,
+  conformite: WORKSPACE_ACCENTS.conformite.primary,
+  rse: WORKSPACE_ACCENTS.rse.primary,
+  parametres: WORKSPACE_ACCENTS.parametres.primary,
 } as const
 
 /** Déclarations CSS à injecter (Phase 3+ shell). */
