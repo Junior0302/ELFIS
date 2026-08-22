@@ -70,6 +70,11 @@ ROLE_PERMS: dict[str, list[str]] = {
         "sales.comment",
         "sales.mention",
         "sales.transfer",
+        "accounting.view",
+        "accounting.edit",
+        "accounting.validate",
+        "accounting.reject",
+        "accounting.reopen",
     ],
     "cfo": [
         "finance.read",
@@ -108,6 +113,11 @@ ROLE_PERMS: dict[str, list[str]] = {
         "sales.read",
         "sales.proposals.read",
         "sales.comment",
+        "accounting.view",
+        "accounting.edit",
+        "accounting.validate",
+        "accounting.reject",
+        "accounting.reopen",
     ],
     "employe": [
         "invoice.create",
@@ -198,6 +208,11 @@ ALL_PERMISSIONS = [
     ("sales.comment", "sales"),
     ("sales.mention", "sales"),
     ("sales.transfer", "sales"),
+    ("accounting.view", "accounting"),
+    ("accounting.edit", "accounting"),
+    ("accounting.validate", "accounting"),
+    ("accounting.reject", "accounting"),
+    ("accounting.reopen", "accounting"),
 ]
 
 

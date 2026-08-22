@@ -40,8 +40,15 @@ engine.check_quota(org_id, QuotaCodes.AI_EXECUTIONS_MONTH)
 
 Registre : `plan_registry.py` — **Starter**, **Professional** (public), **Enterprise** (privé / devis).
 
+| Plan | Catalogue public | Checkout self-service | Prix catalogue | Stripe env |
+|------|------------------|----------------------|----------------|------------|
+| Starter | oui | oui | 19 €/mois, essai 14 j | `stripe_price_starter_monthly` ou legacy `stripe_price_pro` |
+| Professional | oui | oui | 49 €/mois, essai 14 j | `stripe_price_professional_monthly` |
+| Enterprise | non | non (commercial/devis) | sur devis | réservé admin — jamais checkout public |
+
 - Prix catalogue pour UI / MRR — **pas** de price_id inventé côté client
 - Price Stripe uniquement via settings / env (`stripe_price_*`)
+- `assert_plan_purchasable()` valide `is_public`, `purchasable`, plan actif et price Stripe avant checkout
 
 ## Essai
 

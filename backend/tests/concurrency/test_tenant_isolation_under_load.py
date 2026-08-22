@@ -3,14 +3,30 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
+from uuid import uuid4
 
+from app.services.auth import create_access_token
 from tests.functional.helpers.phase_a import seed_search_document
 
 
-def test_conc_008_tenant_isolation_under_load(api, functional_db):
-    Session = functional_db["Session"]
-    org_a = functional_db["seed"]["organizations"]["ORG_ACTIVE"]["id"]
-    org_b = functional_db["seed"]["organizations"]["ORG_SECOND_TENANT"]["id"]
+def _auth_headers(seed: dict[str, Any], user_key: str) -> dict[str, str]:
+    info = seed["users"][user_key]
+    org_id = info.get("org_id")
+    token = create_access_token({"sub": str(info["id"]), "org_id": org_id})
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Organization-Id": str(org_id),
+        "X-Request-Id": f"conc-008-{user_key}-{uuid4()}",
+    }
+
+
+def test_conc_008_tenant_isolation_under_load(concurrency_db):
+    Session = concurrency_db["Session"]
+    seed = concurrency_db["seed"]
+    client = concurrency_db["client"]
+    org_a = seed["organizations"]["ORG_ACTIVE"]["id"]
+    org_b = seed["organizations"]["ORG_SECOND_TENANT"]["id"]
     db = Session()
     try:
         seed_search_document(db, org_id=org_a, unique_term="TENANT_A_ONLY_PHASE_F")
@@ -19,9 +35,14 @@ def test_conc_008_tenant_isolation_under_load(api, functional_db):
         db.close()
 
     def search_as(user_key: str, term: str):
-        api.login_user(user_key)
-        r = api.client.get(f"/api/search?q={term}", headers=api._headers())
-        return user_key, term, r.status_code, r.json() if r.status_code == 200 else {}
+        headers = _auth_headers(seed, user_key)
+        r = client.get(f"/api/search?q={term}", headers=headers)
+        body: Any
+        try:
+            body = r.json()
+        except Exception:
+            body = {"raw": r.text[:1000]}
+        return user_key, term, r.status_code, body
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         futs = [
@@ -33,8 +54,7 @@ def test_conc_008_tenant_isolation_under_load(api, functional_db):
         results = [f.result() for f in futs]
 
     for user_key, term, status, body in results:
-        if status != 200:
-            continue
+        assert status == 200, f"search infra failure for {user_key}/{term}: HTTP {status} body={body}"
         blob = str(body)
         if user_key == "org_admin" and term == "TENANT_B_ONLY_PHASE_F":
             assert "TENANT_B_ONLY_PHASE_F" not in blob or body.get("total", 0) == 0 or not body.get("items")

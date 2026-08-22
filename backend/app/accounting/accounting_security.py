@@ -81,13 +81,14 @@ def check_accounting_permission(permissions: list[str] | set[str], action: str) 
     required = f"accounting.{action}"
     if required in perms:
         return
-    # Fallbacks documentés
+    # Fallbacks documentés — réservés aux actions non sensibles (view/edit).
+    # validate / reject / reopen exigent accounting.* explicite ou '*'.
     fallbacks = {
         "view": {"ai.analysis", "documents.read", "invoice.read"},
         "edit": {"ai.analysis", "documents.write", "invoice.create"},
-        "validate": {"ai.analysis", "documents.write"},
-        "reject": {"ai.analysis", "documents.write"},
-        "reopen": {"ai.analysis", "documents.write"},
+        "validate": set(),
+        "reject": set(),
+        "reopen": set(),
     }
     if perms & fallbacks.get(action, set()):
         return

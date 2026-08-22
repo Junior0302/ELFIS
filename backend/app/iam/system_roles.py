@@ -20,6 +20,7 @@ from app.iam.role_permission_map import (
     PLATFORM_SUPPORT_PERMISSIONS,
     PLATFORM_VIEWER_PERMISSIONS,
 )
+from app.security.security_redaction import safe_log_extra
 
 logger = logging.getLogger(__name__)
 
@@ -109,5 +110,5 @@ def bootstrap_system_roles(db: Session, *, commit: bool = True) -> dict[str, Any
         "user_assignments": 0,
         "note": "Aucun utilisateur n'a reçu de rôle automatiquement",
     }
-    logger.info("iam_system_roles_bootstrapped", extra=result)
+    logger.info("iam_system_roles_bootstrapped", extra=safe_log_extra(result))
     return result

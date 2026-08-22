@@ -67,6 +67,16 @@ def safe_log_context(**fields: Any) -> dict[str, Any]:
     return redact_mapping(fields)
 
 
+def safe_log_extra(data: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Construit un dict ``extra`` compatible ``LogRecord`` (namespace ``elfis``).
+
+    Les clés réservées de ``logging.LogRecord`` (ex. ``created``, ``message``,
+    ``name``, ``module``) ne doivent jamais être passées au niveau racine de
+    ``extra=`` — elles provoquent ``KeyError`` une fois le logging structuré actif.
+    """
+    return {"elfis": redact_mapping(data or {})}
+
+
 def filter_error_details(details: Mapping[str, Any] | None) -> dict[str, Any]:
     if not details:
         return {}

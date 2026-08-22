@@ -34,9 +34,12 @@ def test_decimal_conversion():
 
 def test_permissions_star_and_fallback():
     check_accounting_permission(["*"], "validate")
+    check_accounting_permission(["accounting.validate"], "validate")
     check_accounting_permission(["ai.analysis"], "view")
     with pytest.raises(AccountingPermissionError):
         check_accounting_permission(["invoice.read"], "validate")
+    with pytest.raises(AccountingPermissionError):
+        check_accounting_permission(["documents.write"], "validate")
 
 
 def test_safe_log_excludes_sensitive():

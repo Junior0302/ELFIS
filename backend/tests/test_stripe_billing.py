@@ -159,6 +159,42 @@ class StripeBillingTests(unittest.TestCase):
         self.assertEqual(portal_url, "https://billing.stripe.test/session")
         self.assertEqual(foreign_portal.exception.detail["code"], "stripe_customer_missing")
 
+    def test_checkout_uses_plan_specific_stripe_price(self):
+        self.db.add(
+            Subscription(
+                organization_id=42,
+                plan="pro",
+                status="canceled",
+                price=19.0,
+                stripe_customer_id="cus_org_42",
+            )
+        )
+        self.db.commit()
+
+        with (
+            patch.object(settings, "stripe_secret_key", "sk_test_unit"),
+            patch.object(settings, "stripe_price_starter_monthly", "price_starter"),
+            patch.object(settings, "stripe_price_professional_monthly", "price_professional"),
+            patch.object(settings, "frontend_url", "https://app.example"),
+            patch(
+                "app.services.stripe_billing.stripe.checkout.Session.create",
+                return_value=SimpleNamespace(
+                    url="https://checkout.stripe.test/pro",
+                    id="cs_test_pro",
+                ),
+            ) as checkout_create,
+        ):
+            create_checkout_session(
+                self.db,
+                organization_id=42,
+                customer_email="owner@example.com",
+                plan_code="professional",
+            )
+
+        checkout_params = checkout_create.call_args.kwargs
+        self.assertEqual(checkout_params["line_items"][0]["price"], "price_professional")
+        self.assertEqual(checkout_params["metadata"]["plan_code"], "professional")
+
     def test_subscription_manage_permission_for_owner_admin_only(self):
         user = User(
             first_name="Test",

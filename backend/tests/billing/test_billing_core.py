@@ -93,6 +93,43 @@ class PlanRegistryTests(BillingTestCase):
             assert_known_price_id("price_unknown_xyz")
 
 
+class PlanPurchasableSecurityTests(BillingTestCase):
+    def test_starter_requires_stripe_price(self):
+        from app.billing.billing_exceptions import BillingValidationError
+        from app.billing.billing_security import assert_plan_purchasable
+
+        with self.assertRaises(BillingValidationError):
+            assert_plan_purchasable("starter")
+
+    def test_professional_requires_public_purchasable_and_stripe(self):
+        from app.billing.billing_exceptions import BillingValidationError
+        from app.billing.billing_security import assert_plan_purchasable
+        from app.config import settings
+
+        with self.assertRaises(BillingValidationError):
+            assert_plan_purchasable("professional")
+        with patch.object(settings, "stripe_price_professional_monthly", "price_pro_unit"):
+            self.assertEqual(assert_plan_purchasable("professional"), "price_pro_unit")
+
+    def test_enterprise_never_publicly_purchasable(self):
+        from app.billing.billing_exceptions import BillingValidationError
+        from app.billing.billing_security import assert_plan_purchasable
+        from app.config import settings
+
+        with patch.object(settings, "stripe_price_enterprise_monthly", "price_ent_unit"):
+            with self.assertRaises(BillingValidationError) as ctx:
+                assert_plan_purchasable("enterprise")
+            self.assertIn("publiquement", ctx.exception.message.lower())
+
+    def test_unknown_plan_rejected(self):
+        from app.billing.billing_exceptions import BillingValidationError
+        from app.billing.billing_security import assert_plan_purchasable
+
+        with self.assertRaises(BillingValidationError) as ctx:
+            assert_plan_purchasable("does_not_exist")
+        self.assertIn("inconnu", ctx.exception.message.lower())
+
+
 class EntitlementEngineTests(BillingTestCase):
     def test_resolve_trial_state(self):
         from app.billing.entitlement_engine import EntitlementEngine

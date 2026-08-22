@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.billing.billing_exceptions import BillingValidationError
 from app.billing.billing_security import assert_plan_purchasable, assert_webhook_size
-from app.billing.plan_registry import default_plan_code, resolve_stripe_price_id
+from app.billing.plan_registry import default_plan_code
 from app.billing.subscription_service import SubscriptionService
 from app.config import settings
 
@@ -34,14 +34,16 @@ class StripeService:
     ) -> dict[str, Any]:
         code = (plan_code or default_plan_code()).strip().lower()
         # Valide que le plan est achetable ; le price_id vient du registre serveur
-        assert_plan_purchasable(code)
+        price_id = assert_plan_purchasable(code)
         from app.services.stripe_billing import create_checkout_session as _create
 
         url, session_id = _create(
             self.db,
             organization_id=organization_id,
             customer_email=user_email,
+            plan_code=code,
             trial_period_days=trial_period_days,
+            price_id=price_id,
         )
         return {"url": url, "session_id": session_id, "plan_code": code}
 
@@ -82,9 +84,7 @@ class StripeService:
         return self.create_customer_portal_session(organization_id=organization_id)
 
     def change_plan(self, organization_id: int, plan_code: str) -> dict[str, Any]:
-        price = resolve_stripe_price_id(plan_code)
-        if not price:
-            raise BillingValidationError("Plan inconnu ou non configuré dans Stripe")
+        assert_plan_purchasable(plan_code)
         return self.create_customer_portal_session(organization_id=organization_id)
 
     def get_subscription_status(self, organization_id: int, *, user=None) -> dict[str, Any]:

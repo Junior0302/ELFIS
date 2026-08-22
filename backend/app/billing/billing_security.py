@@ -6,7 +6,11 @@ import hashlib
 from typing import Any
 
 from app.billing.billing_exceptions import BillingValidationError, StripeWebhookError
-from app.billing.plan_registry import plan_code_for_stripe_price, resolve_stripe_price_id
+from app.billing.plan_registry import (
+    get_plan,
+    plan_code_for_stripe_price,
+    resolve_stripe_price_id,
+)
 from app.config import settings
 
 
@@ -33,10 +37,26 @@ def assert_known_price_id(price_id: str | None) -> str:
     return code
 
 
-def assert_plan_purchasable(plan_code: str) -> str:
-    price = resolve_stripe_price_id(plan_code)
+def assert_plan_purchasable(plan_code: str, *, public_checkout: bool = True) -> str:
+    """Valide qu'un plan peut être acheté via checkout public.
+
+    Le registre métier (``plan_registry``) est la source de vérité — jamais le frontend.
+    """
+    code = (plan_code or "").strip().lower()
+    plan = get_plan(code)
+    if plan is None:
+        raise BillingValidationError("Plan inconnu")
+    if not plan.is_active:
+        raise BillingValidationError("Plan inactif")
+    if public_checkout and not plan.is_public:
+        raise BillingValidationError("Plan non disponible publiquement")
+    if not plan.purchasable:
+        raise BillingValidationError("Plan non achetable")
+    price = resolve_stripe_price_id(code)
     if not price:
         raise BillingValidationError("Plan non achetable ou tarif Stripe non configuré")
+    if not str(price).startswith("price_"):
+        raise BillingValidationError("Identifiant tarif Stripe invalide")
     return price
 
 

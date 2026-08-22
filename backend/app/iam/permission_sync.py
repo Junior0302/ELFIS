@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.iam.permission_catalog import Permission, all_permissions, is_known_permission
 from app.iam.platform_role_repository import PlatformPermissionRepository
+from app.security.security_redaction import safe_log_extra
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def sync_permissions_from_catalog(
         "inactivated": inactivated,
         "catalog_size": len(known),
     }
-    logger.info("iam_permissions_synced", extra=result)
+    logger.info("iam_permissions_synced", extra=safe_log_extra(result))
     return result
 
 

@@ -4,19 +4,37 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from app.billing.billing_exceptions import BillingValidationError
 from app.billing.billing_security import assert_plan_purchasable
 from app.billing.plan_registry import get_plan
 from tests.functional.helpers.phase_b import assert_safe_billing_body
 
 
-def test_checkout_002_private_plan_refused():
-    with __import__("pytest").raises(BillingValidationError):
-        assert_plan_purchasable("professional")
-    with __import__("pytest").raises(BillingValidationError):
+def test_checkout_002_non_public_and_unknown_plans_refused():
+    with pytest.raises(BillingValidationError):
         assert_plan_purchasable("enterprise")
-    with __import__("pytest").raises(BillingValidationError):
+    with pytest.raises(BillingValidationError):
         assert_plan_purchasable("unknown_plan_xyz")
+    with pytest.raises(BillingValidationError):
+        assert_plan_purchasable("professional")
+
+
+def test_checkout_002_professional_allowed_when_stripe_configured():
+    from app.config import settings
+
+    with patch.object(settings, "stripe_price_professional_monthly", "price_recette_pro_test"):
+        price = assert_plan_purchasable("professional")
+    assert price == "price_recette_pro_test"
+
+
+def test_checkout_002_enterprise_refused_even_with_stripe_price():
+    from app.config import settings
+
+    with patch.object(settings, "stripe_price_enterprise_monthly", "price_recette_ent_test"):
+        with pytest.raises(BillingValidationError):
+            assert_plan_purchasable("enterprise")
 
 
 def test_checkout_001_mock_org_none(api, monkeypatch):
@@ -48,6 +66,25 @@ def test_checkout_001_mock_org_none(api, monkeypatch):
     body = r.json()
     assert_safe_billing_body(body)
     assert "mock" in (body.get("url") or "") or body.get("session_id")
+
+
+def test_checkout_003_enterprise_checkout_api_refused(api, monkeypatch):
+    api.login_user("no_sub")
+    monkeypatch.setattr(
+        "app.config.settings.stripe_price_enterprise_monthly",
+        "price_recette_ent_test",
+        raising=False,
+    )
+    r = api.client.post(
+        "/api/billing/checkout",
+        headers=api._headers(),
+        json={
+            "plan_code": "enterprise",
+            "automatic_renewal_accepted": True,
+            "terms_accepted": True,
+        },
+    )
+    assert r.status_code in (400, 403)
 
 
 def test_portal_001_002_active_and_pastdue(api):

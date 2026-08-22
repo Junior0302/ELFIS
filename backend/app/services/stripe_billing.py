@@ -47,8 +47,7 @@ def _require_stripe(*, webhook: bool = False) -> None:
         missing.append("STRIPE_SECRET_KEY")
     if webhook and not settings.stripe_webhook_secret:
         missing.append("STRIPE_WEBHOOK_SECRET")
-    if not webhook and not settings.stripe_price_pro:
-        missing.append("STRIPE_PRICE_PRO")
+    # Le price_id est validé par plan au moment du checkout (assert_plan_purchasable).
     if missing:
         raise HTTPException(
             503,
@@ -179,29 +178,43 @@ def create_checkout_session(
     *,
     organization_id: int,
     customer_email: str,
+    plan_code: str = "starter",
     trial_period_days: int | None = None,
+    price_id: str | None = None,
 ) -> tuple[str, str]:
     """Crée une session Checkout. Retourne (url, session_id)."""
-    _require_stripe()
+    from app.billing.billing_exceptions import BillingValidationError
+    from app.billing.billing_security import assert_plan_purchasable
+    from app.billing.plan_registry import default_plan_code, get_plan
     from app.subscriptions.consent import assert_trial_eligible, trial_days_for_checkout
 
-    price_id = settings.stripe_price_pro
-    if not price_id.startswith("price_"):
-        logger.error("Invalid billing price id configured (prefix=%s)", price_id[:5])
+    _require_stripe()
+    code = (plan_code or default_plan_code()).strip().lower()
+    try:
+        resolved_price = price_id or assert_plan_purchasable(code)
+    except BillingValidationError as exc:
         raise HTTPException(
-            503,
-            detail={
-                "code": "stripe_price_invalid",
-                "message": "Paiement sécurisé indisponible pour le moment",
-            },
-        )
+            400,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    plan = get_plan(code)
     current = assert_trial_eligible(db, organization_id)
-    metadata = {"organization_id": str(organization_id), "plan": "pro"}
-    trial_days = trial_days_for_checkout(current) if trial_period_days is None else trial_period_days
+    metadata = {
+        "organization_id": str(organization_id),
+        "plan_code": code,
+        # Legacy webhook/sync — starter historique = "pro"
+        "plan": "pro" if code == "starter" else code,
+    }
+    if trial_period_days is None:
+        trial_days = trial_days_for_checkout(current)
+        if trial_days is None and plan and plan.trial_days > 0:
+            trial_days = plan.trial_days
+    else:
+        trial_days = trial_period_days
 
     params: dict[str, Any] = {
         "mode": "subscription",
-        "line_items": [{"price": price_id, "quantity": 1}],
+        "line_items": [{"price": resolved_price, "quantity": 1}],
         "payment_method_collection": "always",
         "client_reference_id": str(organization_id),
         "subscription_data": {
@@ -246,11 +259,13 @@ def create_checkout_session(
         db.add(current)
         db.flush()
     elif session_id:
+        catalog_price = float(plan.price_amount) if plan else 19.0
+        legacy_plan = "pro" if code == "starter" else code
         row = Subscription(
             organization_id=organization_id,
-            plan="pro",
+            plan=legacy_plan,
             status="incomplete",
-            price=19.0,
+            price=catalog_price,
             stripe_checkout_session_id=session_id,
         )
         db.add(row)

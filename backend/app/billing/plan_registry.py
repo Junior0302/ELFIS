@@ -178,7 +178,7 @@ def resolve_stripe_price_id(plan_code: str) -> str | None:
     plan = get_plan(plan_code)
     if not plan or not plan.purchasable:
         return None
-    # Starter : nouveau nom puis legacy STRIPE_PRICE_PRO
+    # Starter : nouveau nom puis legacy STRIPE_PRICE_PRO (compat production)
     if plan.plan_code == PlanCodes.STARTER:
         price = (settings.stripe_price_starter_monthly or settings.stripe_price_pro or "").strip()
         return price or None
