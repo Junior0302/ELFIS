@@ -21,7 +21,7 @@ import {
 } from './index'
 
 describe('workspaces Phase 2', () => {
-  it('registry contient les 15 espaces maquette Lucide', () => {
+  it('registry contient les 12 espaces visibles (3 ouverts + 9 à venir)', () => {
     expect(WORKSPACE_REGISTRY.map((w) => w.id)).toEqual([
       'finance',
       'commercial',
@@ -32,9 +32,6 @@ describe('workspaces Phase 2', () => {
       'rh',
       'planning',
       'projets',
-      'banque',
-      'comptabilite',
-      'facturation',
       'conformite',
       'rse',
       'parametres',
@@ -59,7 +56,7 @@ describe('workspaces Phase 2', () => {
   })
 
   it('ELFIS_SPACES dérivé du workspace registry', () => {
-    expect(ELFIS_SPACES).toHaveLength(15)
+    expect(ELFIS_SPACES).toHaveLength(12)
     expect(getSpaceById('finance').accent).toBe('#16A34A')
     expect(getSpaceById('commercial').accent).toBe('#2563EB')
     expect(getSpaceById('documents').accent).toBe('#7C3AED')
@@ -88,6 +85,39 @@ describe('workspaces Phase 2', () => {
     expect(isWorkspaceNavLeafActive(tresorerie, '/finance', group!.children)).toBe(false)
   })
 
+  it('Finance — pas de surfaces ELFIS Core dans le menu métier', () => {
+    const tos = financeWorkspaceConfig.navigationGroups.flatMap((g) => [
+      g.to,
+      ...g.children.map((c) => c.to),
+    ])
+    expect(tos.some((t) => t.startsWith('/platform/'))).toBe(false)
+  })
+
+  it('Finance — pas de synchronisation bancaire (menu ELFIS Core)', () => {
+    const tos = financeWorkspaceConfig.navigationGroups.flatMap((g) => [
+      g.to,
+      ...g.children.map((c) => c.to),
+    ])
+    expect(tos).not.toContain('/banque')
+    expect(tos).not.toContain('/platform/banking')
+    expect(financeWorkspaceConfig.shortcuts.every((s) => s.to !== '/banque')).toBe(true)
+  })
+
+  it('Finance et Commercial — pas d’entrée Relations plateforme', () => {
+    const financeTos = financeWorkspaceConfig.navigationGroups.flatMap((g) => [
+      g.to,
+      ...g.children.map((c) => c.to),
+    ])
+    const commercialTos = commercialWorkspaceConfig.navigationGroups.flatMap((g) => [
+      g.to,
+      ...g.children.map((c) => c.to),
+    ])
+    expect(financeTos).not.toContain('/platform/relations')
+    expect(commercialTos).not.toContain('/platform/relations')
+    expect(financeWorkspaceConfig.navigationGroups.some((g) => g.id === 'relations')).toBe(false)
+    expect(commercialWorkspaceConfig.navigationGroups.some((g) => g.id === 'relations')).toBe(false)
+  })
+
   it('Commercial — pas de liens cross-domaine devis/catalogue/factures', () => {
     const tos = commercialWorkspaceConfig.navigationGroups.flatMap((g) => [
       g.to,
@@ -96,7 +126,7 @@ describe('workspaces Phase 2', () => {
     expect(tos.some((t) => t === '/devis' || t === '/catalogue' || t.startsWith('/facturation'))).toBe(
       false,
     )
-    expect(tos.every((t) => t.startsWith('/sales') || t.startsWith('/platform/'))).toBe(true)
+    expect(tos.every((t) => t.startsWith('/sales'))).toBe(true)
   })
 
   it('Documents — sidebar minimale hub uniquement', () => {
@@ -107,7 +137,7 @@ describe('workspaces Phase 2', () => {
 
   it('coming_soon sans rootPath', () => {
     const soon = WORKSPACE_REGISTRY.filter((w) => w.availability === 'coming_soon')
-    expect(soon).toHaveLength(12)
+    expect(soon).toHaveLength(9)
     expect(soon.every((w) => w.rootPath === null)).toBe(true)
     expect(getAvailableWorkspaces().map((w) => w.id)).toEqual([
       'finance',

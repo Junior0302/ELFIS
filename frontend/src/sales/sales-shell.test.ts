@@ -44,8 +44,6 @@ describe('SalesPilot shell', () => {
 
         '/sales/settings',
 
-        '/platform/relations',
-
       ]),
 
     )

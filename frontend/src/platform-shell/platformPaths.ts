@@ -15,6 +15,15 @@ const PLATFORM_EXACT = new Set([
 
 const PLATFORM_PREFIXES = ['/platform', '/admin', '/home'] as const
 
+/** Gestion des connexions / sync bancaires — menu ELFIS Core uniquement. */
+export const ELFIS_BANKING_PATH = '/platform/banking' as const
+
+/** Aide / support tenant — menu ELFIS Core uniquement. */
+export const ELFIS_HELP_PATH = '/platform/help' as const
+
+/** Recherche globale — surface ELFIS Core. */
+export const ELFIS_SEARCH_PATH = '/platform/search' as const
+
 export function isPlatformShellPath(pathname: string): boolean {
   const path = normalize(pathname)
   if (PLATFORM_EXACT.has(path)) return true

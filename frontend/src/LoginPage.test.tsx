@@ -50,8 +50,9 @@ describe('LoginPage ELFIS Core V1', () => {
   it('rendu ELFIS Core — pas de texte principal ComptaPilot', () => {
     renderLogin()
     expect(screen.getByRole('heading', { name: /^connexion$/i })).toBeInTheDocument()
-    expect(screen.getByText(/une connexion\./i)).toBeInTheDocument()
+    expect(screen.getByText(/une seule connexion\./i)).toBeInTheDocument()
     expect(screen.getByText(/tout votre écosystème/i)).toBeInTheDocument()
+    expect(screen.getByText(/accédez à votre espace sécurisé/i)).toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/pilotez vos chiffres/i)
     expect(screen.getAllByText(/ELFIS Core/i).length).toBeGreaterThan(0)
   })
@@ -188,5 +189,14 @@ describe('LoginPage ELFIS Core V1', () => {
     renderLogin()
     expect(document.querySelector('.elfis-login__illu-ring')).toBeTruthy()
     expect(document.querySelector('.elfis-login')).toBeTruthy()
+  })
+
+  it('dock espaces ouvert sans deep-link métier', () => {
+    renderLogin()
+    const dock = screen.getByRole('list', { name: /espaces elfis disponibles/i })
+    expect(within(dock).getByText('Finance')).toBeInTheDocument()
+    expect(within(dock).getByText('Commercial')).toBeInTheDocument()
+    expect(within(dock).getByText('Documents')).toBeInTheDocument()
+    expect(dock.querySelector('a')).toBeNull()
   })
 })

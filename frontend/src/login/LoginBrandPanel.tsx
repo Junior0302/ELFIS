@@ -1,38 +1,38 @@
 import { LoginBenefit } from './LoginBenefit'
-import { LoginIllustration } from './LoginIllustration'
 
 const BENEFITS = [
   {
-    title: 'Une identité unique',
-    text: 'Un compte pour toute la plateforme ELFIS Core.',
+    title: 'Accès sécurisé',
+    text: 'Connexion chiffrée et protégée.',
+    icon: 'shield',
+    tone: 'secure' as const,
   },
   {
-    title: 'Vos applications réunies',
-    text: 'ComptaPilot, SalesPilot et les prochains Pilot.',
+    title: 'Écosystème unifié',
+    text: 'Toutes vos applications réunies.',
+    icon: 'apps',
+    tone: 'ecosystem' as const,
   },
   {
-    title: 'Vos données protégées',
-    text: 'Organisation, droits et continuité sécurisées.',
+    title: 'Accès unique',
+    text: 'Un accès rapide à vos espaces ELFIS.',
+    icon: 'activity',
+    tone: 'access' as const,
   },
 ] as const
 
 export function LoginBrandPanel() {
   return (
     <aside className="elfis-login__brand-panel" aria-labelledby="elfis-login-hero-title">
-      <p className="elfis-login__kicker">Espace sécurisé</p>
       <h2 id="elfis-login-hero-title" className="elfis-login__hero-title">
-        Une connexion.
-        <br />
-        Tout votre écosystème.
+        Bienvenue sur <span>ELFIS Core</span>
       </h2>
       <p className="elfis-login__hero-lead">
-        Accédez à ComptaPilot, SalesPilot et aux prochaines applications ELFIS depuis un espace
-        unique et sécurisé.
+        Tout votre écosystème. Une seule connexion.
       </p>
-      <LoginIllustration />
       <ul className="elfis-login__benefits">
         {BENEFITS.map((b) => (
-          <LoginBenefit key={b.title} title={b.title} text={b.text} />
+          <LoginBenefit key={b.title} title={b.title} text={b.text} icon={b.icon} tone={b.tone} />
         ))}
       </ul>
     </aside>

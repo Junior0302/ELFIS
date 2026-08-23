@@ -36,6 +36,10 @@ from app.services.sales_email import send_sales_document_email, smtp_configured
 from app.services.sales_pdf import sales_document_to_pdf
 from app.services.mailer import email_configured, mailer_diagnostic
 from app.services.document_delivery import DocumentDeliveryError, DocumentDeliveryService
+from app.services.sales_document_validation import (
+    SalesDocumentValidationError,
+    validate_sales_document_payload,
+)
 
 
 def _mailer_public_flags(*, can_send_direct: bool | None = None) -> dict:
@@ -169,6 +173,60 @@ def _get_doc(db: Session, auth: AuthContext, doc_id: int) -> SalesDocument:
     if not doc or doc.organization_id != _org_id(auth):
         raise HTTPException(404, detail="Document introuvable")
     return doc
+
+
+def _resolve_customer_name(db: Session, auth: AuthContext, *, customer_name: str, customer_id: int | None) -> str:
+    name = (customer_name or "").strip()
+    if name or customer_id is None:
+        return name
+    customer = _get_customer(db, auth, customer_id)
+    return (customer.name or "").strip()
+
+
+def _raise_sales_validation(exc: SalesDocumentValidationError) -> None:
+    raise HTTPException(
+        status_code=422,
+        detail={"code": exc.code, "message": exc.message},
+    ) from exc
+
+
+def _doc_lines(doc: SalesDocument) -> list[dict]:
+    try:
+        parsed = json.loads(doc.lines_json or "[]")
+    except (TypeError, ValueError):
+        parsed = []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _validate_sales_doc_state(
+    db: Session,
+    auth: AuthContext,
+    *,
+    doc_type: str,
+    customer_name: str,
+    customer_id: int | None,
+    amount_ht: float,
+    vat_rate: float,
+    lines: list[dict],
+) -> str:
+    resolved_name = _resolve_customer_name(
+        db,
+        auth,
+        customer_name=customer_name,
+        customer_id=customer_id,
+    )
+    try:
+        validate_sales_document_payload(
+            doc_type=doc_type,
+            customer_name=resolved_name,
+            customer_id=customer_id,
+            amount_ht=amount_ht,
+            vat_rate=vat_rate,
+            lines=lines,
+        )
+    except SalesDocumentValidationError as exc:
+        _raise_sales_validation(exc)
+    return resolved_name
 
 
 def _serialize(doc: SalesDocument) -> dict:
@@ -653,11 +711,21 @@ def create_document(
     # Isolation multi-tenant : un customer_id hors organisation est refusé.
     if payload.customer_id is not None:
         _get_customer(db, auth, payload.customer_id)
+    customer_name = _validate_sales_doc_state(
+        db,
+        auth,
+        doc_type=payload.doc_type,
+        customer_name=payload.customer_name,
+        customer_id=payload.customer_id,
+        amount_ht=payload.amount_ht,
+        vat_rate=payload.vat_rate,
+        lines=payload.lines,
+    )
     doc = create_sales_document(
         db,
         organization_id=_org_id(auth),
         doc_type=payload.doc_type,
-        customer_name=payload.customer_name,
+        customer_name=customer_name,
         customer_email=payload.customer_email,
         amount_ht=payload.amount_ht,
         vat_rate=payload.vat_rate,
@@ -699,7 +767,27 @@ def patch_document(
 ):
     auth.require("invoice.create")
     doc = _get_doc(db, auth, doc_id)
-    updated = update_sales_document(db, doc, **payload.model_dump(exclude_unset=True))
+    patch = payload.model_dump(exclude_unset=True)
+    if payload.customer_id is not None:
+        _get_customer(db, auth, payload.customer_id)
+    merged_name = patch.get("customer_name", doc.customer_name)
+    merged_customer_id = patch.get("customer_id", doc.customer_id)
+    merged_amount_ht = patch.get("amount_ht", doc.amount_ht)
+    merged_vat_rate = patch.get("vat_rate", doc.vat_rate)
+    merged_lines = patch.get("lines", _doc_lines(doc))
+    resolved_name = _validate_sales_doc_state(
+        db,
+        auth,
+        doc_type=doc.doc_type,
+        customer_name=merged_name,
+        customer_id=merged_customer_id,
+        amount_ht=merged_amount_ht,
+        vat_rate=merged_vat_rate,
+        lines=merged_lines,
+    )
+    if "customer_name" in patch or (payload.customer_id is not None and not (merged_name or "").strip()):
+        patch["customer_name"] = resolved_name
+    updated = update_sales_document(db, doc, **patch)
     write_audit(
         db,
         user_id=auth.user.id if auth.user else None,

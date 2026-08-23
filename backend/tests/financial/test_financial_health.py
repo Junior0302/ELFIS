@@ -81,6 +81,23 @@ def test_degraded_finances_lower_the_score():
     assert components["treasury"]["score"] < 10.0
 
 
+def test_mixed_currencies_do_not_score_treasury_as_empty():
+    from app.models import BankAccount
+
+    db = make_financial_db()
+    org = seed_org(db)
+    db.add(BankAccount(organization_id=org.id, currency="EUR", balance=100.0, connected=True))
+    db.add(BankAccount(organization_id=org.id, currency="USD", balance=200.0, connected=True))
+    db.commit()
+
+    health = _health(db, org.id)
+    components = {c["id"]: c for c in health["components"]}
+    assert components["treasury"]["score"] == 15.0
+    assert "nulle" not in components["treasury"]["detail"].lower()
+    assert "négative" not in components["treasury"]["detail"].lower()
+    assert "devises" in components["treasury"]["detail"].lower()
+
+
 def test_setup_state_without_data():
     db = make_financial_db()
     org = seed_org(db)

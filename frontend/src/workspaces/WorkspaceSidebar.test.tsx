@@ -105,12 +105,12 @@ describe('WorkspaceSidebar', () => {
     expect(within(group).getByRole('menu', { name: 'Finance' })).toBeTruthy()
   })
 
-  it('filtre permissions — masque Banque sans bank.read', () => {
+  it('Finance — pas de lien Banque (sync = menu ELFIS Core)', () => {
     renderSidebar(financeWorkspaceConfig, '/finance', {
       ariaLabel: 'Navigation Finance',
-      can: (p) => p !== 'bank.read',
     })
     expect(screen.queryByRole('link', { name: 'Banque' })).toBeNull()
+    expect(screen.queryByRole('link', { name: /synchronisation bancaire/i })).toBeNull()
     expect(screen.getByRole('link', { name: 'TVA' })).toBeTruthy()
   })
 

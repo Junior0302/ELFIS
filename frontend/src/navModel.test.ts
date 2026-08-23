@@ -99,7 +99,7 @@ describe('navModel — Navigation Finance (NAV.DOMAIN.1)', () => {
     expect(findActiveCategory('/facturation/nouveau')?.id).toBe('ventes')
     expect(findActiveCategory('/devis')?.id).toBe('ventes')
     expect(findActiveCategory('/catalogue')?.id).toBe('ventes')
-    expect(findActiveCategory('/banque')?.id).toBe('pilotage')
+    expect(findActiveCategory('/platform/banking')?.id).toBeUndefined()
     expect(findActiveCategory('/accounting/proposals')?.id).toBe('comptabilite')
     expect(findActiveCategory('/clients')?.id).toBe('tiers')
     expect(findActiveCategory('/copilote')?.id).toBe('assistant')

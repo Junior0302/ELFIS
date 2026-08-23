@@ -105,6 +105,10 @@ def test_full_api_flow_connect_sync_accounts_transactions_status_health(client_c
     accounts = res.json()
     assert accounts["total"] == 1
     assert accounts["items"][0]["provider"] == "fake"
+    assert "iban" not in accounts["items"][0]
+    assert "••••" in accounts["items"][0]["iban_masked"]
+    assert accounts["items"][0]["available_balance"] is None
+    assert "FR7699999000011234567890147" not in res.text
 
     # Transactions normalisées + filtres
     res = client.get("/api/banking/transactions", headers=headers)
@@ -122,6 +126,10 @@ def test_full_api_flow_connect_sync_accounts_transactions_status_health(client_c
         "category",
         "status",
         "source",
+        "value_date",
+        "counterparty_name",
+        "reference",
+        "reconciled",
     ):
         assert field in first
     res = client.get("/api/banking/transactions?q=loyer", headers=headers)

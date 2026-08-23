@@ -171,6 +171,7 @@ export const navIcons: Record<string, (props: IconProps) => ReactNode> = {
   '/dashboard': NavIconDashboard,
   '/finance': NavIconBilling,
   '/banque': NavIconSubscription,
+  '/platform/banking': NavIconSubscription,
   '/intelligence': NavIconIntelligence,
   '/notifications': NavIconNotifications,
   '/copilote': NavIconCopilote,

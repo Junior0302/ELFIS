@@ -121,6 +121,40 @@ def test_quote_email_sends_with_pdf_attachment(monkeypatch):
     assert calls[0]["attachment"][0]["name"].endswith(".pdf")
 
 
+def test_preferred_from_external_stays_reply_to(monkeypatch):
+    """Une adresse perso (Gmail) ne devient pas le From technique."""
+    calls = _patch_brevo(monkeypatch)
+    db = _session()
+    org = _org(db)
+    user = User(first_name="Chris", last_name="D", email="chris@gmail.com")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    doc = create_sales_document(
+        db,
+        organization_id=org.id,
+        doc_type="facture",
+        customer_name="Client",
+        customer_email="client@exemple.fr",
+        amount_ht=50,
+        vat_rate=20,
+    )
+    log = send_sales_document_email(
+        db,
+        doc,
+        recipient="client@exemple.fr",
+        sent_by_user_id=user.id,
+        preferred_from_email="chris@gmail.com",
+        preferred_from_label="Chris",
+        idempotency_key="pref-from-1",
+    )
+    assert log.status == "sent"
+    payload = calls[0]
+    assert payload["sender"]["email"] == "documents@elfiscore.com"
+    assert payload["sender"]["email"] != "chris@gmail.com"
+    assert payload["replyTo"]["email"] == "chris@gmail.com"
+
+
 def test_email_security_org_isolation(monkeypatch):
     """Un document d’une org ne doit pas être envoyable via une autre org (lien doc)."""
     _patch_brevo(monkeypatch)

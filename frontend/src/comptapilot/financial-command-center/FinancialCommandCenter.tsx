@@ -89,7 +89,7 @@ const QUICK_ACTIONS = [
   { label: 'Importer un justificatif', href: '/deposit' },
   { label: 'Impayés', href: '/facturation/documents' },
   { label: 'Valider une écriture', href: '/accounting/proposals' },
-  { label: 'Banque', href: '/banque' },
+  { label: 'Banque', href: '/platform/banking' },
   { label: 'TVA', href: '/tva' },
 ] as const
 
@@ -776,7 +776,7 @@ export default function FinancialCommandCenter() {
               })}
               footer={
                 <div className="fcc-actions">
-                  <ElfisButtonLink to="/banque" variant="primary">
+                  <ElfisButtonLink to="/platform/banking" variant="primary">
                     Connecter une banque
                   </ElfisButtonLink>
                   <ElfisButtonLink to="/finance" variant="secondary">
@@ -844,7 +844,7 @@ export default function FinancialCommandCenter() {
                 <p className="fcc-ops-item__label">Rapprochements</p>
                 <p className="fcc-kpi-value muted">N/A</p>
                 <p className="muted fcc-ops-item__hint">Signal non exposé par overview</p>
-                <ElfisButtonLink to="/banque" variant="secondary">
+                <ElfisButtonLink to="/platform/banking" variant="secondary">
                   Ouvrir
                 </ElfisButtonLink>
               </div>
@@ -906,7 +906,7 @@ export default function FinancialCommandCenter() {
                 ) : (
                   <p className="fcc-kpi-value muted">—</p>
                 )}
-                <ElfisButtonLink to="/banque" variant="secondary">
+                <ElfisButtonLink to="/platform/banking" variant="secondary">
                   Ouvrir
                 </ElfisButtonLink>
               </div>

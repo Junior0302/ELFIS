@@ -8,18 +8,29 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.orm import Session
 
+from app.banking.account_types import normalize_account_type
 from app.banking.banking_models import ElfisBankConnection, ElfisBankSyncRun
 from app.banking.banking_types import ConnectionStatus, NormalizedAccount
 from app.banking.banking_events import publish_connection_event
+from app.banking.consent_state import ConsentStateError, issue_consent_state, verify_consent_state
 from app.banking.connectors.base import BankConnector, ConnectorError
 from app.banking.connectors import registry
+from app.config import settings
 from app.events.event_types import EventNames
 from app.models import BankAccount, BankTransaction
 
 logger = logging.getLogger(__name__)
+
+
+def _callback_url_with_state(base: str, state: str) -> str:
+    parts = urlsplit(base.strip())
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["state"] = state
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 class BankingEngineError(Exception):
@@ -47,6 +58,7 @@ class BankingEngine:
                     "status": health.status,
                     "message": health.message,
                     "latency_ms": health.latency_ms,
+                    "requires_user_consent": bool(connector.requires_user_consent),
                 }
             )
         return out
@@ -88,6 +100,11 @@ class BankingEngine:
         options: dict | None = None,
     ) -> ElfisBankConnection:
         connector = registry.get_connector(provider)
+        if connector.requires_user_consent:
+            raise BankingEngineError(
+                "Ce fournisseur nécessite un consentement utilisateur. "
+                "Utilisez le parcours de connexion redirigé."
+            )
         provider_connection_id = connector.connect(
             organization_id=organization_id,
             bank_name=bank_name,
@@ -120,7 +137,9 @@ class BankingEngine:
 
         # Importer immédiatement les comptes (source de vérité locale)
         try:
-            accounts = connector.list_accounts(provider_connection_id)
+            accounts = connector.list_accounts(
+                provider_connection_id, organization_id=organization_id
+            )
             self.upsert_accounts(connection, accounts)
         except ConnectorError as exc:
             logger.warning(
@@ -146,11 +165,208 @@ class BankingEngine:
         )
         return connection
 
+    def begin_bank_consent(
+        self,
+        *,
+        organization_id: int,
+        provider: str,
+        bank_name: str = "",
+    ) -> tuple[ElfisBankConnection, str]:
+        connector = registry.get_connector(provider)
+        if not connector.requires_user_consent:
+            raise BankingEngineError("Ce fournisseur ne nécessite pas de consentement redirigé.")
+        callback_base = (settings.banking_bridge_redirect_uri or "").strip()
+        if not callback_base:
+            raise BankingEngineError(
+                "Callback Bridge non configuré (BANKING_BRIDGE_REDIRECT_URI)."
+            )
+
+        self._supersede_pending_consents(organization_id, provider)
+        connection = ElfisBankConnection(
+            organization_id=organization_id,
+            provider=provider,
+            provider_connection_id="",
+            bank_name=bank_name or connector.display_name,
+            status=ConnectionStatus.preparing.value,
+        )
+        self.db.add(connection)
+        self.db.flush()
+
+        state = issue_consent_state(organization_id=organization_id, connection_id=connection.id)
+        callback_url = _callback_url_with_state(callback_base, state)
+        try:
+            started = connector.start_user_consent(
+                organization_id=organization_id,
+                callback_url=callback_url,
+                bank_name=bank_name,
+                context=state,
+            )
+        except ConnectorError as exc:
+            connection.status = ConnectionStatus.error.value
+            connection.error_message = str(exc)
+            self.db.add(connection)
+            self.db.commit()
+            raise
+        connection.status = ConnectionStatus.awaiting_consent.value
+        connection.error_message = None
+        self.db.add(connection)
+        self.db.commit()
+        self.db.refresh(connection)
+        logger.info(
+            "banking_consent_started",
+            extra={
+                "organization_id": organization_id,
+                "provider": provider,
+                "connection_id": connection.id,
+            },
+        )
+        return connection, started.redirect_url
+
+    def finalize_bank_consent(
+        self,
+        *,
+        state: str | None,
+        context: str | None = None,
+        item_id: str | None = None,
+        success: str | None = None,
+    ) -> str:
+        """Valide le retour fournisseur. Retourne ok | denied | error."""
+        token = (state or "").strip() or (context or "").strip()
+        try:
+            claims = verify_consent_state(token)
+        except ConsentStateError:
+            logger.warning("banking_consent_invalid_state")
+            return "error"
+
+        organization_id = claims["organization_id"]
+        connection_id = claims["connection_id"]
+        try:
+            connection = self.get_connection(organization_id, connection_id)
+        except BankingEngineError:
+            logger.warning(
+                "banking_consent_unknown_connection",
+                extra={"organization_id": organization_id, "connection_id": connection_id},
+            )
+            return "error"
+
+        if connection.status != ConnectionStatus.awaiting_consent.value:
+            logger.warning(
+                "banking_consent_replay_refused",
+                extra={"organization_id": organization_id, "connection_id": connection.id},
+            )
+            return "error"
+
+        accepted = str(success or "").strip().lower() in {"1", "true", "yes"}
+        remote_item = str(item_id or "").strip()
+        if not accepted or not remote_item:
+            connection.status = ConnectionStatus.error.value
+            connection.error_message = "Consentement bancaire annulé ou incomplet."
+            self.db.add(connection)
+            self.db.commit()
+            return "denied"
+
+        connector = self.get_connector_for(connection)
+        try:
+            completed = connector.complete_user_consent(
+                organization_id=organization_id,
+                provider_item_id=remote_item,
+            )
+        except ConnectorError as exc:
+            connection.status = ConnectionStatus.error.value
+            connection.error_message = str(exc)
+            self.db.add(connection)
+            self.db.commit()
+            logger.warning(
+                "banking_consent_item_rejected",
+                extra={"organization_id": organization_id, "connection_id": connection.id},
+            )
+            return "error"
+
+        connection.provider_connection_id = completed.provider_connection_id
+        connection.bank_name = completed.bank_name or connection.bank_name
+        connection.status = ConnectionStatus.connected.value
+        connection.error_message = None
+        self.db.add(connection)
+        self.db.commit()
+        self.db.refresh(connection)
+
+        try:
+            accounts = connector.list_accounts(
+                connection.provider_connection_id,
+                organization_id=organization_id,
+            )
+            self.upsert_accounts(connection, accounts)
+        except ConnectorError as exc:
+            logger.warning(
+                "banking_connect_accounts_failed",
+                extra={
+                    "provider": connection.provider,
+                    "connection_id": connection.id,
+                    "error": str(exc),
+                },
+            )
+
+        publish_connection_event(
+            self.db,
+            event_name=EventNames.BANKING_CONNECTION_CONNECTED,
+            organization_id=organization_id,
+            connection_id=connection.id,
+            provider=connection.provider,
+            bank_name=connection.bank_name,
+        )
+        logger.info(
+            "banking_connection_connected",
+            extra={
+                "organization_id": organization_id,
+                "provider": connection.provider,
+                "connection_id": connection.id,
+            },
+        )
+
+        from app.banking.sync_engine import SyncEngine
+
+        try:
+            SyncEngine(self.db).run_sync(
+                organization_id,
+                connection_id=connection.id,
+                trigger="consent",
+            )
+        except Exception as exc:
+            logger.warning(
+                "banking_consent_initial_sync_failed",
+                extra={"connection_id": connection.id, "error": str(exc)},
+            )
+        return "ok"
+
+    def _supersede_pending_consents(self, organization_id: int, provider: str) -> None:
+        pending = (
+            self.db.query(ElfisBankConnection)
+            .filter(
+                ElfisBankConnection.organization_id == organization_id,
+                ElfisBankConnection.provider == provider,
+                ElfisBankConnection.status.in_(
+                    [
+                        ConnectionStatus.preparing.value,
+                        ConnectionStatus.awaiting_consent.value,
+                    ]
+                ),
+            )
+            .all()
+        )
+        for row in pending:
+            row.status = ConnectionStatus.error.value
+            row.error_message = "Tentative remplacée par une nouvelle connexion."
+            self.db.add(row)
+
     def disconnect(self, *, organization_id: int, connection_id: int) -> ElfisBankConnection:
         connection = self.get_connection(organization_id, connection_id)
         connector = self.get_connector_for(connection)
         try:
-            connector.disconnect(connection.provider_connection_id)
+            if connection.provider_connection_id:
+                connector.disconnect(
+                    connection.provider_connection_id,
+                    organization_id=organization_id,
+                )
         except ConnectorError as exc:
             # La déconnexion locale prime : on journalise sans bloquer.
             logger.warning(
@@ -211,6 +427,9 @@ class BankingEngine:
                 account.iban = item.iban or account.iban
                 account.currency = item.currency or account.currency
                 account.balance = float(item.balance)
+                account.available_balance = item.available_balance
+                account.account_type = normalize_account_type(item.account_type)
+                account.balance_updated_at = item.balance_updated_at
                 account.connected = True
             else:
                 account = BankAccount(
@@ -223,6 +442,9 @@ class BankingEngine:
                     iban=item.iban,
                     currency=item.currency,
                     balance=float(item.balance),
+                    available_balance=item.available_balance,
+                    account_type=normalize_account_type(item.account_type),
+                    balance_updated_at=item.balance_updated_at,
                     connected=True,
                 )
                 self.db.add(account)

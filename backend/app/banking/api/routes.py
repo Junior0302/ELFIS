@@ -15,14 +15,20 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.banking.account_types import normalize_account_type
 from app.banking.banking_models import ElfisBankConnection, ElfisBankSyncRun
+from app.banking.connectors import registry
 from app.banking.connectors.base import ConnectorError
 from app.banking.engine import BankingEngine, BankingEngineError
+from app.banking.iban import iban_last4, mask_iban
+from app.models import BankAccount
 from app.banking.health import BankingHealthService
 from app.banking.sync_engine import SyncEngine
+from app.config import settings
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context, require_active_subscription, require_platform_admin
 
@@ -30,6 +36,11 @@ router = APIRouter(
     prefix="/banking",
     tags=["banking"],
     dependencies=[Depends(require_active_subscription)],
+)
+
+callback_router = APIRouter(
+    prefix="/banking/connectors/bridge",
+    tags=["banking-bridge-callback"],
 )
 
 admin_router = APIRouter(
@@ -65,13 +76,35 @@ class AccountOut(BaseModel):
     external_id: str
     label: str
     bank_name: str
-    iban: str
+    iban_masked: str
+    iban_last4: str | None
+    account_type: str
     currency: str
     balance: float
+    available_balance: float | None
     connected: bool
     last_sync_at: datetime | None
+    balance_updated_at: datetime | None = None
 
-    model_config = {"from_attributes": True}
+
+def serialize_account(account: BankAccount) -> AccountOut:
+    return AccountOut(
+        id=account.id,
+        connection_id=account.connection_id,
+        provider=account.provider,
+        external_id=account.external_id,
+        label=account.label,
+        bank_name=account.bank_name,
+        iban_masked=mask_iban(account.iban),
+        iban_last4=iban_last4(account.iban),
+        account_type=normalize_account_type(getattr(account, "account_type", None)),
+        currency=account.currency,
+        balance=float(account.balance),
+        available_balance=getattr(account, "available_balance", None),
+        connected=account.connected,
+        last_sync_at=account.last_sync_at,
+        balance_updated_at=getattr(account, "balance_updated_at", None),
+    )
 
 
 class TransactionOut(BaseModel):
@@ -79,12 +112,15 @@ class TransactionOut(BaseModel):
     account_id: int
     external_id: str
     booked_at: str
+    value_date: str | None = None
     label: str
     amount: float
     currency: str
     category: str
     status: str
     source: str
+    counterparty_name: str | None = None
+    reference: str | None = None
     is_duplicate: bool
     is_anomaly: bool
     reconciled: bool
@@ -157,9 +193,24 @@ def connect_bank(
 ):
     auth.require("bank.connect")
     engine = BankingEngine(db)
+    org_id = auth.require_organization_id()
     try:
+        connector = registry.get_connector(payload.provider)
+        if connector.requires_user_consent:
+            connection, redirect_url = engine.begin_bank_consent(
+                organization_id=org_id,
+                provider=payload.provider,
+                bank_name=payload.bank_name,
+            )
+            return {
+                "ok": True,
+                "redirect_url": redirect_url,
+                "connection": ConnectionOut.model_validate(connection),
+                "accounts": [],
+                "message": "Redirection vers le consentement bancaire.",
+            }
         connection = engine.connect(
-            organization_id=auth.require_organization_id(),
+            organization_id=org_id,
             provider=payload.provider,
             bank_name=payload.bank_name,
         )
@@ -169,10 +220,38 @@ def connect_bank(
         "ok": True,
         "connection": ConnectionOut.model_validate(connection),
         "accounts": [
-            AccountOut.model_validate(a) for a in engine.accounts_for_connection(connection)
+            serialize_account(a) for a in engine.accounts_for_connection(connection)
         ],
         "message": f"Banque connectée via {connection.provider}.",
     }
+
+
+def _banking_frontend_redirect(result: str) -> RedirectResponse:
+    base = (settings.frontend_url or "http://localhost:5173").rstrip("/")
+    safe = result if result in {"ok", "denied", "error"} else "error"
+    return RedirectResponse(f"{base}/platform/banking?consent={safe}", status_code=303)
+
+
+@callback_router.get("/callback")
+def bridge_connect_callback(
+    db: Session = Depends(get_db),
+    state: str | None = Query(default=None),
+    context: str | None = Query(default=None),
+    item_id: str | None = Query(default=None),
+    success: str | None = Query(default=None),
+    user_uuid: str | None = Query(default=None),
+    step: str | None = Query(default=None),
+    source: str | None = Query(default=None),
+):
+    """Retour Bridge Connect — pas d'auth navigateur ; le state HMAC lie org + tentative."""
+    del user_uuid, step, source
+    result = BankingEngine(db).finalize_bank_consent(
+        state=state,
+        context=context,
+        item_id=item_id,
+        success=success,
+    )
+    return _banking_frontend_redirect(result)
 
 
 @router.post("/connectors/{connection_id}/disconnect")
@@ -209,7 +288,7 @@ def list_accounts(
     auth.require("bank.read")
     accounts = BankingEngine(db).list_accounts(auth.require_organization_id())
     return {
-        "items": [AccountOut.model_validate(a) for a in accounts],
+        "items": [serialize_account(a) for a in accounts],
         "total": len(accounts),
     }
 

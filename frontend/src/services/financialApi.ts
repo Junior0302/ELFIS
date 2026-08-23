@@ -13,7 +13,7 @@ export type KpiTrend = {
 export type Kpi = {
   id: string
   label: string
-  value: number
+  value: number | null
   unit: 'EUR' | 'count'
   format: 'currency' | 'integer'
   status: 'ok' | 'warning' | 'critical' | 'neutral'
@@ -128,7 +128,7 @@ export type PlatformFinancialOverview = {
     score: number | null
     grade: string | null
     state: string
-    treasury: number
+    treasury: number | null
     revenue: number
     sync_status: string
     critical_alerts: number
@@ -183,15 +183,19 @@ function suffix(refresh: boolean): string {
   return refresh ? '?refresh=true' : ''
 }
 
-export const formatEuro = (value: number): string =>
-  new Intl.NumberFormat('fr-FR', {
+export const formatEuro = (value: number | null | undefined): string => {
+  if (value == null || Number.isNaN(value)) return '—'
+  return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'EUR',
     maximumFractionDigits: Math.abs(value) >= 1000 ? 0 : 2,
   }).format(value)
+}
 
-export const formatKpiValue = (kpi: Kpi): string =>
-  kpi.format === 'currency' ? formatEuro(kpi.value) : String(Math.round(kpi.value))
+export const formatKpiValue = (kpi: Kpi): string => {
+  if (kpi.value == null) return '—'
+  return kpi.format === 'currency' ? formatEuro(kpi.value) : String(Math.round(kpi.value))
+}
 
 export const severityLabel = (severity: FinancialAlert['severity']): string => {
   const map: Record<string, string> = {

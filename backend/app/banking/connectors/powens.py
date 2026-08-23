@@ -13,18 +13,46 @@ from typing import Any, ClassVar
 
 import httpx
 
+from app.banking.account_types import normalize_account_type
 from app.banking.banking_types import (
     ConnectorHealth,
     NormalizedAccount,
     NormalizedTransaction,
+    TransactionPage,
     TransactionStatus,
+    optional_provider_date,
+    optional_provider_datetime,
+    optional_provider_float,
 )
+from app.banking.transaction_identity import provider_transaction_id
 from app.banking.connectors.base import (
     BankConnector,
     ConnectorError,
     ConnectorNotConfiguredError,
 )
 from app.config import settings
+
+
+def map_powens_transaction(raw: dict[str, Any], account_external_id: str) -> NormalizedTransaction | None:
+    """Mappe un objet Powens connu — ignore les champs inconnus, jamais d'IBAN."""
+    booked = optional_provider_date(raw.get("date") or raw.get("rdate"))
+    if booked is None:
+        return None
+    currency = raw.get("currency")
+    currency_id = currency.get("id") if isinstance(currency, dict) else currency
+    return NormalizedTransaction(
+        external_id=provider_transaction_id(raw.get("id")),
+        booked_at=booked,
+        value_date=optional_provider_date(raw.get("rdate") or raw.get("application_date")),
+        label=str(raw.get("simplified_wording") or raw.get("wording") or "Opération"),
+        amount=float(raw.get("value") or 0.0),
+        currency=str(currency_id or "EUR"),
+        account_external_id=account_external_id,
+        status=TransactionStatus.pending if raw.get("coming") else TransactionStatus.booked,
+        source="powens",
+        counterparty_name=str(raw.get("wording") or "").strip() or None,
+        reference=None,
+    )
 
 
 class PowensBankConnector(BankConnector):
@@ -75,13 +103,15 @@ class PowensBankConnector(BankConnector):
             raise ConnectorError("Powens n'a pas retourné d'identifiant de connexion.")
         return connection_id
 
-    def disconnect(self, provider_connection_id: str) -> None:
+    def disconnect(self, provider_connection_id: str, *, organization_id: int | None = None) -> None:
         self._request("DELETE", f"/2.0/users/{provider_connection_id}/connections")
 
-    def refresh(self, provider_connection_id: str) -> None:
+    def refresh(self, provider_connection_id: str, *, organization_id: int | None = None) -> None:
         self._request("PUT", f"/2.0/users/{provider_connection_id}/connections")
 
-    def list_accounts(self, provider_connection_id: str) -> list[NormalizedAccount]:
+    def list_accounts(
+        self, provider_connection_id: str, *, organization_id: int | None = None
+    ) -> list[NormalizedAccount]:
         data = self._request("GET", f"/2.0/users/{provider_connection_id}/accounts")
         accounts: list[NormalizedAccount] = []
         for raw in data.get("accounts", []):
@@ -93,6 +123,11 @@ class PowensBankConnector(BankConnector):
                     iban=str(raw.get("iban") or ""),
                     currency=str((raw.get("currency") or {}).get("id") or "EUR"),
                     balance=float(raw.get("balance") or 0.0),
+                    available_balance=optional_provider_float(raw.get("available_balance")),
+                    account_type=normalize_account_type(raw.get("type")),
+                    balance_updated_at=optional_provider_datetime(
+                        raw.get("last_update") or raw.get("updated")
+                    ),
                 )
             )
         return accounts
@@ -103,8 +138,33 @@ class PowensBankConnector(BankConnector):
         account_external_id: str,
         *,
         since: date | None = None,
+        organization_id: int | None = None,
     ) -> list[NormalizedTransaction]:
-        params: dict[str, Any] = {"limit": 500}
+        page = self.list_transaction_page(
+            provider_connection_id,
+            account_external_id,
+            since=since,
+            organization_id=organization_id,
+        )
+        return list(page.transactions)
+
+    def list_transaction_page(
+        self,
+        provider_connection_id: str,
+        account_external_id: str,
+        *,
+        since: date | None = None,
+        cursor: str | None = None,
+        organization_id: int | None = None,
+    ) -> TransactionPage:
+        limit = 200
+        offset = 0
+        if cursor:
+            try:
+                offset = int(cursor)
+            except ValueError as exc:
+                raise ConnectorError("Curseur de pagination Powens invalide.", retryable=False) from exc
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
         if since:
             params["min_date"] = since.isoformat()
         data = self._request(
@@ -112,30 +172,19 @@ class PowensBankConnector(BankConnector):
             f"/2.0/users/{provider_connection_id}/accounts/{account_external_id}/transactions",
             params=params,
         )
-        transactions: list[NormalizedTransaction] = []
-        for raw in data.get("transactions", []):
-            booked_raw = str(raw.get("date") or raw.get("rdate") or "")
-            try:
-                booked = datetime.strptime(booked_raw[:10], "%Y-%m-%d").date()
-            except ValueError:
-                continue
-            transactions.append(
-                NormalizedTransaction(
-                    external_id=str(raw.get("id")),
-                    booked_at=booked,
-                    label=str(raw.get("simplified_wording") or raw.get("wording") or "Opération"),
-                    amount=float(raw.get("value") or 0.0),
-                    currency=str((raw.get("currency") or {}).get("id") or "EUR"),
-                    account_external_id=account_external_id,
-                    status=(
-                        TransactionStatus.pending
-                        if raw.get("coming")
-                        else TransactionStatus.booked
-                    ),
-                    source=self.provider,
-                )
-            )
-        return transactions
+        transactions = [
+            mapped
+            for raw in data.get("transactions", [])
+            if isinstance(raw, dict)
+            for mapped in [map_powens_transaction(raw, account_external_id)]
+            if mapped is not None
+        ]
+        has_more = len(transactions) >= limit
+        return TransactionPage(
+            transactions=transactions,
+            next_cursor=str(offset + len(transactions)) if has_more else None,
+            has_more=has_more,
+        )
 
     def health(self) -> ConnectorHealth:
         if not self.configured:

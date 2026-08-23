@@ -3362,7 +3362,7 @@ export type PilotOverview = {
   ca: number
   benefice: number
   marge_pct: number
-  tresorerie: number
+  tresorerie: number | null
   depenses: number
   unpaid: number
   forecast_30: number

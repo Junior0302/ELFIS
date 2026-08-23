@@ -165,9 +165,6 @@ export default function ClientsPage() {
               <Link to="/dashboard">Retour au Dashboard</Link>
             </p>
           ) : null}
-          <p className="muted">
-            <Link to="/platform/relations?tab=customer">Ouvrir la fiche dans ELFIS Relations</Link>
-          </p>
         </div>
       </div>
 

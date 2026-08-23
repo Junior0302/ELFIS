@@ -139,7 +139,7 @@ export default function CockpitPage() {
                 <p style={{ marginTop: '1rem' }}>
                   <Link to="/dashboard">Accueil synthèse</Link>
                   {' · '}
-                  <Link to="/banque">Banque</Link>
+                  <Link to="/platform/banking">Banque</Link>
                   {' · '}
                   <Link to="/copilote">Copilote</Link>
                 </p>

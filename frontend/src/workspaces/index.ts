@@ -32,10 +32,7 @@ export { commercialWorkspaceConfig } from './commercialWorkspaceConfig'
 export { documentsWorkspaceConfig } from './documentsWorkspaceConfig'
 export {
   achatsWorkspaceConfig,
-  banqueWorkspaceConfig,
-  comptabiliteWorkspaceConfig,
   conformiteWorkspaceConfig,
-  facturationWorkspaceConfig,
   logistiqueWorkspaceConfig,
   parametresWorkspaceConfig,
   planningWorkspaceConfig,

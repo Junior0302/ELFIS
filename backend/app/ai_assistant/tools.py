@@ -122,6 +122,8 @@ class AssistantTools:
             tool="get_cashflow",
             data={
                 "treasury": snap["treasury"],
+                "treasury_homogeneous": snap.get("treasury_homogeneous", True),
+                "treasury_by_currency": snap.get("treasury_by_currency") or {},
                 "forecast": snap["forecast"],
                 "tensions": snap["tensions"],
                 "recommendations": snap["recommendations"][:3],

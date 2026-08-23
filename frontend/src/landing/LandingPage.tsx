@@ -1,37 +1,50 @@
 import { useAuth } from '../auth'
-import { ApplicationsSection } from './sections/ApplicationsSection'
-import { BenefitsSection } from './sections/BenefitsSection'
-import { CTASection } from './sections/CTASection'
-import { FeaturesSection } from './sections/FeaturesSection'
+import { AudiencesSection } from './sections/AudiencesSection'
+import { BrandSection } from './sections/BrandSection'
+import { ContinuitySection } from './sections/ContinuitySection'
+import { FinalCtaSection } from './sections/FinalCtaSection'
 import { Footer } from './sections/Footer'
 import { HeroSection } from './sections/HeroSection'
+import { HorizonSection } from './sections/HorizonSection'
+import { IntelligenceSection } from './sections/IntelligenceSection'
 import { Navbar } from './sections/Navbar'
-import { PartnersSection } from './sections/PartnersSection'
-import { WorkflowSection } from './sections/WorkflowSection'
+import { PlatformSection } from './sections/PlatformSection'
+import { ProblemSection } from './sections/ProblemSection'
+import { SecuritySection } from './sections/SecuritySection'
+import { SpacesShowcaseSection } from './sections/SpacesShowcaseSection'
 import './landing.css'
 
 /**
- * Landing officielle ELFIS Core V1 (LAND-CEB).
+ * Page d’accueil publique ELFIS Core.
  * Thème plateforme via route `/` → RuntimeThemeSync (elfis-core).
  */
 export function LandingPage() {
   const { user } = useAuth()
-  const primaryTo = user ? '/home' : '/register'
-  const loginTo = '/login'
+  const isAuthenticated = Boolean(user)
 
   return (
     <div className="landing">
-      <Navbar primaryTo={primaryTo} loginTo={loginTo} isAuthenticated={Boolean(user)} />
+      <div className="landing__atmosphere" aria-hidden>
+        <span className="landing__orb landing__orb--blue" />
+        <span className="landing__orb landing__orb--navy" />
+        <span className="landing__orb landing__orb--mint" />
+        <span className="landing__grid" />
+      </div>
+      <Navbar isAuthenticated={isAuthenticated} />
       <main id="contenu-principal">
-        <HeroSection primaryTo={primaryTo} secondaryTo={loginTo} isAuthenticated={Boolean(user)} />
-        <ApplicationsSection />
-        <WorkflowSection />
-        <BenefitsSection />
-        <PartnersSection />
-        <FeaturesSection />
-        <CTASection primaryTo={primaryTo} secondaryTo={loginTo} isAuthenticated={Boolean(user)} />
+        <HeroSection isAuthenticated={isAuthenticated} />
+        <ProblemSection />
+        <PlatformSection />
+        <SpacesShowcaseSection />
+        <ContinuitySection />
+        <AudiencesSection />
+        <IntelligenceSection />
+        <SecuritySection />
+        <HorizonSection />
+        <BrandSection />
+        <FinalCtaSection isAuthenticated={isAuthenticated} />
       </main>
-      <Footer />
+      <Footer isAuthenticated={isAuthenticated} />
     </div>
   )
 }

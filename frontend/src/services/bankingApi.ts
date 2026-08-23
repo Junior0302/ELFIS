@@ -5,6 +5,7 @@ export type BankingProvider = {
   status: string
   message: string
   latency_ms?: number | null
+  requires_user_consent?: boolean
 }
 
 export type BankConnection = {
@@ -26,11 +27,15 @@ export type BankAccount = {
   external_id: string
   label: string
   bank_name: string
-  iban: string
+  iban_masked: string
+  iban_last4?: string | null
+  account_type: string
   currency: string
   balance: number
+  available_balance?: number | null
   connected: boolean
   last_sync_at?: string | null
+  balance_updated_at?: string | null
 }
 
 export type BankTransaction = {
@@ -38,12 +43,15 @@ export type BankTransaction = {
   account_id: number
   external_id: string
   booked_at: string
+  value_date?: string | null
   label: string
   amount: number
   currency: string
   category: string
   status: string
   source: string
+  counterparty_name?: string | null
+  reference?: string | null
   is_duplicate: boolean
   is_anomaly: boolean
   reconciled: boolean
@@ -158,8 +166,22 @@ export const syncStatusLabel = (status: string): string => {
   return map[status] || status
 }
 
+export const accountTypeLabel = (accountType: string): string => {
+  const map: Record<string, string> = {
+    checking: 'Compte courant',
+    savings: 'Épargne',
+    card: 'Carte',
+    loan: 'Crédit',
+    investment: 'Investissement',
+    other: 'Autre',
+  }
+  return map[accountType] || map.other
+}
+
 export const connectionStatusLabel = (status: string): string => {
   const map: Record<string, string> = {
+    preparing: 'Connexion en préparation',
+    awaiting_consent: 'En attente du consentement',
     connected: 'Connectée',
     disconnected: 'Déconnectée',
     error: 'Erreur',
@@ -183,6 +205,7 @@ export const bankingApi = {
     })
     return parse<{
       ok: boolean
+      redirect_url?: string
       connection: BankConnection
       accounts: BankAccount[]
       message: string

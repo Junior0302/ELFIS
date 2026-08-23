@@ -246,7 +246,7 @@ export const ELFIS_NAVIGATION_CONFIG: readonly ElfisNavSectionConfig[] = [
 
       },
 
-      {
+        {
 
         id: 'documents',
 
@@ -257,6 +257,22 @@ export const ELFIS_NAVIGATION_CONFIG: readonly ElfisNavSectionConfig[] = [
         to: '/platform/documents',
 
         permission: 'documents.read',
+
+        match: 'prefix',
+
+      },
+
+      {
+
+        id: 'banking',
+
+        label: 'Synchronisation bancaire',
+
+        icon: 'landmark',
+
+        to: '/platform/banking',
+
+        permission: 'bank.read',
 
         match: 'prefix',
 
@@ -360,7 +376,7 @@ export const ELFIS_NAVIGATION_CONFIG: readonly ElfisNavSectionConfig[] = [
 
         icon: 'search',
 
-        to: '/search',
+        to: '/platform/search',
 
         match: 'prefix',
 
@@ -390,9 +406,9 @@ export const ELFIS_NAVIGATION_CONFIG: readonly ElfisNavSectionConfig[] = [
 
         icon: 'help-circle',
 
-        to: '/home#home-status',
+        to: '/platform/help',
 
-        match: 'hash',
+        match: 'prefix',
 
       },
 
@@ -490,8 +506,6 @@ const COMPTA_PREFIXES = [
 
   '/accounting',
 
-  '/banque',
-
   '/finance',
 
   '/tva',
@@ -555,6 +569,22 @@ export function splitNavTarget(to: string | undefined): { path: string; hash: st
 }
 
 
+
+const CORE_EXACT = new Set([
+  '/home',
+  '/notifications',
+  '/compte',
+  '/abonnement',
+  '/modules',
+])
+
+/** Destination menu ELFIS Core — jamais Finance / Commercial. */
+export function isElfisCoreOwnedPath(pathname: string): boolean {
+  const path = normalizeNavPath(pathname)
+  if (CORE_EXACT.has(path)) return true
+  if (path === '/home' || path.startsWith('/home/')) return true
+  return path.startsWith('/platform')
+}
 
 export function isComptaPilotPath(pathname: string): boolean {
 

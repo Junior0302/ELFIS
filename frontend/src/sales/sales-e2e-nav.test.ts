@@ -118,8 +118,6 @@ describe('SalesPilot E2E navigation minimal (statique)', () => {
 
       'clients-contacts',
 
-      'relations',
-
       'settings-general',
 
     ])

@@ -44,13 +44,19 @@ export function buildDayPriorities(overview: FinancialOverview): DayPriority[] {
   }
 
   const unpaid = kpi(overview, 'factures_impayees')
-  if (unpaid && unpaid.value > 0 && !out.some((p) => p.id.includes('impay'))) {
+  const unpaidCount = unpaid?.value
+  if (
+    unpaid &&
+    unpaidCount != null &&
+    unpaidCount > 0 &&
+    !out.some((p) => p.id.includes('impay'))
+  ) {
     out.push({
       id: 'kpi:factures_impayees',
       level: unpaid.status === 'critical' ? 'critical' : 'high',
       title: 'Factures impayées',
-      reason: unpaid.hint || `${Math.round(unpaid.value)} facture(s) en attente de règlement`,
-      amountOrDate: unpaid.format === 'currency' ? undefined : String(Math.round(unpaid.value)),
+      reason: unpaid.hint || `${Math.round(unpaidCount)} facture(s) en attente de règlement`,
+      amountOrDate: unpaid.format === 'currency' ? undefined : String(Math.round(unpaidCount)),
       actionLabel: 'Voir les impayés',
       href: '/facturation',
       source: 'kpi',
@@ -76,7 +82,7 @@ export function buildDayPriorities(overview: FinancialOverview): DayPriority[] {
       title: 'Synchronisation bancaire',
       reason: 'Échec ou erreurs de synchronisation détectés',
       actionLabel: 'Ouvrir la banque',
-      href: '/banque',
+      href: '/platform/banking',
       source: 'banking',
     })
   }
@@ -89,7 +95,7 @@ export function buildDayPriorities(overview: FinancialOverview): DayPriority[] {
 function routeForAlert(alert: FinancialAlert): string {
   const code = (alert.code || '').toLowerCase()
   if (code.includes('tva') || code.includes('vat')) return '/tva'
-  if (code.includes('bank') || code.includes('sync')) return '/banque'
+  if (code.includes('bank') || code.includes('sync')) return '/platform/banking'
   if (code.includes('doc')) return '/documents'
   if (code.includes('invoice') || code.includes('impay') || code.includes('overdue')) return '/facturation'
   if (code.includes('accounting') || code.includes('ecriture')) return '/accounting/proposals'

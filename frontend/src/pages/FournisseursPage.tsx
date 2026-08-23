@@ -126,8 +126,6 @@ export default function FournisseursPage() {
             Pas d’activités commerciales générales.
           </p>
           <p className="muted">
-            <Link to="/platform/relations?tab=supplier">Ouvrir la fiche dans ELFIS Relations</Link>
-            {' · '}
             Suggestions OCR sur <Link to="/deposit">Import</Link>.
           </p>
           {fromLaunch ? (

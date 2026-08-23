@@ -16,11 +16,8 @@ export default function PlatformAuraPage() {
           aussi l’Assistant financier dans ComptaPilot.
         </p>
         <div className="platform-surface-banner__actions">
-          <Link className="btn secondary" to="/copilote">
-            Assistant financier ComptaPilot
-          </Link>
           <Link className="btn secondary" to="/home">
-            Retour Home
+            Accueil ELFIS
           </Link>
         </div>
       </div>

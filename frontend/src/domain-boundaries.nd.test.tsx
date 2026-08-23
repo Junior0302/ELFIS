@@ -9,6 +9,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { getFinanceNavTos, navCategories } from './navModel'
 import {
+  flattenElfisNavItems,
+  isElfisCoreOwnedPath,
+} from './platform-shell/global-nav/elfisNavigationConfig'
+import {
   getSalesNavTos,
   SALES_FORBIDDEN_PLATFORM_PATHS,
   SALES_NAV_ITEMS,
@@ -60,13 +64,18 @@ describe('NAV.DOMAIN.1 — Finance nav (ND01–ND14)', () => {
     expect(financeTos).toContain('/fournisseurs')
   })
 
-  it('ND08 lien ELFIS Relations (pages métier)', () => {
+  it('ND08 pages Finance sans sortie vers Relations Core', () => {
     const clients = readFileSync(resolve(__dirname, 'pages/ClientsPage.tsx'), 'utf8')
     const fournisseurs = readFileSync(resolve(__dirname, 'pages/FournisseursPage.tsx'), 'utf8')
+    const facturation = readFileSync(
+      resolve(__dirname, 'pages/facturation/FacturationOverviewPage.tsx'),
+      'utf8',
+    )
     expect(clients).toMatch(/Données issues d’ELFIS Relations/)
-    expect(clients).toMatch(/\/platform\/relations\?tab=customer/)
+    expect(clients).not.toMatch(/\/platform\/relations/)
     expect(fournisseurs).toMatch(/Données issues d’ELFIS Relations/)
-    expect(fournisseurs).toMatch(/\/platform\/relations\?tab=supplier/)
+    expect(fournisseurs).not.toMatch(/\/platform\/relations/)
+    expect(facturation).not.toMatch(/\/platform\/relations/)
   })
 
   it('ND09 lien ELFIS Organisation (contextuel FCC)', () => {
@@ -89,8 +98,9 @@ describe('NAV.DOMAIN.1 — Finance nav (ND01–ND14)', () => {
     expect(financeTos).toContain('/devis')
   })
 
-  it('ND12 banque présente', () => {
-    expect(financeTos).toContain('/banque')
+  it('ND12 banque absente Finance (sync = menu ELFIS Core)', () => {
+    expect(financeTos).not.toContain('/banque')
+    expect(financeTos).not.toContain('/platform/banking')
   })
 
   it('ND13 TVA présente', () => {
@@ -113,13 +123,11 @@ describe('NAV.DOMAIN.1 — Commercial nav (ND15–ND24)', () => {
     }
   })
 
-  it('ND16 Relations = accès contextuel Clients (badge ELFIS), pas org/settings', () => {
-    expect(salesTos).toContain('/platform/relations')
-    const clients = salesNavCategories.find((c) => c.id === 'clients')
-    const relations = clients?.children.find((l) => l.to === '/platform/relations')
-    expect(relations?.badge).toBe('ELFIS')
+  it('ND16 Commercial sans menu Relations plateforme', () => {
+    expect(salesTos).not.toContain('/platform/relations')
     expect(salesTos).not.toContain('/platform/organization')
     expect(salesTos).not.toContain('/platform/settings')
+    expect(salesTos.every((t) => t.startsWith('/sales'))).toBe(true)
   })
 
   it('ND17 paramètres plateforme absents Commercial', () => {
@@ -198,6 +206,29 @@ describe('NAV.DOMAIN.1 — routes & chrome (ND25–ND28)', () => {
     expect(screen.queryByText('Moteur SalesPilot')).toBeNull()
     expect(APP_TSX).toContain('path="sales/pipeline"')
     expect(APP_TSX).toContain('path="facturation"')
+  })
+
+  it('ND26b — menu ELFIS Core sans routes Finance / Commercial', () => {
+    for (const item of flattenElfisNavItems()) {
+      if (!item.to) continue
+      expect(isElfisCoreOwnedPath(item.to)).toBe(true)
+    }
+    const help = readFileSync(resolve(__dirname, 'pages/platform-core/PlatformHelpPage.tsx'), 'utf8')
+    expect(help).toContain('/platform/organization')
+    expect(help).toContain('/platform/relations')
+    expect(help).not.toMatch(/\/copilote|\/finance|\/dashboard|\/sales/)
+    const relations = readFileSync(
+      resolve(__dirname, 'pages/platform-core/PlatformRelationsPage.tsx'),
+      'utf8',
+    )
+    const relationDetail = readFileSync(
+      resolve(__dirname, 'pages/platform-core/PlatformRelationDetailPage.tsx'),
+      'utf8',
+    )
+    expect(relations).not.toMatch(/\/copilote|\/finance|\/dashboard|\/sales|\/clients|\/fournisseurs/)
+    expect(relationDetail).not.toMatch(
+      /\/copilote|\/finance|\/dashboard|\/sales|\/clients|\/fournisseurs/,
+    )
   })
 
   it('ND27 refresh — chemins exacts nav stables', () => {

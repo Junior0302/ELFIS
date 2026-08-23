@@ -34,5 +34,9 @@ export function getKnownSpaRoutes(): ReadonlySet<string> {
     Object.values(PRODUCT_ENTRY_ROUTES).filter((r): r is string => typeof r === 'string' && r.length > 0),
   )
   routes.add('/platform/documents')
+  routes.add('/platform/banking')
+  routes.add('/platform/help')
+  routes.add('/platform/search')
+  routes.add('/platform/relations')
   return routes
 }

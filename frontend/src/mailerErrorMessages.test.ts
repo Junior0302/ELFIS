@@ -9,6 +9,10 @@ describe('mailerErrorMessages', () => {
       mailerReasonMessage('authentication_failed'),
     )
     expect(mailerReasonMessage('ok')).toBe('')
+    expect(mailerReasonMessage('authentication_failed')).toMatch(
+      /n’a pas pu s’authentifier auprès du fournisseur de messagerie/,
+    )
+    expect(mailerReasonMessage('authentication_failed')).not.toMatch(/535|Brevo|SMTP/)
   })
 
   it('resolves send button states', () => {

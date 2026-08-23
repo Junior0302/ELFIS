@@ -111,7 +111,7 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     expect(screen.queryByText(/changer d’application/i)).toBeNull()
   })
 
-  it('EH03 — quinze espaces métier catalogue', () => {
+  it('EH03 — douze espaces métier catalogue', () => {
     expect(ELFIS_SPACES.map((s) => s.id)).toEqual([
       'finance',
       'commercial',
@@ -122,9 +122,6 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
       'rh',
       'planning',
       'projets',
-      'banque',
-      'comptabilite',
-      'facturation',
       'conformite',
       'rse',
       'parametres',
@@ -239,7 +236,7 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     await screen.findByText('Espaces métier')
     const panel = document.querySelector('[data-launcher="spaces-hub-v1"]')
     expect(panel).toBeTruthy()
-    expect(panel?.querySelectorAll('[data-space]').length).toBeGreaterThanOrEqual(15)
+    expect(panel?.querySelectorAll('[data-space]').length).toBeGreaterThanOrEqual(12)
   })
 
   it('EH15 — accents domaines distincts', () => {
@@ -269,14 +266,14 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     renderLauncher()
     await user.click(screen.getByRole('button', { name: /Espaces/i }))
     await screen.findByRole('heading', { name: /espaces à venir/i })
-    expect(screen.getAllByText('À venir').length).toBeGreaterThanOrEqual(12)
+    expect(screen.getAllByText('À venir').length).toBeGreaterThanOrEqual(9)
     expect(screen.queryByRole('button', { name: /Ouvrir RH/i })).toBeNull()
   })
 
   it('EH19 — raccourcis Finance routes réelles', () => {
     const finance = getSpaceById('finance')
     expect(finance.shortcuts.map((s) => s.to)).toEqual(
-      expect.arrayContaining(['/facturation', '/tva', '/banque']),
+      expect.arrayContaining(['/facturation', '/tva', '/finance']),
     )
   })
 
@@ -374,7 +371,7 @@ describe('EH — Hub Espaces ELFIS (BRAND.ELFIS.1)', () => {
     const mod = await import('./index')
     expect(mod.AppLauncher).toBeTypeOf('function')
     expect(mod.buildSpaceSections).toBeTypeOf('function')
-    expect(mod.ELFIS_SPACES.length).toBe(15)
+    expect(mod.ELFIS_SPACES.length).toBe(12)
   })
 
   it('EH30 — build/tsc asserted via npm scripts (smoke module)', () => {

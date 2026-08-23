@@ -45,25 +45,24 @@ export function LoginForm({
       </FormField>
 
       <div className="elfis-login__password-block">
-        <div className="elfis-login__password-heading">
-          <label htmlFor="elfis-login-password">
-            Mot de passe <span className="ds-form-field__required" aria-hidden> *</span>
-          </label>
+        <FormField label="Mot de passe" htmlFor="elfis-login-password" required>
+          <Input
+            id="elfis-login-password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Votre mot de passe"
+            value={password}
+            onChange={(e) => onPasswordChange(e.target.value)}
+            required
+            disabled={loading || disabled}
+            aria-describedby={error ? 'elfis-login-error' : undefined}
+            aria-invalid={error ? true : undefined}
+          />
+        </FormField>
+        <p className="elfis-login__forgot">
           <Link to={forgotPasswordTo}>Mot de passe oublié ?</Link>
-        </div>
-        <Input
-          id="elfis-login-password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          placeholder="Votre mot de passe"
-          value={password}
-          onChange={(e) => onPasswordChange(e.target.value)}
-          required
-          disabled={loading || disabled}
-          aria-describedby={error ? 'elfis-login-error' : undefined}
-          aria-invalid={error ? true : undefined}
-        />
+        </p>
       </div>
 
       {error ? (

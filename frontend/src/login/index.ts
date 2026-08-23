@@ -1,5 +1,7 @@
 export { LoginPage as default, LoginPage } from './LoginPage'
+export { ElfisAuthShell } from './ElfisAuthShell'
 export { LoginBrandPanel } from './LoginBrandPanel'
 export { LoginForm } from './LoginForm'
 export { LoginBenefit } from './LoginBenefit'
 export { LoginIllustration } from './LoginIllustration'
+export { LoginSpaceDock } from './LoginSpaceDock'

@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from app.models_saas import DocumentEmailLog, Organization, SalesDocument, User
 from app.services.email_connections import ensure_platform_connection
 from app.services.email_dispatch import dispatch_email, resolve_send_connection
+from app.services.email_providers.types import EmailProviderError, user_safe_message
 from app.services.mailer import MailAttachment, email_configured
 from app.services.org_email_settings import (
     build_subject_and_body,
@@ -30,6 +31,8 @@ def smtp_configured() -> bool:
 
 
 def _user_facing_error(exc: Exception) -> tuple[str, str]:
+    if isinstance(exc, EmailProviderError):
+        return exc.error_code, user_safe_message(exc.error_code)
     msg = str(exc)
     lower = msg.lower()
     if "adresse e-mail destinataire manquante" in lower or lower.strip() == "missing recipient":
@@ -47,7 +50,7 @@ def _user_facing_error(exc: Exception) -> tuple[str, str]:
     if "535" in lower or "auth smtp" in lower:
         return (
             "authentication_failed",
-            "Authentification SMTP refusée. Vérifiez la configuration e-mail côté plateforme ELFIS.",
+            user_safe_message("authentication_failed"),
         )
     if "xsmtpsib" in lower and "brevo_api_key" in lower:
         return (
@@ -57,7 +60,7 @@ def _user_facing_error(exc: Exception) -> tuple[str, str]:
     if "key not found" in lower or "clé brevo invalide" in lower or "clé api brevo invalide" in lower:
         return (
             "authentication_failed",
-            "Le fournisseur d’e-mail a refusé la clé API. Contactez l’admin ELFIS.",
+            user_safe_message("authentication_failed"),
         )
     if "sender" in lower and (
         "not verified" in lower or "invalid" in lower or "unrecognised" in lower or "unauthorized" in lower

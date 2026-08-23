@@ -176,7 +176,7 @@ function renderFcc(path = '/dashboard') {
       <Routes>
         <Route path="/dashboard" element={<FinancialCommandCenter />} />
         <Route path="/finance" element={<div>Finance page</div>} />
-        <Route path="/banque" element={<div>Banque page</div>} />
+        <Route path="/platform/banking" element={<div>Banque page</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -378,7 +378,7 @@ describe('FinancialCommandCenter S1.2.6 Premium V2', () => {
     expect(screen.getByText(/flux prévisionnels indisponibles/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /connecter une banque/i })).toHaveAttribute(
       'href',
-      '/banque',
+      '/platform/banking',
     )
     expect(document.body.textContent).not.toMatch(/15[\s\u00a0]?420/)
     expect(document.body.textContent).not.toMatch(/15420/)

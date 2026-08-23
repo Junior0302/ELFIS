@@ -61,7 +61,7 @@ export default function RegisterPage() {
         <p>
           {inviteToken
             ? 'Créez votre compte avec l’adresse invitée. Aucun abonnement personnel n’est requis pour rejoindre l’équipe.'
-            : 'Créez votre compte et votre organisation ComptaPilot en une étape.'}
+            : 'Créez votre compte et votre organisation ELFIS en une étape.'}
         </p>
       </div>
 

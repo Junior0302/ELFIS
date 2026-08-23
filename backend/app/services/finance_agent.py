@@ -76,7 +76,14 @@ def list_conversations(db: Session, organization_id: int, limit: int = 20) -> li
 
 def pilot_kpis(db: Session, organization_id: int | None) -> dict:
     snap = _finance_snapshot(db, organization_id)
-    empty = not snap["has_data"] and snap["balance"] == 0 and snap["ca"] == 0 and snap["charges"] == 0
+    balance = snap.get("balance")
+    homogeneous = snap.get("treasury_homogeneous", True)
+    empty = (
+        not snap["has_data"]
+        and (balance == 0 or balance is None)
+        and snap["ca"] == 0
+        and snap["charges"] == 0
+    )
 
     if empty:
         return {
@@ -100,9 +107,16 @@ def pilot_kpis(db: Session, organization_id: int | None) -> dict:
         }
 
     health = "ok"
-    if snap["tensions"] or (snap["balance"] > 0 and snap["balance"] < 5000):
+    if snap["tensions"] or (
+        homogeneous and balance is not None and 0 < balance < 5000
+    ):
         health = "attention"
-    if snap["forecast"]["30"] < 3000 and snap["charges"] > 0:
+    if (
+        homogeneous
+        and balance is not None
+        and snap["forecast"]["30"] < 3000
+        and snap["charges"] > 0
+    ):
         health = "critique"
 
     alerts: list[str] = []
@@ -120,7 +134,7 @@ def pilot_kpis(db: Session, organization_id: int | None) -> dict:
         "ca": snap["ca"],
         "benefice": snap["marge"],
         "marge_pct": snap["marge_pct"],
-        "tresorerie": snap["balance"],
+        "tresorerie": balance,
         "depenses": snap["charges"],
         "unpaid": snap["unpaid"],
         "forecast_30": snap["forecast"]["30"],

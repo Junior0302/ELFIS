@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <polygon
+    points="32,5 55.5,18.5 55.5,45.5 32,59 8.5,45.5 8.5,18.5"
+    stroke="#0B1F3A"
+    stroke-width="2.75"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M32 18v30"
+    stroke="#15803D"
+    stroke-width="2.4"
+    stroke-linecap="round"
+  />
+  <path
+    d="M32 22l-11 8M32 22l11 8"
+    stroke="#16A34A"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M32 32l-13 9M32 32l13 9"
+    stroke="#15803D"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M32 42l-11 8M32 42l11 8"
+    stroke="#15803D"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

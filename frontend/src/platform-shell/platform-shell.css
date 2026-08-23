@@ -1,3 +1,11 @@
+/* Chrome figé : la fenêtre ne défile pas, seul .ps-viewport scrolle. */
+html:has(.ps-shell),
+body:has(.ps-shell),
+#root:has(.ps-shell) {
+  height: 100%;
+  overflow: hidden;
+}
+
 /* Platform Shell V1 â " chrome ELFIS Core (Landing/Login language) */
 
 .ps-shell {
@@ -37,7 +45,11 @@
   --product-sidebar-label-size: 0.9rem;
   --product-sidebar-collapse-size: 32px;
   --product-sidebar-collapsed-item-pad-inline: 0.35rem;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
   background: var(--ps-bg);
   color: var(--ps-text);
   display: flex;
@@ -76,8 +88,7 @@
   padding: 0 1rem;
   background: var(--ps-card);
   border-bottom: 1px solid var(--ps-border);
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 30;
 }
 
@@ -590,6 +601,7 @@
   display: grid;
   grid-template-columns: 1fr;
   min-height: 0;
+  overflow: hidden;
   position: relative;
 }
 
@@ -604,10 +616,12 @@
   padding: var(--product-sidebar-surface-pad-block-start)
     var(--product-sidebar-surface-pad-inline)
     var(--product-sidebar-surface-pad-block-end);
-  min-height: calc(100vh - var(--ps-topbar-h));
+  min-height: 0;
+  height: 100%;
   min-width: 0;
   width: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
   transition: padding 180ms ease;
 }
@@ -628,6 +642,8 @@
 
 .ps-viewport {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   padding: 1.25rem;
   overflow: auto;
   overflow-x: hidden;

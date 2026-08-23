@@ -52,12 +52,16 @@ def _transaction_payload(tx: BankTransaction) -> dict:
         "external_id": tx.external_id,
         "account_id": tx.account_id,
         "booked_at": tx.booked_at,
+        "value_date": getattr(tx, "value_date", None),
         "label": tx.label[:120],
         "amount": tx.amount,
         "currency": tx.currency,
         "category": tx.category,
         "status": getattr(tx, "status", "booked"),
         "source": getattr(tx, "source", "manual"),
+        "counterparty_name": getattr(tx, "counterparty_name", None),
+        "reference": getattr(tx, "reference", None),
+        "is_duplicate": bool(getattr(tx, "is_duplicate", False)),
     }
 
 

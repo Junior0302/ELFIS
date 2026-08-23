@@ -27,29 +27,34 @@ def build_alerts(snap: dict) -> list[FinancialAlert]:
     # 1. Trésorerie faible / critique
     low = _threshold("financial_treasury_low_threshold", 5000.0)
     critical = _threshold("financial_treasury_critical_threshold", 1000.0)
-    if snap["has_bank"]:
-        if snap["treasury"] < critical:
+    treasury_value = snap.get("treasury")
+    if (
+        snap["has_bank"]
+        and snap.get("treasury_homogeneous", True)
+        and treasury_value is not None
+    ):
+        if treasury_value < critical:
             alerts.append(
                 FinancialAlert(
                     id=f"{org}-treasury_critical",
                     code="TREASURY_CRITICAL",
                     severity=AlertSeverity.critical,
                     title="Trésorerie critique",
-                    message=f"Solde bancaire de {snap['treasury']:.2f} €, sous le seuil critique de {critical:.0f} €.",
+                    message=f"Solde bancaire de {treasury_value:.2f} €, sous le seuil critique de {critical:.0f} €.",
                     action="Relancer les impayés et reporter toute dépense non essentielle.",
-                    value=snap["treasury"],
+                    value=treasury_value,
                 )
             )
-        elif snap["treasury"] < low:
+        elif treasury_value < low:
             alerts.append(
                 FinancialAlert(
                     id=f"{org}-treasury_low",
                     code="TREASURY_LOW",
                     severity=AlertSeverity.warning,
                     title="Trésorerie faible",
-                    message=f"Solde bancaire de {snap['treasury']:.2f} €, sous le seuil de vigilance de {low:.0f} €.",
+                    message=f"Solde bancaire de {treasury_value:.2f} €, sous le seuil de vigilance de {low:.0f} €.",
                     action="Surveiller les décaissements et accélérer les encaissements.",
-                    value=snap["treasury"],
+                    value=treasury_value,
                 )
             )
 

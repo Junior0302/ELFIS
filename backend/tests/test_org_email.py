@@ -292,7 +292,12 @@ def test_brevo_failure_user_message(monkeypatch):
     )
     log = send_sales_document_email(db, doc, recipient="c@exemple.fr")
     assert log.status == "failed"
-    assert log.error_code in {"delivery_failed", "provider_error", "brevo_refused"}
+    assert log.error_code in {
+        "delivery_failed",
+        "provider_error",
+        "brevo_refused",
+        "provider_unreachable",
+    }
     assert "boom" not in log.error_message
     assert "xkeysib" not in log.error_message
     assert any(

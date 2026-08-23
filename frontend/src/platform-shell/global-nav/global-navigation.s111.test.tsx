@@ -26,7 +26,7 @@ vi.mock('../../auth', () => ({
         organization_id: 1,
         organization_name: 'Acme',
         role: 'admin',
-        permissions: ['*', 'documents.read', 'users.manage', 'ai.analysis'],
+        permissions: ['*', 'documents.read', 'users.manage', 'ai.analysis', 'bank.read'],
       },
     ],
     orgId: 1,
@@ -89,6 +89,8 @@ describe('globalNavModel', () => {
   it('détecte routes Compta / Sales', () => {
     expect(isComptaPilotPath('/dashboard')).toBe(true)
     expect(isComptaPilotPath('/platform/documents')).toBe(false)
+    expect(isComptaPilotPath('/banque')).toBe(false)
+    expect(isComptaPilotPath('/platform/banking')).toBe(false)
     expect(isSalesPilotPath('/sales/pipeline')).toBe(true)
     expect(isSalesPilotPath('/dashboard')).toBe(false)
   })

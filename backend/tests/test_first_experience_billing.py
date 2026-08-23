@@ -110,6 +110,7 @@ class FirstExperienceBillingIsolationTests(unittest.TestCase):
                 "customer_id": self.foreign_id,
                 "amount_ht": 100,
                 "vat_rate": 20,
+                "lines": [{"label": "Prestation", "quantity": 1, "unit_price": 100}],
             },
         )
         self.assertEqual(res.status_code, 404)
@@ -123,6 +124,7 @@ class FirstExperienceBillingIsolationTests(unittest.TestCase):
                 "customer_id": self.local_id,
                 "amount_ht": 100,
                 "vat_rate": 20,
+                "lines": [{"label": "Prestation", "quantity": 1, "unit_price": 100}],
             },
         )
         self.assertEqual(res.status_code, 200)

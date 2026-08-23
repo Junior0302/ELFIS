@@ -142,6 +142,20 @@ def test_alerts_sorted_by_severity():
     assert alerts[0].severity.value == "critical"
 
 
+def test_mixed_currencies_do_not_raise_treasury_alerts():
+    from app.models import BankAccount
+
+    db = make_financial_db()
+    org = seed_org(db)
+    db.add(BankAccount(organization_id=org.id, currency="EUR", balance=100.0, connected=True))
+    db.add(BankAccount(organization_id=org.id, currency="USD", balance=200.0, connected=True))
+    db.commit()
+
+    codes = {a.code for a in _alerts(db, org.id)}
+    assert "TREASURY_LOW" not in codes
+    assert "TREASURY_CRITICAL" not in codes
+
+
 def test_no_alerts_on_empty_org_except_none():
     db = make_financial_db()
     org = seed_org(db)

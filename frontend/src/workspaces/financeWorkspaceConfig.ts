@@ -19,13 +19,12 @@ export const financeWorkspaceConfig: WorkspaceConfig = {
   shortcuts: [
     { id: 'facturation', label: 'Facturation', to: '/facturation' },
     { id: 'tva', label: 'TVA', to: '/tva' },
-    { id: 'banque', label: 'Banque', to: '/banque' },
+    { id: 'tresorerie', label: 'Trésorerie', to: '/finance' },
   ],
   searchAliases: [
     'facture',
     'facturation',
     'tva',
-    'banque',
     'compta',
     'comptabilité',
     'trésorerie',
@@ -33,7 +32,7 @@ export const financeWorkspaceConfig: WorkspaceConfig = {
     'devis',
     'finance',
   ],
-  capabilities: ['Facturation', 'Banque', 'TVA'],
+  capabilities: ['Facturation', 'Trésorerie', 'TVA'],
   navigationGroups: [
     {
       id: 'dashboard',
@@ -104,12 +103,6 @@ export const financeWorkspaceConfig: WorkspaceConfig = {
           permission: 'invoice.read',
           /** Même path que Vue d’ensemble — jamais actif en parallèle (Phase 2/3). */
           activePolicy: 'contextual',
-        },
-        {
-          id: 'banque',
-          to: '/banque',
-          label: 'Banque',
-          permission: 'bank.read',
         },
         {
           id: 'tva',
@@ -224,13 +217,6 @@ export const financeWorkspaceConfig: WorkspaceConfig = {
       children: [
         { id: 'copilote', to: '/copilote', label: 'Assistant financier', permission: 'ai.analysis' },
         { id: 'signaux', to: '/intelligence', label: 'Signaux', permission: 'ai.analysis' },
-        {
-          id: 'aura',
-          to: '/platform/aura',
-          label: 'Aura',
-          permission: 'ai.analysis',
-          badge: 'ELFIS',
-        },
       ],
     },
     {

@@ -124,17 +124,24 @@ def test_resync_detects_duplicates_and_creates_nothing():
     assert db.query(BankTransaction).count() == 3
 
 
-def test_fingerprint_duplicate_skipped_even_with_different_external_id():
-    duplicate = make_tx("fake-acc-1", date(2026, 7, 1), "VIREMENT CLIENT ALPHA", 500.0)
-    duplicate = duplicate.model_copy(update={"external_id": "autre-id-fournisseur"})
+def test_two_real_transactions_same_fingerprint_keep_both_rows():
+    twin = make_tx(
+        "fake-acc-1",
+        date(2026, 7, 1),
+        "VIREMENT CLIENT ALPHA",
+        500.0,
+        external_id="autre-id-fournisseur",
+    )
     connector = FakeBankConnector(
-        transactions={"fake-acc-1": [BASE_TXS[0], duplicate]}
+        transactions={"fake-acc-1": [BASE_TXS[0], twin]}
     )
     db, org, _ = _setup(connector)
     run = SyncEngine(db).run_sync(org.id)[0]
-    assert run.transactions_created == 1
-    assert run.duplicates_skipped == 1
-    assert db.query(BankTransaction).count() == 1
+    assert run.transactions_created == 2
+    rows = db.query(BankTransaction).all()
+    assert len(rows) == 2
+    assert {r.external_id for r in rows} == {BASE_TXS[0].external_id, "autre-id-fournisseur"}
+    assert sum(1 for r in rows if r.is_duplicate) == 1
 
 
 def test_transaction_update_publishes_updated_event():
@@ -143,16 +150,12 @@ def test_transaction_update_publishes_updated_event():
     engine = SyncEngine(db)
     engine.run_sync(org.id)
 
-    # Le fournisseur corrige le libellé de la même transaction (même external_id)
     corrected = BASE_TXS[0].model_copy(update={"label": "VIREMENT CLIENT ALPHA CORRIGE"})
     connector.transactions["fake-acc-1"] = [corrected]
-    # resync complet (curseur au 2026-07-01, la tx n'est pas > curseur → on la repousse)
-    connector.transactions["fake-acc-1"] = [
-        corrected.model_copy(update={"booked_at": date(2026, 7, 2)})
-    ]
     run = engine.run_sync(org.id)[0]
-    # Nouvelle date → nouvel enregistrement n'est PAS créé car même external_id : update
     assert run.transactions_updated == 1
+    assert db.query(BankTransaction).count() == 1
+    assert db.query(BankTransaction).one().label == "VIREMENT CLIENT ALPHA CORRIGE"
     updated_events = (
         db.query(ElfisEvent)
         .filter(ElfisEvent.event_name == EventNames.BANKING_TRANSACTION_UPDATED)
@@ -264,3 +267,207 @@ def test_sync_without_connection_raises():
 
     with pytest.raises(BankingEngineError):
         SyncEngine(db).run_sync(org.id)
+
+
+def test_same_provider_id_synced_twice_is_one_row():
+    connector = FakeBankConnector(transactions={"fake-acc-1": [BASE_TXS[0]]})
+    db, org, _ = _setup(connector)
+    engine = SyncEngine(db)
+    engine.run_sync(org.id)
+    engine.run_sync(org.id)
+    assert db.query(BankTransaction).count() == 1
+
+
+def test_pending_to_booked_same_id_updates():
+    from app.banking.banking_types import TransactionStatus
+
+    pending = make_tx(
+        "fake-acc-1",
+        date(2026, 7, 1),
+        "PAIEMENT CARTE",
+        -25.0,
+        status=TransactionStatus.pending,
+        external_id="card-1",
+    )
+    connector = FakeBankConnector(transactions={"fake-acc-1": [pending]})
+    db, org, _ = _setup(connector)
+    engine = SyncEngine(db)
+    engine.run_sync(org.id)
+    assert db.query(BankTransaction).one().status == "pending"
+
+    connector.transactions["fake-acc-1"] = [
+        pending.model_copy(update={"status": TransactionStatus.booked})
+    ]
+    run = engine.run_sync(org.id)[0]
+    assert run.transactions_created == 0
+    assert run.transactions_updated == 1
+    assert db.query(BankTransaction).count() == 1
+    assert db.query(BankTransaction).one().status == "booked"
+    updated = (
+        db.query(ElfisEvent)
+        .filter(ElfisEvent.event_name == EventNames.BANKING_TRANSACTION_UPDATED)
+        .count()
+    )
+    created = (
+        db.query(ElfisEvent)
+        .filter(ElfisEvent.event_name == EventNames.BANKING_TRANSACTION_CREATED)
+        .count()
+    )
+    assert updated == 1
+    assert created == 1
+
+
+def test_pending_and_booked_different_ids_are_not_merged():
+    from app.banking.banking_types import TransactionStatus
+
+    pending = make_tx(
+        "fake-acc-1",
+        date(2026, 7, 1),
+        "RESTAURANT",
+        -25.0,
+        status=TransactionStatus.pending,
+        external_id="pend-1",
+    )
+    booked = make_tx(
+        "fake-acc-1",
+        date(2026, 7, 1),
+        "RESTAURANT",
+        -25.0,
+        status=TransactionStatus.booked,
+        external_id="book-1",
+    )
+    connector = FakeBankConnector(transactions={"fake-acc-1": [pending, booked]})
+    db, org, _ = _setup(connector)
+    SyncEngine(db).run_sync(org.id)
+    rows = db.query(BankTransaction).all()
+    assert len(rows) == 2
+    assert {r.external_id for r in rows} == {"pend-1", "book-1"}
+
+
+def test_same_external_id_isolated_by_account():
+    accounts = [
+        NormalizedAccount(external_id="fake-acc-1", label="A", balance=1.0),
+        NormalizedAccount(external_id="fake-acc-2", label="B", balance=2.0),
+    ]
+    tx_a = make_tx("fake-acc-1", date(2026, 7, 1), "X", 10.0, external_id="shared-id")
+    tx_b = make_tx("fake-acc-2", date(2026, 7, 1), "X", 10.0, external_id="shared-id")
+    connector = FakeBankConnector(
+        accounts=accounts,
+        transactions={"fake-acc-1": [tx_a], "fake-acc-2": [tx_b]},
+    )
+    db, org, _ = _setup(connector)
+    SyncEngine(db).run_sync(org.id)
+    rows = db.query(BankTransaction).all()
+    assert len(rows) == 2
+    assert len({r.account_id for r in rows}) == 2
+    assert all(r.external_id == "shared-id" for r in rows)
+
+
+def test_same_external_id_isolated_by_organization():
+    connector = FakeBankConnector(
+        transactions={
+            "fake-acc-1": [
+                make_tx("fake-acc-1", date(2026, 7, 1), "X", 10.0, external_id="shared-id")
+            ]
+        }
+    )
+    db = make_banking_db()
+    org_a = seed_org(db, "A")
+    org_b = seed_org(db, "B")
+    _register(connector)
+    BankingEngine(db).connect(organization_id=org_a.id, provider="fake", bank_name="A")
+    BankingEngine(db).connect(organization_id=org_b.id, provider="fake", bank_name="B")
+    SyncEngine(db).run_sync(org_a.id)
+    SyncEngine(db).run_sync(org_b.id)
+    rows = db.query(BankTransaction).all()
+    assert len(rows) == 2
+    accounts = {r.account_id for r in rows}
+    assert len(accounts) == 2
+
+
+def test_pagination_three_pages_imports_all():
+    txs = [
+        make_tx("fake-acc-1", date(2026, 7, d), f"OP {d}", -d * 1.0, external_id=f"p-{d}")
+        for d in range(1, 7)
+    ]
+    connector = FakeBankConnector(transactions={"fake-acc-1": txs}, page_size=2)
+    db, org, _ = _setup(connector)
+    run = SyncEngine(db).run_sync(org.id)[0]
+    assert run.status == "completed"
+    assert run.transactions_created == 6
+    assert db.query(BankTransaction).count() == 6
+
+
+def test_repeated_pagination_cursor_fails_cleanly():
+    txs = [
+        make_tx("fake-acc-1", date(2026, 7, d), f"OP {d}", -1.0, external_id=f"c-{d}")
+        for d in range(1, 5)
+    ]
+    connector = FakeBankConnector(
+        transactions={"fake-acc-1": txs}, page_size=2, repeat_cursor=True
+    )
+    db, org, _ = _setup(connector)
+    run = SyncEngine(db).run_sync(org.id)[0]
+    assert run.status == "failed"
+    assert "curseur répété" in (run.error_message or "")
+
+
+def test_retry_after_pagination_interrupt_creates_no_duplicates():
+    txs = [
+        make_tx("fake-acc-1", date(2026, 7, d), f"OP {d}", -1.0, external_id=f"r-{d}")
+        for d in range(1, 5)
+    ]
+    connector = FakeBankConnector(
+        transactions={"fake-acc-1": txs}, page_size=2, fail_on_page=2, fail_retryable=True
+    )
+    db, org, _ = _setup(connector)
+    engine = SyncEngine(db, max_attempts=1)
+    failed = engine.run_sync(org.id)[0]
+    assert failed.status == "failed"
+    created_after_fail = db.query(BankTransaction).count()
+    assert created_after_fail == 2
+
+    connector.fail_on_page = None
+    resumed = SyncEngine(db, max_attempts=1).run_sync(org.id)[0]
+    assert resumed.status == "completed"
+    assert db.query(BankTransaction).count() == 4
+    ids = [r.external_id for r in db.query(BankTransaction).all()]
+    assert len(ids) == len(set(ids))
+
+
+def test_missing_external_id_does_not_drop_second_movement():
+    a = make_tx("fake-acc-1", date(2026, 7, 1), "RESTAURANT", -25.0, external_id="")
+    b = make_tx("fake-acc-1", date(2026, 7, 1), "RESTAURANT", -25.0, external_id="")
+    connector = FakeBankConnector(transactions={"fake-acc-1": [a, b]})
+    db, org, _ = _setup(connector)
+    run = SyncEngine(db).run_sync(org.id)[0]
+    assert run.transactions_created == 2
+    rows = db.query(BankTransaction).all()
+    assert len(rows) == 2
+    assert all(r.external_id == "" for r in rows)
+    assert sum(1 for r in rows if r.is_duplicate) == 1
+
+
+def test_overlap_window_captures_past_transaction_update():
+    original = make_tx("fake-acc-1", date(2026, 7, 1), "LOYER", -900.0, external_id="past-1")
+    connector = FakeBankConnector(transactions={"fake-acc-1": [original]})
+    db, org, _ = _setup(connector)
+    engine = SyncEngine(db)
+    engine.run_sync(org.id)
+    connector.transactions["fake-acc-1"] = [
+        original.model_copy(update={"label": "LOYER CORRIGE"})
+    ]
+    run = engine.run_sync(org.id)[0]
+    assert run.sync_type == "incremental"
+    assert run.transactions_updated == 1
+    assert db.query(BankTransaction).one().label == "LOYER CORRIGE"
+
+
+def test_sync_does_not_purge_missing_provider_rows():
+    connector = FakeBankConnector(transactions={"fake-acc-1": list(BASE_TXS)})
+    db, org, _ = _setup(connector)
+    engine = SyncEngine(db)
+    engine.run_sync(org.id)
+    connector.transactions["fake-acc-1"] = [BASE_TXS[0]]
+    engine.run_sync(org.id)
+    assert db.query(BankTransaction).count() == 3

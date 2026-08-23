@@ -30,7 +30,7 @@ def is_valid_email(value: str) -> bool:
 
 def org_display_name(org: Organization | None) -> str:
     if not org:
-        return "ComptaPilot"
+        return "ELFIS Core"
     return (org.legal_name or org.name or "Entreprise").strip() or "Entreprise"
 
 

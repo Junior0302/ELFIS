@@ -101,6 +101,7 @@ const PlatformCommunicationsSettingsPage = lazyPage(
   () => import('./pages/platform-core/PlatformCommunicationsSettingsPage'),
 )
 const PlatformAuraPage = lazyPage(() => import('./pages/platform-core/PlatformAuraPage'))
+const PlatformHelpPage = lazyPage(() => import('./pages/platform-core/PlatformHelpPage'))
 const PlatformRelationsPage = lazyPage(() => import('./pages/platform-core/PlatformRelationsPage'))
 const PlatformRelationDetailPage = lazyPage(
   () => import('./pages/platform-core/PlatformRelationDetailPage'),
@@ -318,7 +319,9 @@ export default function App() {
                 />
                 <Route path="accounting/engine" element={<AccountingEnginePage />} />
                 <Route path="accounting/intelligence" element={<AccountingIntelligencePage />} />
-                <Route path="banque" element={<BankingPage />} />
+                <Route path="platform/banking" element={<BankingPage />} />
+                <Route path="banque" element={<Navigate to="/platform/banking" replace />} />
+                <Route path="banking" element={<Navigate to="/platform/banking" replace />} />
                 <Route path="finance" element={<FinancialDashboardPage />} />
                 <Route path="tva" element={<VatDeclarationPage />} />
                 <Route path="cloture" element={<PeriodClosePage />} />
@@ -364,6 +367,8 @@ export default function App() {
                   element={<PlatformCommunicationsSettingsPage />}
                 />
                 <Route path="platform/aura" element={<PlatformAuraPage />} />
+                <Route path="platform/help" element={<PlatformHelpPage />} />
+                <Route path="platform/search" element={<SearchPage />} />
                 <Route path="platform/relations" element={<PlatformRelationsPage />} />
                 <Route
                   path="platform/relations/:relationId"

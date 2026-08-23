@@ -8,10 +8,7 @@ import type { SpaceDefinition } from '../app-launcher/spaces.types'
 import { getProductById } from '../design-system/products/registry'
 import {
   achatsWorkspaceConfig,
-  banqueWorkspaceConfig,
-  comptabiliteWorkspaceConfig,
   conformiteWorkspaceConfig,
-  facturationWorkspaceConfig,
   logistiqueWorkspaceConfig,
   parametresWorkspaceConfig,
   planningWorkspaceConfig,
@@ -35,9 +32,6 @@ export const WORKSPACE_REGISTRY: readonly WorkspaceConfig[] = [
   rhWorkspaceConfig,
   planningWorkspaceConfig,
   projetsWorkspaceConfig,
-  banqueWorkspaceConfig,
-  comptabiliteWorkspaceConfig,
-  facturationWorkspaceConfig,
   conformiteWorkspaceConfig,
   rseWorkspaceConfig,
   parametresWorkspaceConfig,

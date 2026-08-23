@@ -16,7 +16,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'customer', label: 'Clients' },
   { id: 'supplier', label: 'Fournisseurs' },
   { id: 'prospect', label: 'Prospects' },
-  { id: 'commercial_account', label: 'Comptes Sales' },
+  { id: 'commercial_account', label: 'Comptes commerciaux' },
   { id: 'partner', label: 'Partenaires' },
   { id: 'duplicates', label: 'Doublons possibles' },
 ]
@@ -26,7 +26,7 @@ const ROLE_LABEL: Record<string, string> = {
   supplier: 'Fournisseur',
   prospect: 'Prospect',
   partner: 'Partenaire',
-  commercial_account: 'Compte SalesPilot',
+  commercial_account: 'Compte commercial',
   employee: 'Employé',
   billing_contact: 'Contact facturation',
 }
@@ -105,10 +105,10 @@ export default function PlatformRelationsPage() {
       </div>
 
       <div className="platform-surface-banner">
-        <strong>Contrat SharedRelation</strong>
+        <strong>ELFIS Core</strong>
         <p>
-          Sources : <code>customers</code>, <code>contacts</code>, <code>sales_companies</code>. ID
-          opaque <code>source:id</code>. Les doublons sont signalés uniquement.
+          Annuaire plateforme uniquement. Les vues métier Clients restent dans Finance et
+          Commercial, via Espaces.
         </p>
       </div>
 

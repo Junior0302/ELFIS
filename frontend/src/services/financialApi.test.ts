@@ -120,7 +120,10 @@ describe('financial API', () => {
 
   it('formate les valeurs sans calculer (affichage uniquement)', () => {
     expect(formatEuro(12000)).toContain('12')
+    expect(formatEuro(null)).toBe('—')
+    expect(formatEuro(undefined)).toBe('—')
     expect(formatKpiValue(kpi())).toContain('€')
+    expect(formatKpiValue(kpi({ value: null }))).toBe('—')
     expect(formatKpiValue(kpi({ format: 'integer', unit: 'count', value: 3 }))).toBe('3')
     expect(severityLabel('critical')).toBe('Critique')
     expect(severityLabel('warning')).toBe('Vigilance')

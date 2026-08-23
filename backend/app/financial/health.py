@@ -58,14 +58,21 @@ def compute_health_score(snap: dict) -> dict:
     monthly_expenses = [monthly.get(k, {}).get("expenses", 0.0) for k in keys]
     active_months = [e for e in monthly_expenses if e > 0]
     avg_expenses = (sum(active_months) / len(active_months)) if active_months else 0.0
-    if snap["treasury"] <= 0:
+    treasury_value = snap.get("treasury")
+    if snap.get("has_bank") and not snap.get("treasury_homogeneous", True):
+        treasury_score = 15.0
+        treasury_detail = "Soldes dans plusieurs devises — total unique non calculé."
+    elif treasury_value is None:
+        treasury_score = 15.0
+        treasury_detail = "Trésorerie non agrégeable — aucun total unique."
+    elif treasury_value <= 0:
         treasury_score = 0.0
         treasury_detail = "Trésorerie négative ou nulle."
     elif avg_expenses <= 0:
-        treasury_score = 30.0 if snap["treasury"] > 0 else 0.0
+        treasury_score = 30.0 if treasury_value > 0 else 0.0
         treasury_detail = "Pas de dépenses récurrentes détectées."
     else:
-        runway = snap["treasury"] / avg_expenses
+        runway = treasury_value / avg_expenses
         treasury_score = _linear(runway, worst=0.0, best=3.0, max_score=30.0)
         treasury_detail = f"Autonomie estimée : {runway:.1f} mois de dépenses."
     components.append(

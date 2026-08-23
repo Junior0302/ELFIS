@@ -120,10 +120,10 @@ export const navSections: NavSection[] = [
         ],
       },
       {
-        to: '/banque',
-        label: 'Banque',
-        hint: 'Comptes & synchronisation',
-        spokenIntro: 'Espace Banque. Connexions, comptes et transactions.',
+        to: '/platform/banking',
+        label: 'Synchronisation bancaire',
+        hint: 'Connexions & synchronisation ELFIS',
+        spokenIntro: 'Synchronisation bancaire ELFIS. Connexions, comptes et transactions.',
         permission: 'bank.read',
         guide: [
           'Connectez vos banques via un fournisseur interchangeable.',

@@ -5,11 +5,11 @@ import { useAuth } from '../../auth'
 import '../../platform-workspace/platform-workspace.css'
 
 const ROLE_LABEL: Record<string, string> = {
-  customer: 'Client ComptaPilot',
+  customer: 'Client',
   supplier: 'Fournisseur',
   prospect: 'Prospect',
   partner: 'Partenaire',
-  commercial_account: 'Compte SalesPilot',
+  commercial_account: 'Compte commercial',
   employee: 'Employé',
   billing_contact: 'Contact facturation',
 }
@@ -108,24 +108,12 @@ export default function PlatformRelationDetailPage() {
       <section className="panel" aria-labelledby="rel-usage">
         <h3 id="rel-usage">Utilisations</h3>
         <ul>
-          <li>ComptaPilot : {detail.usages.comptapilot ? 'oui' : 'non'}</li>
-          <li>SalesPilot : {detail.usages.salespilot ? 'oui' : 'non'}</li>
+          <li>Finance : {detail.usages.comptapilot ? 'oui' : 'non'}</li>
+          <li>Commercial : {detail.usages.salespilot ? 'oui' : 'non'}</li>
         </ul>
-        <div className="platform-surface-banner__actions">
-          {r.roles.includes('customer') || r.roles.includes('supplier') ? (
-            <Link
-              className="btn secondary"
-              to={r.roles.includes('supplier') && !r.roles.includes('customer') ? '/fournisseurs' : '/clients'}
-            >
-              Ouvrir dans ComptaPilot
-            </Link>
-          ) : null}
-          {r.roles.includes('commercial_account') || r.roles.includes('prospect') ? (
-            <Link className="btn secondary" to="/sales/companies">
-              Ouvrir dans SalesPilot
-            </Link>
-          ) : null}
-        </div>
+        <p className="muted">
+          Les espaces métier s’ouvrent via Espaces — cette fiche reste dans ELFIS Core.
+        </p>
       </section>
 
       <section className="panel" aria-labelledby="rel-dups">

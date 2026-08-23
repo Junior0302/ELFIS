@@ -155,19 +155,32 @@
   outline-offset: 2px;
 }
 
-.up-shell--unified .nav-icon,
-.up-shell--unified .elfis-gnav__icon {
+.up-shell--unified .nav-icon {
   background: color-mix(in srgb, var(--pilot-accent, #7bc4a0) 22%, transparent);
   color: #e8eef6;
 }
 
 .up-shell--unified .nav a.active .nav-icon,
-.up-shell--unified .nav a:hover .nav-icon,
-.up-shell--unified .elfis-gnav__link.is-active .elfis-gnav__icon,
-.up-shell--unified .elfis-gnav__link[aria-current='page'] .elfis-gnav__icon,
-.up-shell--unified .elfis-gnav__link:hover .elfis-gnav__icon {
+.up-shell--unified .nav a:hover .nav-icon {
   background: color-mix(in srgb, var(--pilot-accent, #7bc4a0) 35%, transparent);
   color: #fff;
+}
+
+.up-shell--unified .elfis-gnav__icon {
+  background: var(--elfis-gnav-icon-tile, rgba(255, 255, 255, 0.06));
+  color: rgba(226, 232, 240, 0.86);
+}
+
+.up-shell--unified .elfis-gnav__link:hover .elfis-gnav__icon {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.up-shell--unified .elfis-gnav__link.is-active .elfis-gnav__icon,
+.up-shell--unified .elfis-gnav__link[aria-current='page'] .elfis-gnav__icon {
+  color: #93c5fd;
+  background: color-mix(in srgb, var(--elfis-gnav-accent, #2764e7) 28%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--elfis-gnav-accent, #2764e7) 42%, transparent);
 }
 
 .up-shell--unified .nav-sublink {

@@ -28,6 +28,8 @@ class ElfisBankConnection(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(Integer, index=True)
     provider: Mapped[str] = mapped_column(String(32), index=True)
+    # Identifiant unique côté fournisseur après liaison (item Bridge, etc.).
+    # Ne pas y stocker user UUID, jeton ou date d'expiration.
     provider_connection_id: Mapped[str] = mapped_column(String(128), default="")
     bank_name: Mapped[str] = mapped_column(String(255), default="")
     status: Mapped[str] = mapped_column(String(32), default="connected", index=True)

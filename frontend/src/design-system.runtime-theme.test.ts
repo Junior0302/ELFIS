@@ -30,6 +30,11 @@ describe('resolveRuntimeProductFromPath', () => {
     expect(resolveRuntimeProductFromPath('/dashboard').productId).toBe('comptapilot')
   })
 
+  it('/platform/banking → elfis-core (sync hors Finance)', () => {
+    expect(resolveRuntimeProductFromPath('/platform/banking').productId).toBe('elfis-core')
+    expect(resolveRuntimeProductFromPath('/platform/banking').surface).toBe('platform')
+  })
+
   it('/sales → salespilot', () => {
     expect(resolveRuntimeProductFromPath('/sales').productId).toBe('salespilot')
   })

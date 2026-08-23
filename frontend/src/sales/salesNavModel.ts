@@ -97,12 +97,6 @@ export const salesNavCategories: readonly SalesNavCategory[] = [
     children: [
       { id: 'clients-companies', label: 'Entreprises', to: '/sales/companies' },
       { id: 'clients-contacts', label: 'Contacts', to: '/sales/contacts' },
-      {
-        id: 'relations',
-        label: 'Relations',
-        to: '/platform/relations',
-        badge: 'ELFIS',
-      },
     ],
   },
   {
@@ -144,6 +138,7 @@ export const SALES_FORBIDDEN_PLATFORM_PATHS = [
   '/platform/settings',
   '/platform/documents',
   '/platform/communications',
+  '/platform/relations',
   '/organisation',
   '/admin/equipe',
 ] as const

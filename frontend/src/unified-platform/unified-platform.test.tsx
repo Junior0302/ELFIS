@@ -317,9 +317,9 @@ describe('Unified Platform Vague 2 (UXU14–60)', () => {
     expect(screen.getByTestId('pid').textContent).toBe('elfis-core')
   })
 
-  it('UXU16 — ElfisIcon résout glyph home', () => {
+  it('UXU16 — ElfisIcon résout icône Lucide home', () => {
     const { container } = render(<ElfisIcon id="home" />)
-    expect(container.textContent).toContain('⌂')
+    expect(container.querySelector('svg')).toBeTruthy()
   })
 
   it('UXU17 — resolveElfisIcon path dashboard SVG', () => {

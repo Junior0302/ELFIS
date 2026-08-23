@@ -37,7 +37,7 @@ class Kpi(BaseModel):
 
     id: str
     label: str
-    value: float
+    value: float | None
     unit: str  # "EUR" | "count"
     format: str  # "currency" | "integer"
     status: KpiStatus = KpiStatus.neutral

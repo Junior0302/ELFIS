@@ -1,5 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { bankingApi, connectionStatusLabel, syncStatusLabel } from '../services/bankingApi'
+import {
+  accountTypeLabel,
+  bankingApi,
+  connectionStatusLabel,
+  syncStatusLabel,
+} from '../services/bankingApi'
 
 function mockFetch(payload: unknown, ok = true, status = 200) {
   vi.stubGlobal(
@@ -90,5 +95,34 @@ describe('banking API', () => {
     expect(syncStatusLabel('completed')).toBe('Terminée')
     expect(connectionStatusLabel('connected')).toBe('Connectée')
     expect(connectionStatusLabel('error')).toBe('Erreur')
+    expect(connectionStatusLabel('preparing')).toBe('Connexion en préparation')
+    expect(connectionStatusLabel('awaiting_consent')).toBe('En attente du consentement')
+    expect(connectionStatusLabel('disconnected')).toBe('Déconnectée')
+    expect(accountTypeLabel('checking')).toBe('Compte courant')
+    expect(accountTypeLabel('savings')).toBe('Épargne')
+    expect(accountTypeLabel('card')).toBe('Carte')
+    expect(accountTypeLabel('loan')).toBe('Crédit')
+    expect(accountTypeLabel('investment')).toBe('Investissement')
+    expect(accountTypeLabel('inconnu')).toBe('Autre')
+  })
+
+  it('expose uniquement l’URL temporaire Bridge, sans secret', async () => {
+    mockFetch({
+      ok: true,
+      redirect_url: 'https://connect.bridgeapi.io/session/abc',
+      connection: {
+        id: 2,
+        provider: 'bridge',
+        bank_name: 'Bridge',
+        status: 'awaiting_consent',
+        sync_interval_minutes: 1440,
+        created_at: '2026-08-23',
+      },
+      accounts: [],
+      message: 'Redirection vers le consentement bancaire.',
+    })
+    const res = await bankingApi.connect('tok', 1, 'bridge')
+    expect(res.redirect_url).toBe('https://connect.bridgeapi.io/session/abc')
+    expect(JSON.stringify(res)).not.toMatch(/client_secret|access_token|Client-Secret/i)
   })
 })

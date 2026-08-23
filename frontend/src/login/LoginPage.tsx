@@ -3,9 +3,8 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { useAuth } from '../auth'
 import { mapLoginFailure } from '../authNetwork'
 import { sanitizeReturnPath } from '../platform-routing/returnPath'
-import { LoginBrandPanel } from './LoginBrandPanel'
+import { ElfisAuthShell } from './ElfisAuthShell'
 import { LoginForm } from './LoginForm'
-import './login.css'
 
 function resolveAfterAuthPath(inviteToken: string | null, from: unknown): string {
   if (inviteToken) {
@@ -15,7 +14,7 @@ function resolveAfterAuthPath(inviteToken: string | null, from: unknown): string
 }
 
 /**
- * Login ELFIS Core V1 — expérience premium alignée Landing.
+ * Login ELFIS Core — surface premium plateforme.
  * Flux auth inchangé : Firebase → POST /api/auth/firebase → session.
  */
 export function LoginPage() {
@@ -73,58 +72,40 @@ export function LoginPage() {
     : '/register'
 
   return (
-    <div className="elfis-login" data-product="elfis-core">
-      <header className="elfis-login__top">
-        <Link to="/" className="elfis-login__brand" aria-label="ELFIS Core — accueil">
-          <img src="/favicon.svg" alt="" width={40} height={40} decoding="async" />
-          <span>
-            <strong>ELFIS Core</strong>
-            <small>Plateforme</small>
-          </span>
-        </Link>
-        <Link className="elfis-login__back" to="/">
-          Retour au site
-        </Link>
-      </header>
+    <ElfisAuthShell>
+      <div className="elfis-login__card">
+        <header className="elfis-login__card-head">
+          <h1 id="elfis-login-title">Connexion</h1>
+          <p>Accédez à votre espace sécurisé.</p>
+        </header>
 
-      <div className="elfis-login__grid">
-        <LoginBrandPanel />
-        <section className="elfis-login__panel" aria-labelledby="elfis-login-title">
-          <div className="elfis-login__card">
-            <header className="elfis-login__card-head">
-              <h1 id="elfis-login-title">Connexion</h1>
-              <p>Une seule connexion pour accéder à tout l&apos;écosystème ELFIS.</p>
-            </header>
-
-            {!firebaseReady ? (
-              <div className="elfis-login__alert" role="alert" aria-live="polite">
-                Connexion indisponible pour le moment. Réessayez plus tard ou contactez le support.
-              </div>
-            ) : null}
-
-            <LoginForm
-              email={email}
-              password={password}
-              loading={loading}
-              disabled={!firebaseReady}
-              error={error}
-              errorRef={errorRef}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              onSubmit={onSubmit}
-              forgotPasswordTo="/forgot-password"
-            />
-
-            <p className="elfis-login__switch">
-              Pas encore de compte ? <Link to={registerTo}>Créer un compte</Link>
-            </p>
-            <p className="elfis-login__home">
-              <Link to="/">← Retour à l&apos;accueil</Link>
-            </p>
+        {!firebaseReady ? (
+          <div className="elfis-login__alert" role="alert" aria-live="polite">
+            Connexion indisponible pour le moment. Réessayez plus tard ou contactez le support.
           </div>
-        </section>
+        ) : null}
+
+        <LoginForm
+          email={email}
+          password={password}
+          loading={loading}
+          disabled={!firebaseReady}
+          error={error}
+          errorRef={errorRef}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onSubmit={onSubmit}
+          forgotPasswordTo="/forgot-password"
+        />
+
+        <p className="elfis-login__switch">
+          Pas encore de compte ? <Link to={registerTo}>Créer un compte</Link>
+        </p>
+        <p className="elfis-login__home">
+          <Link to="/">← Retour à l&apos;accueil</Link>
+        </p>
       </div>
-    </div>
+    </ElfisAuthShell>
   )
 }
 

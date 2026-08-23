@@ -90,6 +90,10 @@ class BankAccount(Base):
     iban: Mapped[str] = mapped_column(String(64), default="")
     currency: Mapped[str] = mapped_column(String(8), default="EUR")
     balance: Mapped[float] = mapped_column(Float, default=0.0)
+    # BANK-2 — interne uniquement ; jamais exposé en clair par l'API banking
+    account_type: Mapped[str] = mapped_column(String(32), default="other")
+    available_balance: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    balance_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     connected: Mapped[bool] = mapped_column(Boolean, default=False)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -101,7 +105,8 @@ class BankTransaction(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     account_id: Mapped[int] = mapped_column(Integer, index=True)
     external_id: Mapped[str] = mapped_column(String(128), index=True)
-    booked_at: Mapped[str] = mapped_column(String(32))  # JJ-MM-AAAA
+    booked_at: Mapped[str] = mapped_column(String(32))  # ISO YYYY-MM-DD (legacy JJ-MM-AAAA possible)
+    value_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
     label: Mapped[str] = mapped_column(String(512))
     amount: Mapped[float] = mapped_column(Float)  # + crédit / - débit
     currency: Mapped[str] = mapped_column(String(8), default="EUR")
@@ -109,6 +114,8 @@ class BankTransaction(Base):
     # Banking Platform V1 : statut normalisé + fournisseur d'origine
     status: Mapped[str] = mapped_column(String(16), default="booked")
     source: Mapped[str] = mapped_column(String(32), default="manual")
+    counterparty_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
     is_duplicate: Mapped[bool] = mapped_column(Boolean, default=False)
     is_anomaly: Mapped[bool] = mapped_column(Boolean, default=False)
     anomaly_reason: Mapped[str | None] = mapped_column(Text, nullable=True)

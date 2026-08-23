@@ -119,8 +119,7 @@ export default function FacturationOverviewPage() {
         <p className="muted" style={{ marginTop: 0 }}>
           Les routes historiques restent disponibles :{' '}
           <Link to="/facturation/documents">documents & CRUD</Link>, <Link to="/devis">devis</Link>,{' '}
-          <Link to="/clients">clients</Link>,{' '}
-          <Link to="/platform/relations?tab=customer">ELFIS Relations</Link>.
+          <Link to="/clients">clients</Link>.
         </p>
       </section>
     </div>

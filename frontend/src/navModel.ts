@@ -96,7 +96,6 @@ export const navCategories: readonly NavCategory[] = [
     permission: 'invoice.read',
     children: [
       { id: 'finance', to: '/finance', label: 'Vue d’ensemble', permission: 'invoice.read' },
-      { id: 'banque', to: '/banque', label: 'Banque', permission: 'bank.read' },
       { id: 'tva', to: '/tva', label: 'TVA', permission: 'invoice.read' },
       { id: 'cloture', to: '/cloture', label: 'Clôture', permission: 'invoice.read' },
       { id: 'cockpit', to: '/cockpit', label: 'Centre opérationnel', permission: 'invoice.read' },
@@ -178,13 +177,6 @@ export const navCategories: readonly NavCategory[] = [
     children: [
       { id: 'copilote', to: '/copilote', label: 'Assistant financier', permission: 'ai.analysis' },
       { id: 'signaux', to: '/intelligence', label: 'Signaux', permission: 'ai.analysis' },
-      {
-        id: 'aura',
-        to: '/platform/aura',
-        label: 'Aura',
-        permission: 'ai.analysis',
-        badge: 'ELFIS',
-      },
     ],
   },
   {

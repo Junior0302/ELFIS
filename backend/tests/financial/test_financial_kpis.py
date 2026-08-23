@@ -97,6 +97,22 @@ def test_kpi_statuses_on_empty_org():
     assert kpis["synchronisations_bancaires"].status.value == "neutral"
 
 
+def test_mixed_currencies_kpi_has_no_numeric_total():
+    from app.models import BankAccount
+
+    db = make_financial_db()
+    org = seed_org(db)
+    db.add(BankAccount(organization_id=org.id, currency="EUR", balance=10000.0, connected=True))
+    db.add(BankAccount(organization_id=org.id, currency="USD", balance=5000.0, connected=True))
+    db.commit()
+
+    kpis = {k.id: k for k in build_kpis(_snap(db, org.id))}
+    assert kpis["tresorerie"].value is None
+    assert "EUR" in kpis["tresorerie"].hint
+    assert "USD" in kpis["tresorerie"].hint
+    assert "pas de total unique" in kpis["tresorerie"].hint.lower()
+
+
 def test_treasury_critical_status():
     db = make_financial_db()
     org = seed_org(db)

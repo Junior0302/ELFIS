@@ -39,6 +39,32 @@ def test_mig_006_vault_hash_index():
     assert "checksum" in vault.lower()
 
 
+def test_mig_bank2_postgres_is_additive_and_registered():
+    name = "elfis_banking_bank2_postgres.sql"
+    runner = Path(__file__).resolve().parents[2] / "scripts" / "rc1" / "migrate_sql.py"
+    assert name in runner.read_text(encoding="utf-8")
+    sql = (SQL_DIR / name).read_text(encoding="utf-8").lower()
+    assert "drop" not in sql
+    assert "add column if not exists account_type" in sql
+    assert "add column if not exists available_balance" in sql
+    assert "add column if not exists balance_updated_at" in sql
+    assert "default 'other'" in sql
+    assert "available_balance double precision" in sql
+    assert "not null" not in sql.split("available_balance")[1].split(";")[0]
+    assert "not null" not in sql.split("balance_updated_at")[1].split(";")[0]
+
+
+def test_mig_bank3_postgres_is_additive_and_registered():
+    name = "elfis_banking_bank3_postgres.sql"
+    runner = Path(__file__).resolve().parents[2] / "scripts" / "rc1" / "migrate_sql.py"
+    assert name in runner.read_text(encoding="utf-8")
+    sql = (SQL_DIR / name).read_text(encoding="utf-8").lower()
+    assert "drop" not in sql
+    assert "add column if not exists value_date" in sql
+    assert "add column if not exists counterparty_name" in sql
+    assert "add column if not exists reference" in sql
+
+
 def test_mig_007_search_gin():
     search = (SQL_DIR / "elfis_search_engine_postgres.sql").read_text(encoding="utf-8")
     assert "gin" in search.lower() or "tsvector" in search.lower()

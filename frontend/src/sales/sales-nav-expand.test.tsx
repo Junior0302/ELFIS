@@ -63,7 +63,6 @@ describe('salesNavModel — hiérarchie Commercial', () => {
         '/sales/reports',
         '/sales/intelligence',
         '/sales/settings',
-        '/platform/relations',
       ]),
     )
     expect(tos).not.toContain('/sales/negotiations')
@@ -77,7 +76,6 @@ describe('salesNavModel — hiérarchie Commercial', () => {
     expect(findActiveSalesCategory('/sales/proposals')?.id).toBe('pipeline')
     expect(findActiveSalesCategory('/sales/calendar')?.id).toBe('activites')
     expect(findActiveSalesCategory('/sales/intelligence')?.id).toBe('reporting')
-    expect(findActiveSalesCategory('/platform/relations')?.id).toBe('clients')
     expect(findActiveSalesCategory('/sales')?.id).toBe('dashboard')
   })
 
@@ -125,11 +123,13 @@ describe('SalesProductNav — expand / collapse', () => {
     expect(within(flyout).getByRole('link', { name: 'Propositions' })).toBeTruthy()
   })
 
-  it('Relations contextuel sous Clients avec badge ELFIS', () => {
+  it('Clients Commercial sans lien Relations plateforme', () => {
     renderNav('/sales/companies')
-    const link = screen.getByRole('link', { name: /Relations/i })
-    expect(link.getAttribute('href')).toBe('/platform/relations')
-    expect(within(link).getByLabelText('ELFIS')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /^Relations$/i })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Entreprises' })).toHaveAttribute(
+      'href',
+      '/sales/companies',
+    )
   })
 
   it('Paramètres → Général', () => {

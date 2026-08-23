@@ -9,8 +9,7 @@ type LandingLogoProps = {
 }
 
 /**
- * Logo officiel affiché sur la Landing.
- * Même asset que ComptaPilot / shells legacy : `/favicon.svg`.
+ * Marque ELFIS Core — hexagone navy, arbre vert, wordmark officiel.
  */
 export function LandingLogo({ className, withWordmark = true, size = 'md' }: LandingLogoProps) {
   return (
@@ -19,7 +18,9 @@ export function LandingLogo({ className, withWordmark = true, size = 'md' }: Lan
       className={cx('landing-logo', `landing-logo--${size}`, className)}
       aria-label="ELFIS Core — accueil"
     >
-      <img src="/favicon.svg" alt="" width={40} height={40} decoding="async" />
+      <span className="landing-logo__glass">
+        <img src="/elfis-core-mark.svg" alt="" width={40} height={40} decoding="async" />
+      </span>
       {withWordmark ? (
         <span className="landing-logo__text">
           <strong>ELFIS Core</strong>

@@ -89,42 +89,6 @@ export const projetsWorkspaceConfig = soon({
   capabilities: ['Projets', 'Tâches', 'Jalons'],
 })
 
-export const banqueWorkspaceConfig = soon({
-  id: 'banque',
-  label: 'Banque',
-  description: 'Relevés et synchronisation.',
-  engineLabel: null,
-  engineProductId: null,
-  icon: 'landmark',
-  accent: WORKSPACE_ACCENTS.banque,
-  searchAliases: ['banque', 'relevé', 'relevés', 'synchronisation', 'compte', 'virement'],
-  capabilities: ['Relevés', 'Synchronisation', 'Comptes'],
-})
-
-export const comptabiliteWorkspaceConfig = soon({
-  id: 'comptabilite',
-  label: 'Comptabilité',
-  description: 'Écritures et clôtures.',
-  engineLabel: null,
-  engineProductId: null,
-  icon: 'calculator',
-  accent: WORKSPACE_ACCENTS.comptabilite,
-  searchAliases: ['comptabilité', 'écriture', 'écritures', 'clôture', 'bilan', 'journal'],
-  capabilities: ['Écritures', 'Clôtures', 'Bilan'],
-})
-
-export const facturationWorkspaceConfig = soon({
-  id: 'facturation',
-  label: 'Facturation',
-  description: 'Devis, factures et paiements.',
-  engineLabel: null,
-  engineProductId: null,
-  icon: 'receipt',
-  accent: WORKSPACE_ACCENTS.facturation,
-  searchAliases: ['facture', 'facturation', 'devis', 'paiement', 'paiements', 'avoir'],
-  capabilities: ['Devis', 'Factures', 'Paiements'],
-})
-
 export const conformiteWorkspaceConfig = soon({
   id: 'conformite',
   label: 'Conformité',

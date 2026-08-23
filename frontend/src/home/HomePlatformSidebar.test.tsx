@@ -15,7 +15,7 @@ vi.mock('../auth', () => ({
     memberships: [
       {
         organization_id: 1,
-        permissions: ['*', 'documents.read', 'users.manage', 'ai.analysis'],
+        permissions: ['*', 'documents.read', 'users.manage', 'ai.analysis', 'bank.read'],
       },
     ],
     orgId: 1,
@@ -64,7 +64,11 @@ describe('HomePlatformSidebar', () => {
       'href',
       '/platform/communications',
     )
-    expect(screen.getByRole('link', { name: /aide/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /aide/i })).toHaveAttribute('href', '/platform/help')
+    expect(screen.getByRole('link', { name: /recherche globale/i })).toHaveAttribute(
+      'href',
+      '/platform/search',
+    )
     expect(screen.getByRole('button', { name: /déconnexion/i })).toBeInTheDocument()
     expect(screen.getByText('ELFIS')).toBeInTheDocument()
     expect(screen.queryByText('ELFIS Core')).toBeNull()

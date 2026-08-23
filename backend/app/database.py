@@ -170,11 +170,17 @@ def init_db() -> None:
         "connection_id": "connection_id INTEGER",
         "provider": "provider VARCHAR(32) DEFAULT 'manual'",
         "external_id": "external_id VARCHAR(128) DEFAULT ''",
+        "account_type": "account_type VARCHAR(32) DEFAULT 'other'",
+        "available_balance": "available_balance FLOAT",
+        "balance_updated_at": "balance_updated_at DATETIME",
     }.items():
         _sqlite_add_column_if_missing("bank_accounts", column, ddl)
     for column, ddl in {
         "status": "status VARCHAR(16) DEFAULT 'booked'",
         "source": "source VARCHAR(32) DEFAULT 'manual'",
+        "value_date": "value_date VARCHAR(32)",
+        "counterparty_name": "counterparty_name VARCHAR(255)",
+        "reference": "reference VARCHAR(128)",
     }.items():
         _sqlite_add_column_if_missing("bank_transactions", column, ddl)
     _sqlite_add_column_if_missing("organizations", "address", "address TEXT DEFAULT ''")

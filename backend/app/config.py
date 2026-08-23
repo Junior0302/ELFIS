@@ -144,10 +144,16 @@ class Settings(BaseSettings):
     banking_bridge_api_url: str = "https://api.bridgeapi.io"
     banking_bridge_client_id: str = ""
     banking_bridge_client_secret: str = ""
+    # Callback ELFIS pour le retour Bridge Connect (domaine à autoriser chez Bridge)
+    banking_bridge_redirect_uri: str = ""
     banking_powens_api_url: str = ""
     banking_powens_client_id: str = ""
     banking_powens_client_secret: str = ""
     banking_sync_max_attempts: int = 3
+    banking_sync_max_pages: int = 50
+    banking_sync_max_transactions_per_run: int = 10000
+    banking_sync_overlap_days: int = 7
+    banking_sync_run_timeout_seconds: int = 180
     # Financial Dashboard V1 — cache et seuils d'alertes
     financial_cache_ttl_seconds: int = 60
     financial_treasury_low_threshold: float = 5000.0
@@ -201,7 +207,7 @@ class Settings(BaseSettings):
     brevo_webhook_secret: str = ""
     # Adresse technique authentifiée (ex. documents@elfiscore.com)
     platform_email_from: str = ""
-    platform_email_from_name: str = "ComptaPilot"
+    platform_email_from_name: str = "ELFIS Core"
     # Alias rétrocompatibles
     smtp_host: str = ""
     smtp_port: int = 587
@@ -409,7 +415,7 @@ class Settings(BaseSettings):
 
     @property
     def effective_platform_from_name(self) -> str:
-        return (self.platform_email_from_name or self.product_name or "ComptaPilot").strip()
+        return (self.platform_email_from_name or "ELFIS Core").strip()
 
     @staticmethod
     def _clean_secret(value: str) -> str:

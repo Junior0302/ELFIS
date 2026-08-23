@@ -2,9 +2,11 @@
 
 Gère :
 - première importation (initial) et synchronisation incrémentale
-- détection des doublons (external_id + empreinte montant/libellé/date)
+- identité primaire provider (account + external_id)
+- empreinte métier uniquement comme candidat (jamais une suppression)
+- pagination fournisseur opaque + garde-fous
 - retry automatique (erreurs fournisseur transitoires)
-- reprise après erreur (curseur persisté dans le journal)
+- reprise après erreur (curseur incrémental persisté, pas le curseur de page)
 - journalisation complète (ElfisBankSyncRun)
 """
 
@@ -13,7 +15,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -32,6 +34,7 @@ from app.banking.banking_types import (
 )
 from app.banking.connectors.base import ConnectorError
 from app.banking.engine import BankingEngine, BankingEngineError
+from app.banking.transaction_identity import business_fingerprint
 from app.models import BankAccount, BankTransaction
 from app.services.banking import categorize
 
@@ -52,6 +55,14 @@ class SyncEngine:
         self.engine = BankingEngine(db)
         self.max_attempts = max(1, max_attempts or settings.banking_sync_max_attempts)
         self.retry_delay_seconds = max(0.0, retry_delay_seconds)
+        self.max_pages = max(1, int(getattr(settings, "banking_sync_max_pages", 50) or 50))
+        self.max_transactions = max(
+            1, int(getattr(settings, "banking_sync_max_transactions_per_run", 10000) or 10000)
+        )
+        self.overlap_days = max(0, int(getattr(settings, "banking_sync_overlap_days", 7) or 0))
+        self.run_timeout_seconds = max(
+            1, int(getattr(settings, "banking_sync_run_timeout_seconds", 180) or 180)
+        )
 
     # ------------------------------------------------------------------ #
     # API publique
@@ -70,7 +81,9 @@ class SyncEngine:
             connections = [
                 c
                 for c in self.engine.list_connections(organization_id)
-                if c.status != ConnectionStatus.disconnected.value
+                if c.status
+                in {ConnectionStatus.connected.value, ConnectionStatus.error.value}
+                and (c.provider_connection_id or "").strip()
             ]
         if not connections:
             raise BankingEngineError(
@@ -99,8 +112,13 @@ class SyncEngine:
     def _sync_connection(
         self, connection: ElfisBankConnection, *, trigger: str
     ) -> ElfisBankSyncRun:
-        if connection.status == ConnectionStatus.disconnected.value:
-            raise BankingEngineError("Connexion déconnectée : reconnectez la banque.")
+        if connection.status not in {
+            ConnectionStatus.connected.value,
+            ConnectionStatus.error.value,
+        } or not (connection.provider_connection_id or "").strip():
+            raise BankingEngineError(
+                "Connexion bancaire non prête : le consentement doit d'abord aboutir."
+            )
 
         previous_runs = (
             self.db.query(ElfisBankSyncRun)
@@ -177,25 +195,103 @@ class SyncEngine:
 
     def _execute_attempt(self, connection: ElfisBankConnection, run: ElfisBankSyncRun) -> None:
         connector = self.engine.get_connector_for(connection)
-        connector.refresh(connection.provider_connection_id)
+        org_id = connection.organization_id
+        connector.refresh(connection.provider_connection_id, organization_id=org_id)
         accounts = self.engine.upsert_accounts(
-            connection, connector.list_accounts(connection.provider_connection_id)
+            connection,
+            connector.list_accounts(
+                connection.provider_connection_id, organization_id=org_id
+            ),
         )
         run.accounts_synced = len(accounts)
 
-        since = self._cursor_to_date(run.cursor) if run.sync_type == SyncType.incremental.value or run.resumed_from_cursor else None
+        since = self._incremental_since(run)
+        imported = 0
+        attempt_started = time.monotonic()
         for account in accounts:
-            transactions = connector.list_transactions(
+            if account.organization_id != run.organization_id:
+                raise ConnectorError(
+                    "Isolation tenant : compte hors organisation.",
+                    retryable=False,
+                )
+            imported += self._sync_account_pages(
+                connector,
+                connection,
+                account,
+                run,
+                since=since,
+                imported_so_far=imported,
+                attempt_started=attempt_started,
+            )
+            account.last_sync_at = datetime.utcnow()
+            self.db.add(account)
+            # Curseur incrémental persisté après chaque compte : reprise possible.
+            self.db.add(run)
+            self.db.commit()
+
+    def _incremental_since(self, run: ElfisBankSyncRun) -> date | None:
+        cursor_date = self._cursor_to_date(run.cursor)
+        if cursor_date is None:
+            return None
+        if run.sync_type != SyncType.incremental.value and not run.resumed_from_cursor:
+            return None
+        return cursor_date - timedelta(days=self.overlap_days)
+
+    def _sync_account_pages(
+        self,
+        connector,
+        connection: ElfisBankConnection,
+        account: BankAccount,
+        run: ElfisBankSyncRun,
+        *,
+        since: date | None,
+        imported_so_far: int,
+        attempt_started: float,
+    ) -> int:
+        seen_cursors: set[str] = set()
+        cursor: str | None = None
+        imported = 0
+        for page_index in range(1, self.max_pages + 1):
+            if time.monotonic() - attempt_started > self.run_timeout_seconds:
+                raise ConnectorError("Délai de synchronisation dépassé.", retryable=True)
+            page = connector.list_transaction_page(
                 connection.provider_connection_id,
                 account.external_id,
                 since=since,
+                cursor=cursor,
+                organization_id=run.organization_id,
             )
-            self._apply_transactions(account, transactions, run)
-            account.last_sync_at = datetime.utcnow()
-            self.db.add(account)
-            # Curseur persisté après chaque compte : reprise possible en cas d'échec.
+            batch = list(page.transactions or [])
+            if imported_so_far + imported + len(batch) > self.max_transactions:
+                raise ConnectorError(
+                    "Nombre maximal de transactions atteint pour ce run.",
+                    retryable=False,
+                )
+            self._apply_transactions(account, batch, run)
+            imported += len(batch)
             self.db.add(run)
             self.db.commit()
+            if not page.has_more:
+                return imported
+            next_cursor = (page.next_cursor or "").strip()
+            if not next_cursor:
+                raise ConnectorError(
+                    "Pagination incohérente : has_more sans curseur.",
+                    retryable=False,
+                )
+            if next_cursor == (cursor or "") or next_cursor in seen_cursors:
+                raise ConnectorError(
+                    "Pagination incohérente : curseur répété.",
+                    retryable=False,
+                )
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+            if page_index >= self.max_pages:
+                raise ConnectorError(
+                    "Nombre maximal de pages atteint pour ce run.",
+                    retryable=False,
+                )
+        raise ConnectorError("Nombre maximal de pages atteint pour ce run.", retryable=False)
 
     def _apply_transactions(
         self,
@@ -203,30 +299,22 @@ class SyncEngine:
         transactions: list[NormalizedTransaction],
         run: ElfisBankSyncRun,
     ) -> None:
-        existing = {
-            tx.external_id: tx
-            for tx in self.db.query(BankTransaction)
+        rows = (
+            self.db.query(BankTransaction)
             .filter(BankTransaction.account_id == account.id)
             .all()
-        }
+        )
+        existing = {tx.external_id: tx for tx in rows if (tx.external_id or "").strip()}
         fingerprints = {
-            (round(tx.amount, 2), tx.label.strip().lower(), tx.booked_at)
-            for tx in existing.values()
+            business_fingerprint(tx.amount, tx.label, tx.booked_at) for tx in rows
         }
         max_booked = self._cursor_to_date(run.cursor)
         for item in sorted(transactions, key=lambda t: t.booked_at):
             booked_iso = item.booked_at.isoformat()
-            current = existing.get(item.external_id)
+            provider_id = (item.external_id or "").strip()
+            current = existing.get(provider_id) if provider_id else None
             if current:
-                if (
-                    round(current.amount, 2) != round(item.amount, 2)
-                    or current.label != item.label
-                    or current.status != item.status.value
-                ):
-                    current.amount = round(item.amount, 2)
-                    current.label = item.label
-                    current.status = item.status.value
-                    current.category = item.category or categorize(item.label)
+                if self._apply_update(current, item, booked_iso):
                     self.db.add(current)
                     self.db.commit()
                     run.transactions_updated += 1
@@ -239,25 +327,27 @@ class SyncEngine:
                 else:
                     run.duplicates_skipped += 1
             else:
-                fingerprint = (round(item.amount, 2), item.label.strip().lower(), booked_iso)
-                if fingerprint in fingerprints:
-                    run.duplicates_skipped += 1
-                    continue
+                fingerprint = business_fingerprint(item.amount, item.label, booked_iso)
                 tx = BankTransaction(
                     account_id=account.id,
-                    external_id=item.external_id,
+                    external_id=provider_id,
                     booked_at=booked_iso,
+                    value_date=item.value_date.isoformat() if item.value_date else None,
                     label=item.label,
                     amount=round(item.amount, 2),
                     currency=item.currency,
                     category=item.category or categorize(item.label),
                     status=item.status.value,
                     source=item.source,
+                    counterparty_name=item.counterparty_name,
+                    reference=item.reference,
+                    is_duplicate=fingerprint in fingerprints,
                 )
                 self.db.add(tx)
                 self.db.commit()
                 self.db.refresh(tx)
-                existing[item.external_id] = tx
+                if provider_id:
+                    existing[provider_id] = tx
                 fingerprints.add(fingerprint)
                 run.transactions_created += 1
                 publish_transaction_created(
@@ -270,6 +360,34 @@ class SyncEngine:
                 max_booked = item.booked_at
         if max_booked is not None:
             run.cursor = max_booked.isoformat()
+
+    @staticmethod
+    def _apply_update(current: BankTransaction, item: NormalizedTransaction, booked_iso: str) -> bool:
+        value_iso = item.value_date.isoformat() if item.value_date else None
+        new_amount = round(item.amount, 2)
+        new_status = item.status.value
+        changed = (
+            round(current.amount, 2) != new_amount
+            or current.label != item.label
+            or current.status != new_status
+            or current.booked_at != booked_iso
+            or getattr(current, "value_date", None) != value_iso
+            or getattr(current, "counterparty_name", None) != item.counterparty_name
+            or getattr(current, "reference", None) != item.reference
+            or current.currency != item.currency
+        )
+        if not changed:
+            return False
+        current.amount = new_amount
+        current.label = item.label
+        current.status = new_status
+        current.booked_at = booked_iso
+        current.value_date = value_iso
+        current.counterparty_name = item.counterparty_name
+        current.reference = item.reference
+        current.currency = item.currency
+        current.category = item.category or current.category or categorize(item.label)
+        return True
 
     # ------------------------------------------------------------------ #
     # Finalisation

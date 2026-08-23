@@ -11,7 +11,8 @@ export const MAILER_REASON_MESSAGES: Record<string, string> = {
   sender_not_configured: 'Expéditeur plateforme manquant (PLATFORM_EMAIL_FROM).',
   sender_not_verified: 'L’expéditeur plateforme n’est pas validé chez le fournisseur.',
   provider_unreachable: 'Le fournisseur d’e-mail est injoignable. Réessayez plus tard.',
-  authentication_failed: 'Authentification refusée par le fournisseur (SMTP / API).',
+  authentication_failed:
+    'Le service d’envoi ELFIS n’a pas pu s’authentifier auprès du fournisseur de messagerie.',
   attachment_missing: 'Pièce jointe PDF manquante ou non générée.',
   recipient_missing: 'Destinataire manquant.',
   recipient_invalid: 'Adresse e-mail destinataire invalide.',

@@ -89,6 +89,23 @@ def test_snapshot_sync_state():
     assert sync["failed_runs_7d"] == 1
 
 
+def test_mixed_currencies_are_not_summed_into_treasury():
+    from app.models import BankAccount
+
+    db = make_financial_db()
+    org = seed_org(db)
+    db.add(BankAccount(organization_id=org.id, currency="EUR", balance=100.0, connected=True))
+    db.add(BankAccount(organization_id=org.id, currency="USD", balance=200.0, connected=True))
+    db.commit()
+    snap = _engine(db).snapshot(org.id, today=TODAY)
+    assert snap["treasury_homogeneous"] is False
+    assert snap["treasury_by_currency"] == {"EUR": 100.0, "USD": 200.0}
+    assert snap["treasury"] is None
+    assert snap["treasury_series"] == []
+    assert snap["forecast"] == {"30": 0.0, "60": 0.0, "90": 0.0}
+    assert any("plusieurs devises" in r for r in snap["recommendations"])
+
+
 def test_snapshot_isolated_by_organization():
     db = make_financial_db()
     org_a = seed_org(db, "Org A")
@@ -100,6 +117,9 @@ def test_snapshot_isolated_by_organization():
     assert snap_b["treasury"] == 0.0
     assert snap_b["revenue"] == 0.0
     assert snap_b["has_data"] is False
+    snap_a = _engine(db).snapshot(org_a.id, today=TODAY)
+    assert snap_a["treasury"] == 12000.0
+    assert snap_a["accounts_count"] == 1
 
 
 def test_empty_organization_snapshot_is_safe():
@@ -139,6 +159,7 @@ def test_snapshot_compat_matches_legacy_contract():
         "forecast", "tensions", "recommendations", "supplier_ht", "supplier_vat",
         "to_review", "ca", "unpaid", "overdue_clients", "charges", "marge",
         "marge_pct", "top_charge", "has_data",
+        "treasury_homogeneous", "treasury_by_currency",
     }
     assert set(compat.keys()) == expected_keys
     assert compat["balance"] == 12000.0

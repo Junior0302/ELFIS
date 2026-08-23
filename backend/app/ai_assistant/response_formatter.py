@@ -125,12 +125,24 @@ def format_deterministic(intent: str, results: list[ToolResult], *, question: st
     if cash:
         d = cash.data
         if d.get("has_bank"):
-            facts.append(f"Trésorerie actuelle : {_euro(float(d['treasury']))}.")
-            fc = d.get("forecast") or {}
-            estimates.append(
-                f"Projection de trésorerie — 30 j : {_euro(float(fc.get('30', 0)))}, "
-                f"60 j : {_euro(float(fc.get('60', 0)))}, 90 j : {_euro(float(fc.get('90', 0)))}."
-            )
+            if d.get("treasury_homogeneous", True) and d.get("treasury") is not None:
+                facts.append(f"Trésorerie actuelle : {_euro(float(d['treasury']))}.")
+                fc = d.get("forecast") or {}
+                estimates.append(
+                    f"Projection de trésorerie — 30 j : {_euro(float(fc.get('30', 0)))}, "
+                    f"60 j : {_euro(float(fc.get('60', 0)))}, 90 j : {_euro(float(fc.get('90', 0)))}."
+                )
+            else:
+                parts = [
+                    f"{float(amount):.2f} {ccy}"
+                    for ccy, amount in sorted((d.get("treasury_by_currency") or {}).items())
+                ]
+                facts.append(
+                    "Trésorerie multi-devises — aucun total unique : " + " · ".join(parts) + "."
+                    if parts
+                    else "Trésorerie multi-devises — aucun total unique n'est calculé."
+                )
+                missing.append("Conversion de devises absente — aucun total unique n'est calculé.")
             for t in d.get("tensions") or []:
                 estimates.append(str(t))
             for reco in (d.get("recommendations") or [])[:2]:
@@ -245,6 +257,13 @@ def format_deterministic(intent: str, results: list[ToolResult], *, question: st
     kpis = by.get("get_kpis")
     if kpis and intent in {"overview", "kpis", "health"}:
         for k in (kpis.data.get("kpis") or [])[:6]:
+            if k.get("value") is None:
+                facts.append(
+                    f"{k['label']} : non agrégeable"
+                    + (f" ({k['hint']})" if k.get("hint") else "")
+                    + f" (statut {k['status']})."
+                )
+                continue
             unit = " €" if k.get("unit") == "EUR" else ""
             facts.append(f"{k['label']} : {k['value']}{unit} (statut {k['status']}).")
 
@@ -294,8 +313,11 @@ def format_deterministic(intent: str, results: list[ToolResult], *, question: st
 
 def _summary(intent: str, by: dict[str, ToolResult], facts: list[str]) -> str:
     if intent == "cashflow" and "get_cashflow" in by:
-        t = by["get_cashflow"].data.get("treasury", 0)
-        return f"Votre trésorerie s'élève à {_euro(float(t))}."
+        cash = by["get_cashflow"].data
+        t = cash.get("treasury")
+        if cash.get("treasury_homogeneous", True) and t is not None:
+            return f"Votre trésorerie s'élève à {_euro(float(t))}."
+        return "Vos comptes sont dans plusieurs devises — aucun total unique n'est disponible."
     if intent == "unpaid" and "get_unpaid_invoices" in by:
         d = by["get_unpaid_invoices"].data
         return (

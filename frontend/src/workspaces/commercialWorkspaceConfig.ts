@@ -109,12 +109,6 @@ export const commercialWorkspaceConfig: WorkspaceConfig = {
       children: [
         { id: 'clients-companies', label: 'Entreprises', to: '/sales/companies' },
         { id: 'clients-contacts', label: 'Contacts', to: '/sales/contacts' },
-        {
-          id: 'relations',
-          label: 'Relations',
-          to: '/platform/relations',
-          badge: 'ELFIS',
-        },
       ],
     },
     {

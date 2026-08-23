@@ -57,6 +57,8 @@ SQL_ORDER = [
     "elfis_accounting_intelligence_v2_postgres.sql",
     "elfis_workspace_provisioning_v1_postgres.sql",
     "elfis_launch_dashboard_v1_postgres.sql",
+    "elfis_banking_bank2_postgres.sql",
+    "elfis_banking_bank3_postgres.sql",
 ]
 
 EXPECTED_TABLE_FAMILIES = [
@@ -255,6 +257,7 @@ def ensure_search_gin_index(engine: Engine) -> dict[str, Any]:
 def upgrade_head(database_url: str) -> dict[str, Any]:
     """Applique le schéma complet sur PostgreSQL (idempotent)."""
     # Import tardif pour éviter effets de bord
+    import app.models  # noqa: F401 — BankAccount et tables cœur (create_all)
     import app.billing.billing_models  # noqa: F401
     import app.jobs.job_models  # noqa: F401
     import app.events.event_models  # noqa: F401

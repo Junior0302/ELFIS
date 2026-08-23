@@ -16,6 +16,7 @@ import {
   flattenElfisNavItems,
   getMainNavSections,
   isElfisNavItemActive,
+  isElfisCoreOwnedPath,
 } from './elfisNavigationConfig'
 import { PLATFORM_ICON_GLYPHS } from '../../unified-platform/icons/ElfisIconSystem'
 
@@ -30,7 +31,7 @@ vi.mock('../../auth', () => ({
         organization_id: 1,
         organization_name: 'Acme',
         role: 'admin',
-        permissions: ['*', 'documents.read', 'users.manage', 'ai.analysis'],
+        permissions: ['*', 'documents.read', 'users.manage', 'ai.analysis', 'bank.read'],
       },
     ],
     orgId: 1,
@@ -174,6 +175,13 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     )
   })
 
+  it('NC12b — Synchronisation bancaire (Core, pas Finance)', () => {
+    renderSidebar()
+    expect(
+      within(getSidebarNav()).getByRole('link', { name: /synchronisation bancaire/i }),
+    ).toHaveAttribute('href', '/platform/banking')
+  })
+
   it('NC13 — Notifications', () => {
     renderSidebar()
     expect(within(getSidebarNav()).getByRole('link', { name: /^notifications$/i })).toHaveAttribute(
@@ -223,7 +231,7 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     renderSidebar()
     expect(within(getSidebarNav()).getByRole('link', { name: /recherche globale/i })).toHaveAttribute(
       'href',
-      '/search',
+      '/platform/search',
     )
   })
 
@@ -231,8 +239,19 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     renderSidebar()
     expect(screen.getByRole('link', { name: /aide et support/i })).toHaveAttribute(
       'href',
-      '/home#home-status',
+      '/platform/help',
     )
+  })
+
+  it('NC20b — destinations menu Core restent sur ELFIS Core', () => {
+    for (const item of flattenElfisNavItems()) {
+      if (!item.to) continue
+      expect(isElfisCoreOwnedPath(item.to)).toBe(true)
+      expect(item.to.startsWith('/search')).toBe(false)
+      expect(item.to.startsWith('/copilote')).toBe(false)
+      expect(item.to.startsWith('/finance')).toBe(false)
+      expect(item.to.startsWith('/sales')).toBe(false)
+    }
   })
 
   it('NC21 — Déconnexion', () => {
@@ -263,6 +282,12 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     expect(within(screen.getByRole('dialog')).queryByText('ELFIS Core')).toBeNull()
   })
 
+  it('NC23b — pictogrammes rendus en Lucide SVG', () => {
+    const { container } = renderSidebar()
+    const icons = container.querySelectorAll('.elfis-gnav__icon svg')
+    expect(icons.length).toBeGreaterThanOrEqual(flattenElfisNavItems().length)
+  })
+
   it('NC23 — pictogrammes mapping', () => {
     const expected: Record<string, string> = {
       home: 'home',
@@ -273,6 +298,7 @@ describe('NAV.CORE.1 NC01–NC30', () => {
       roles: 'shield',
       relations: 'network',
       documents: 'file',
+      banking: 'landmark',
       notifications: 'bell',
       communications: 'mail',
       settings: 'settings',
@@ -294,6 +320,7 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     expect(ids).not.toContain('roles')
     expect(ids).not.toContain('documents')
     expect(ids).not.toContain('intelligence')
+    expect(ids).not.toContain('banking')
     expect(ids).toContain('home')
     expect(ids).toContain('logout')
   })
@@ -313,8 +340,7 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     const home = flattenElfisNavItems().find((i) => i.id === 'home')!
     const favorites = flattenElfisNavItems().find((i) => i.id === 'favorites')!
     const activity = flattenElfisNavItems().find((i) => i.id === 'activity')!
-    const help = flattenElfisNavItems().find((i) => i.id === 'help')!
-    const homeLinked = [home, favorites, activity, help]
+    const homeLinked = [home, favorites, activity]
 
     const activeOn = (path: string, hash: string) =>
       homeLinked.filter((item) => isElfisNavItemActive(path, hash, item)).map((i) => i.id)
@@ -324,9 +350,11 @@ describe('NAV.CORE.1 NC01–NC30', () => {
     expect(activeOn('/home', 'home-spaces')).toEqual(['favorites'])
     expect(activeOn('/home', '#home-spaces')).toEqual(['favorites'])
     expect(activeOn('/home', 'home-activity')).toEqual(['activity'])
-    expect(activeOn('/home', 'home-status')).toEqual(['help'])
     expect(activeOn('/home', 'unknown')).toEqual([])
     expect(activeOn('/platform/settings', '')).toEqual([])
+    expect(isElfisNavItemActive('/platform/help', '', flattenElfisNavItems().find((i) => i.id === 'help')!)).toBe(
+      true,
+    )
   })
 
   it('NC25c — UI : un seul aria-current sur /home et hashes', () => {
@@ -334,7 +362,7 @@ describe('NAV.CORE.1 NC01–NC30', () => {
       { path: '/home', activeName: /^accueil$/i },
       { path: '/home#home-spaces', activeName: /^favoris$/i },
       { path: '/home#home-activity', activeName: /^activité$/i },
-      { path: '/home#home-status', activeName: /aide et support/i },
+      { path: '/platform/help', activeName: /aide et support/i },
     ]
     for (const { path, activeName } of cases) {
       cleanup()

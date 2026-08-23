@@ -111,7 +111,17 @@ class FinancialEngine:
                 .all()
             )
 
-        treasury = round(sum(float(a.balance) for a in accounts), 2)
+        treasury_by_currency: dict[str, float] = {}
+        for account in accounts:
+            ccy = (account.currency or "EUR").strip() or "EUR"
+            treasury_by_currency[ccy] = round(
+                treasury_by_currency.get(ccy, 0.0) + float(account.balance), 2
+            )
+        treasury_homogeneous = len(treasury_by_currency) <= 1
+        # Multi-devises : aucun total unique (pas de FX). None ≠ trésorerie nulle.
+        treasury = (
+            round(sum(treasury_by_currency.values()), 2) if treasury_homogeneous else None
+        )
         credits = round(sum(t.amount for t in txs if t.amount > 0), 2)
         debits = round(sum(t.amount for t in txs if t.amount < 0), 2)
         expenses = round(abs(debits), 2)
@@ -193,15 +203,18 @@ class FinancialEngine:
             k = _month_key(d)
             net_by_month[k] = round(net_by_month.get(k, 0.0) + t.amount, 2)
         treasury_series: list[dict] = []
-        running = treasury
-        for k in reversed(month_keys):
-            treasury_series.append({"period": k, "value": round(running, 2)})
-            running -= net_by_month.get(k, 0.0)
-        treasury_series.reverse()
+        if treasury_homogeneous and treasury is not None:
+            running = treasury
+            for k in reversed(month_keys):
+                treasury_series.append({"period": k, "value": round(running, 2)})
+                running -= net_by_month.get(k, 0.0)
+            treasury_series.reverse()
 
         # --- Prévision de trésorerie 30/60/90 j (formule historique conservée) ---
         forecast, tensions, recommendations = self._forecast(
-            treasury, txs, has_account=bool(accounts)
+            treasury,
+            txs,
+            has_account=bool(accounts) and treasury_homogeneous,
         )
 
         # --- Synchronisations bancaires ---
@@ -214,6 +227,8 @@ class FinancialEngine:
             "computed_at": datetime.utcnow().isoformat(),
             "today": today.isoformat(),
             "treasury": treasury,
+            "treasury_by_currency": treasury_by_currency,
+            "treasury_homogeneous": treasury_homogeneous,
             "accounts_count": len(accounts),
             "has_bank": bool(accounts),
             "tx_count": len(txs),
@@ -279,8 +294,14 @@ class FinancialEngine:
 
     @staticmethod
     def _forecast(
-        treasury: float, txs: list[BankTransaction], *, has_account: bool
+        treasury: float | None, txs: list[BankTransaction], *, has_account: bool
     ) -> tuple[dict, list[str], list[str]]:
+        if treasury is None:
+            return (
+                {"30": 0.0, "60": 0.0, "90": 0.0},
+                [],
+                ["Soldes dans plusieurs devises — aucune projection unique sans conversion."],
+            )
         if not has_account:
             return (
                 {"30": 0.0, "60": 0.0, "90": 0.0},
@@ -559,6 +580,8 @@ class FinancialEngine:
         marge = round(snap["revenue"] - snap["expenses"], 2) if snap["revenue"] or snap["expenses"] else 0.0
         return {
             "balance": snap["treasury"],
+            "treasury_homogeneous": snap.get("treasury_homogeneous", True),
+            "treasury_by_currency": snap.get("treasury_by_currency") or {},
             "credits": snap["credits"],
             "debits": snap["debits"],
             "duplicates": snap["duplicates"],
@@ -630,16 +653,30 @@ def build_kpis(snap: dict) -> list[Kpi]:
     cur = monthly.get(keys[-1], {"revenue": 0.0, "expenses": 0.0})
     prev = monthly.get(keys[-2], {"revenue": 0.0, "expenses": 0.0}) if len(keys) > 1 else cur
     series = snap["treasury_series"]
-    treasury_prev = series[-2]["value"] if len(series) > 1 else snap["treasury"]
+    treasury_homogeneous = snap.get("treasury_homogeneous", True)
+    treasury_value = snap["treasury"] if treasury_homogeneous else None
+    treasury_prev = series[-2]["value"] if len(series) > 1 else treasury_value
+    treasury_trend = (
+        _trend(treasury_value, treasury_prev)
+        if treasury_value is not None and treasury_prev is not None
+        else KpiTrend()
+    )
 
     treasury_status = KpiStatus.neutral
-    if snap["has_bank"]:
-        if snap["treasury"] < 1000:
+    treasury_hint = f"Projection 30 j : {snap['forecast']['30']:.0f} €"
+    if snap["has_bank"] and treasury_homogeneous and treasury_value is not None:
+        if treasury_value < 1000:
             treasury_status = KpiStatus.critical
-        elif snap["treasury"] < 5000:
+        elif treasury_value < 5000:
             treasury_status = KpiStatus.warning
         else:
             treasury_status = KpiStatus.ok
+    elif snap["has_bank"] and not treasury_homogeneous:
+        parts = [
+            f"{amount:.2f} {ccy}"
+            for ccy, amount in sorted((snap.get("treasury_by_currency") or {}).items())
+        ]
+        treasury_hint = "Soldes par devise (pas de total unique) : " + " · ".join(parts)
 
     month_result_prev = round(prev["revenue"] - prev["expenses"], 2)
 
@@ -664,12 +701,12 @@ def build_kpis(snap: dict) -> list[Kpi]:
         Kpi(
             id="tresorerie",
             label="Trésorerie",
-            value=snap["treasury"],
+            value=treasury_value,
             unit="EUR",
             format="currency",
             status=treasury_status,
-            trend=_trend(snap["treasury"], treasury_prev),
-            hint=f"Projection 30 j : {snap['forecast']['30']:.0f} €",
+            trend=treasury_trend,
+            hint=treasury_hint,
         ),
         Kpi(
             id="revenus",

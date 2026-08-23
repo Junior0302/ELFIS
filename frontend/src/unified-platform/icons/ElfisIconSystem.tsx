@@ -5,6 +5,7 @@
 
 import type { ReactNode } from 'react'
 import { navIcons } from '../../components/NavIcons'
+import { resolvePlatformNavIcon } from './platformNavIcons'
 
 export type ElfisIconId =
   | keyof typeof PLATFORM_ICON_GLYPHS
@@ -23,6 +24,7 @@ export const PLATFORM_ICON_GLYPHS = {
   user: '☺',
   network: '◎',
   file: '▤',
+  landmark: '🏛',
   bell: '◉',
   mail: '✉',
   settings: '⚙',
@@ -45,12 +47,14 @@ export const PLATFORM_ICON_GLYPHS = {
 
 type IconProps = { className?: string; title?: string }
 
-/** Résout une icône par id / path nav. */
+/** Résout une icône par id / path nav. Lucide plateforme prioritaire, puis NavIcons, puis glyphe. */
 export function resolveElfisIcon(
   id: string | undefined,
   props: IconProps = {},
 ): ReactNode {
   if (!id) return null
+  const platformIcon = resolvePlatformNavIcon(id, props.className)
+  if (platformIcon) return platformIcon
   const Svg = navIcons[id]
   if (Svg) return <Svg className={props.className} />
   const glyph =
@@ -81,10 +85,13 @@ export const ELFIS_NAV_ICON_BY_PATH: Record<string, string> = {
   '/home': 'home',
   '/notifications': 'bell',
   '/search': 'search',
+  '/platform/search': 'search',
+  '/platform/help': 'help-circle',
   '/platform/organization': 'building',
   '/platform/members': 'users',
   '/platform/relations': 'network',
   '/platform/documents': 'file',
+  '/platform/banking': 'landmark',
   '/platform/communications': 'mail',
   '/platform/aura': 'sparkles',
   '/platform/settings': 'settings',

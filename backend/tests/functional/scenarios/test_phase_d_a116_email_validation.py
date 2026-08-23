@@ -73,7 +73,8 @@ def test_a116_delivery_steps_logged_and_status_sent(
 
 
 def test_smtp_auth_failure_message_is_explicit():
-    """Le mailer doit exposer clairement une erreur d'auth SMTP (535), pas un message flou."""
+    """Auth SMTP 535 → code normalisé, sans secret ni message flou."""
+    from app.services.email_providers.types import EmailProviderError
     from app.services.mailer import _send_via_smtp
     import smtplib
     from unittest.mock import MagicMock, patch
@@ -83,8 +84,8 @@ def test_smtp_auth_failure_message_is_explicit():
     smtp.__exit__.return_value = False
     smtp.login.side_effect = smtplib.SMTPAuthenticationError(535, b"5.7.8 Authentication failed")
 
-    with patch("app.services.mailer.smtplib.SMTP", return_value=smtp):
-        with patch("app.services.mailer.settings") as settings:
+    with patch("app.services.email_providers.platform.smtplib.SMTP", return_value=smtp):
+        with patch("app.services.email_providers.platform.settings") as settings:
             settings.smtp_host = "smtp-relay.brevo.com"
             settings.smtp_port = 587
             settings.smtp_use_tls = True
@@ -98,16 +99,18 @@ def test_smtp_auth_failure_message_is_explicit():
                     body="y",
                     attachments=[],
                     from_email="contact@elfis-core.com",
-                    from_name="ComptaPilot",
+                    from_name="ELFIS Core",
                     reply_to_email=None,
                     cc=[],
                     bcc=[],
                 )
                 raised = None
-            except RuntimeError as exc:
+            except EmailProviderError as exc:
                 raised = exc
     assert raised is not None
+    assert raised.error_code == "authentication_failed"
+    assert raised.smtp_code == "535"
     msg = str(raised)
-    assert "535" in msg or "Auth SMTP" in msg
     assert "Service temporairement indisponible" not in msg
     assert "xsmtpsib-test" not in msg
+    assert "xkeysib-" not in msg
