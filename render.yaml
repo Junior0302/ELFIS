@@ -1,3 +1,16 @@
+# ELFIS Core — investor-demo / production API (Render Blueprint)
+# Aucun secret, mot de passe ou URL de base réelle dans ce fichier.
+# DATABASE_URL est injecté par Render depuis la base déclarée ci-dessous.
+
+databases:
+  - name: elfis-core-db
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: 16
+    databaseName: elfis
+    user: elfis
+    ipAllowList: []
+
 services:
   - type: web
     name: elfis-core-api
@@ -6,61 +19,82 @@ services:
     dockerfilePath: ./Dockerfile
     plan: starter
     region: frankfurt
-    healthCheckPath: /api/health
-    autoDeploy: true
+    healthCheckPath: /api/health/live
+    autoDeploy: false
+    preDeployCommand: python -m scripts.rc1.migrate_sql
     envVars:
+      - key: ELFIS_ENVIRONMENT
+        value: production
       - key: APP_ENV
         value: production
       - key: AUTH_REQUIRED
         value: "true"
-      - key: DATABASE_URL
-        value: sqlite:////data/comptapilot.db
+      - key: ELFIS_BILLING_ENABLED
+        value: "false"
+      - key: ELFIS_AI_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_PROVIDER
+        value: disabled
+      - key: ELFIS_EVENT_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_JOB_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_DEV_TRIAL_ENABLED
+        value: "false"
+      - key: ELFIS_DEMO_BANK_ENABLED
+        value: "true"
+      - key: STORAGE_PROVIDER
+        value: local
       - key: STORAGE_DIR
         value: /data/storage
-      - key: CORS_ORIGINS
-        value: https://elfis-core.com,https://www.elfis-core.com,https://elfis-core.web.app,https://elfis-core.firebaseapp.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: elfis-core-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: FIREBASE_PROJECT_ID
-        value: elfis-core
+        sync: false
       - key: FIREBASE_WEB_API_KEY
-        value: AIzaSyBfPpjwJoWxVvfAQskrNbas-CEtUqILRW4
-      - key: OPENAI_CHAT_MODEL
-        value: gpt-4o-mini
-      - key: OPENAI_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
         sync: false
       - key: FRONTEND_URL
-        value: https://elfis-core.com
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: PLATFORM_ADMIN_EMAILS
+        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
       - key: STRIPE_PRICE_PRO
         sync: false
-      - key: STRIPE_TRIAL_DAYS
-        value: "14"
-      - key: STRIPE_PAST_DUE_GRACE_DAYS
-        value: "3"
-      - key: PLATFORM_ADMIN_EMAILS
-        value: johnjuniort40@gmail.com
+      - key: OPENAI_API_KEY
+        sync: false
       - key: BREVO_API_KEY
         sync: false
       - key: PLATFORM_EMAIL_FROM
         sync: false
       - key: PLATFORM_EMAIL_FROM_NAME
-        value: ComptaPilot
+        value: ELFIS Core
       - key: SMTP_FROM
         sync: false
       - key: SMTP_HOST
         sync: false
-      - key: SMTP_PORT
-        value: "587"
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASSWORD
         sync: false
-      - key: SMTP_USE_TLS
-        value: "true"
+      - key: BANKING_BRIDGE_CLIENT_ID
+        sync: false
+      - key: BANKING_BRIDGE_CLIENT_SECRET
+        sync: false
+      - key: BANKING_BRIDGE_REDIRECT_URI
+        sync: false
       - key: EMAIL_CREDENTIALS_ENCRYPTION_KEY
         sync: false
       - key: GOOGLE_CLIENT_ID
@@ -73,8 +107,6 @@ services:
         sync: false
       - key: MICROSOFT_CLIENT_SECRET
         sync: false
-      - key: MICROSOFT_TENANT_ID
-        value: common
       - key: MICROSOFT_OAUTH_REDIRECT_URI
         sync: false
     disk:

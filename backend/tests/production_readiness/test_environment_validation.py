@@ -73,6 +73,18 @@ def test_env_005_refuses_cors_wildcard(monkeypatch):
     assert "cors_wildcard" in fatal_codes(issues) or "cors_credentials_wildcard" in fatal_codes(issues)
 
 
+def test_env_normalizes_render_postgres_url():
+    from app.config import Settings
+
+    assert Settings._normalize_database_url("postgres://u:p@db/elfis").startswith(
+        "postgresql+psycopg://"
+    )
+    assert Settings._normalize_database_url("postgresql://u:p@db/elfis").startswith(
+        "postgresql+psycopg://"
+    )
+    assert Settings._normalize_database_url("sqlite:///./local.db") == "sqlite:///./local.db"
+
+
 def test_env_006_seed_refuses_production():
     from tests.functional.seed import assert_safe_environment
 

@@ -70,7 +70,7 @@ Règles :
 | `BANKING_POWENS_CLIENT_ID` / `BANKING_POWENS_CLIENT_SECRET` | Identifiants Powens |
 | `BANKING_SYNC_MAX_ATTEMPTS` | Tentatives max par sync (défaut 3) |
 
-Le connecteur `demo` est toujours disponible (local, hors ligne, déterministe).
+Le connecteur `demo` est hors ligne et déterministe. Il est masqué en production sauf `ELFIS_DEMO_BANK_ENABLED=true` (libellé « données fictives »).
 
 ## Modèle de transaction normalisé
 

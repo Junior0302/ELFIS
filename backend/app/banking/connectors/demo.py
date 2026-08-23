@@ -148,6 +148,6 @@ class DemoBankConnector(BankConnector):
             provider=self.provider,
             configured=True,
             status="ok",
-            message="Connecteur démo local — toujours disponible.",
+            message="Banque Démo ELFIS — données fictives",
             latency_ms=1,
         )

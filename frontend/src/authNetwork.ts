@@ -6,24 +6,20 @@ export const API_REQUEST_TIMEOUT_MS = 15_000
 
 export type BackendHealthStatus = 'available' | 'unavailable' | 'timeout'
 
+export function resolveApiRoot(input: { viteApiUrl?: string; isDev: boolean }): string {
+  const forced = input.viteApiUrl?.trim()
+  if (forced) return forced
+  if (input.isDev) return '/api'
+  throw new Error(
+    'VITE_API_URL manquant : reconstruire le frontend avec VITE_API_URL=https://<api>/api.',
+  )
+}
+
 export function getApiRoot(): string {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL as string
-  if (import.meta.env.DEV) return '/api'
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname
-    const productionHosts = new Set([
-      'elfis-core.web.app',
-      'elfis-core.firebaseapp.com',
-      'elfis-core.com',
-      'www.elfis-core.com',
-    ])
-    if (productionHosts.has(host)) {
-      return 'https://elfis-core-api.onrender.com/api'
-    }
-  }
-  const { protocol, hostname } = window.location
-  const port = (import.meta.env.VITE_API_PORT as string) || '8000'
-  return `${protocol}//${hostname}:${port}/api`
+  return resolveApiRoot({
+    viteApiUrl: import.meta.env.VITE_API_URL as string | undefined,
+    isDev: Boolean(import.meta.env.DEV),
+  })
 }
 
 export function isAbortError(err: unknown): boolean {

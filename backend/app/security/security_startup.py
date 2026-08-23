@@ -29,7 +29,7 @@ def validate_runtime_configuration() -> list[ConfigIssue]:
     elif len(secret) < 32 and is_production():
         issues.append(ConfigIssue("fatal", "weak_jwt_secret", "JWT_SECRET < 32 caractères en production"))
 
-    if is_production() and settings.cors_origins.strip() == "*":
+    if is_production() and (not settings.cors_origins.strip() or settings.cors_origins.strip() == "*"):
         issues.append(ConfigIssue("fatal", "cors_wildcard", "CORS_ORIGINS=* interdit en production"))
 
     if is_production() and settings.database_url.startswith("sqlite"):

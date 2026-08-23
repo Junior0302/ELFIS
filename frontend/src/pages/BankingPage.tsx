@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth'
+import { FICTIONAL_BANK_LABEL, isFictionalBankProvider, providerPublicLabel } from '../bankingLabels'
 import {
   accountTypeLabel,
   bankingApi,
@@ -39,7 +40,13 @@ function fmtAmount(amount: number, currency: string): string {
   }
 }
 
-function providerStatusLabel(status: string, displayName: string): string {
+function providerStatusLabel(
+  status: string,
+  displayName: string,
+  provider?: string,
+  fictional?: boolean,
+): string {
+  if (fictional || isFictionalBankProvider(provider)) return FICTIONAL_BANK_LABEL
   if (status === 'not_configured') return `${displayName} — configuration requise`
   if (status === 'ok') return 'Opérationnel'
   return 'Indisponible'
@@ -230,6 +237,12 @@ export default function BankingPage() {
     [providers],
   )
   const selectedIsUsable = usableProviders.some((p) => p.provider === selectedProvider)
+  const hasFictionalBank = useMemo(
+    () =>
+      connections.some((c) => isFictionalBankProvider(c.provider)) ||
+      providers.some((p) => p.fictional || isFictionalBankProvider(p.provider)),
+    [connections, providers],
+  )
 
   return (
     <>
@@ -247,6 +260,16 @@ export default function BankingPage() {
           </button>
         ) : null}
       </div>
+
+      {hasFictionalBank ? (
+        <div className="panel" role="status">
+          <strong>{FICTIONAL_BANK_LABEL}</strong>
+          <p className="muted">
+            Ces mouvements sont générés localement pour la démonstration. Aucune banque réelle
+            n’est connectée.
+          </p>
+        </div>
+      ) : null}
 
       {status ? (
         <div className="panel" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
@@ -323,9 +346,7 @@ export default function BankingPage() {
               >
                 {providers.map((p) => (
                   <option key={p.provider} value={p.provider} disabled={p.status !== 'ok'}>
-                    {p.status === 'not_configured'
-                      ? `${p.display_name} — configuration requise`
-                      : p.display_name}
+                    {providerPublicLabel(p)}
                   </option>
                 ))}
               </select>
@@ -352,10 +373,13 @@ export default function BankingPage() {
               {connections.map((c) => (
                 <div key={c.id} className="list-item">
                   <div>
-                    <strong>{c.bank_name}</strong>
+                    <strong>
+                      {isFictionalBankProvider(c.provider) ? FICTIONAL_BANK_LABEL : c.bank_name}
+                    </strong>
                     <p className="muted">
-                      Fournisseur : {c.provider} · {connectionStatusLabel(c.status)} · Dernière
-                      sync : {fmtDate(c.last_sync_at)}
+                      Fournisseur :{' '}
+                      {isFictionalBankProvider(c.provider) ? FICTIONAL_BANK_LABEL : c.provider} ·{' '}
+                      {connectionStatusLabel(c.status)} · Dernière sync : {fmtDate(c.last_sync_at)}
                     </p>
                     {publicBankingMessage(c.error_message) ? (
                       <p className="form-error">{publicBankingMessage(c.error_message)}</p>
@@ -424,7 +448,9 @@ export default function BankingPage() {
                         ? '—'
                         : fmtAmount(a.available_balance, a.currency)}
                     </td>
-                    <td>{a.provider}</td>
+                    <td>
+                      {isFictionalBankProvider(a.provider) ? FICTIONAL_BANK_LABEL : a.provider}
+                    </td>
                     <td>{fmtDate(a.last_sync_at)}</td>
                   </tr>
                 ))}
@@ -560,11 +586,16 @@ export default function BankingPage() {
               {health.providers.map((p) => (
                 <div key={p.provider} className="list-item">
                   <div>
-                    <strong>{p.display_name}</strong>
-                    <p className="muted">{publicBankingMessage(p.message) || providerStatusLabel(p.status, p.display_name)}</p>
+                    <strong>{providerPublicLabel(p)}</strong>
+                    <p className="muted">
+                      {p.fictional || isFictionalBankProvider(p.provider)
+                        ? FICTIONAL_BANK_LABEL
+                        : publicBankingMessage(p.message) ||
+                          providerStatusLabel(p.status, p.display_name, p.provider, p.fictional)}
+                    </p>
                   </div>
                   <span className="badge">
-                    {providerStatusLabel(p.status, p.display_name)}
+                    {providerStatusLabel(p.status, p.display_name, p.provider, p.fictional)}
                     {p.latency_ms != null ? ` · ${p.latency_ms} ms` : ''}
                   </span>
                 </div>
@@ -590,8 +621,12 @@ export default function BankingPage() {
                 <tbody>
                   {health.connections.map((c) => (
                     <tr key={c.connection_id}>
-                      <td>{c.bank_name}</td>
-                      <td>{c.provider}</td>
+                      <td>
+                        {isFictionalBankProvider(c.provider) ? FICTIONAL_BANK_LABEL : c.bank_name}
+                      </td>
+                      <td>
+                        {isFictionalBankProvider(c.provider) ? FICTIONAL_BANK_LABEL : c.provider}
+                      </td>
                       <td>{connectionStatusLabel(c.status)}</td>
                       <td>{fmtDate(c.last_sync_at)}</td>
                       <td>{fmtDate(c.next_sync_at)}</td>

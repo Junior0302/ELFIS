@@ -23,6 +23,7 @@ from app.banking.account_types import normalize_account_type
 from app.banking.banking_models import ElfisBankConnection, ElfisBankSyncRun
 from app.banking.connectors import registry
 from app.banking.connectors.base import ConnectorError
+from app.banking.demo_gate import DEMO_PROVIDER, FICTIONAL_BANK_LABEL
 from app.banking.engine import BankingEngine, BankingEngineError
 from app.banking.iban import iban_last4, mask_iban
 from app.models import BankAccount
@@ -216,13 +217,16 @@ def connect_bank(
         )
     except (ConnectorError, BankingEngineError) as exc:
         _raise_domain(exc)
+    message = f"Banque connectée via {connection.provider}."
+    if connection.provider == DEMO_PROVIDER:
+        message = f"{FICTIONAL_BANK_LABEL}. Aucune banque réelle n’a été connectée."
     return {
         "ok": True,
         "connection": ConnectionOut.model_validate(connection),
         "accounts": [
             serialize_account(a) for a in engine.accounts_for_connection(connection)
         ],
-        "message": f"Banque connectée via {connection.provider}.",
+        "message": message,
     }
 
 

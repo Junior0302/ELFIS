@@ -362,3 +362,52 @@ def verify_critical_indexes(database_url: str) -> dict[str, Any]:
         "ok": all(found.values()) and gin_present,
         "index_count": len(names),
     }
+
+
+def missing_sql_files() -> list[str]:
+    return [name for name in SQL_ORDER if not (SQL_DIR / name).is_file()]
+
+
+def main() -> int:
+    """Entrée production : DATABASE_URL → upgrade_head. Jamais de reset."""
+    import json
+    import os
+    import sys
+
+    from scripts.rc1.safety import normalize_postgres_url
+
+    url = (os.environ.get("DATABASE_URL") or "").strip()
+    if not url:
+        print("DATABASE_URL manquant", file=sys.stderr)
+        return 2
+    if url.lower().startswith("sqlite"):
+        print("SQLite interdit — PostgreSQL requis pour migrate_sql", file=sys.stderr)
+        return 2
+    missing = missing_sql_files()
+    if missing:
+        print("Fichiers SQL manquants: " + ", ".join(missing), file=sys.stderr)
+        return 2
+    result = upgrade_head(normalize_postgres_url(url))
+    print(
+        json.dumps(
+            {
+                "ok": result.get("ok"),
+                "strategy": result.get("strategy"),
+                "alembic": result.get("alembic"),
+                "version_marker": result.get("version_marker"),
+                "tables_count": result.get("tables_count"),
+                "missing_expected": result.get("missing_expected"),
+                "files": [
+                    {"file": item.get("file"), "ok": not item.get("errors")}
+                    for item in (result.get("files") or [])
+                    if isinstance(item, dict)
+                ],
+            },
+            ensure_ascii=False,
+        )
+    )
+    return 0 if result.get("ok") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

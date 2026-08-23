@@ -146,6 +146,8 @@ class Settings(BaseSettings):
     banking_bridge_client_secret: str = ""
     # Callback ELFIS pour le retour Bridge Connect (domaine à autoriser chez Bridge)
     banking_bridge_redirect_uri: str = ""
+    # None = auto (on hors production, off en production). true uniquement si activé volontairement.
+    elfis_demo_bank_enabled: bool | None = None
     banking_powens_api_url: str = ""
     banking_powens_client_id: str = ""
     banking_powens_client_secret: str = ""
@@ -428,6 +430,17 @@ class Settings(BaseSettings):
         return cleaned.replace("\r", "").replace("\n", "").strip()
 
     @staticmethod
+    def _normalize_database_url(url: str) -> str:
+        raw = (url or "").strip()
+        if raw.startswith("postgresql+psycopg://") or raw.startswith("postgresql+psycopg2://"):
+            return raw
+        if raw.startswith("postgresql://"):
+            return "postgresql+psycopg://" + raw[len("postgresql://") :]
+        if raw.startswith("postgres://"):
+            return "postgresql+psycopg://" + raw[len("postgres://") :]
+        return raw
+
+    @staticmethod
     def _normalize_http_base_url(value: str) -> str:
         """Normalise une URL de base HTTP(S) (guillemets, https:host → https://host)."""
         cleaned = (value or "").strip()
@@ -467,6 +480,7 @@ class Settings(BaseSettings):
         self.platform_email_from = (self.platform_email_from or "").strip()
         self.smtp_from = (self.smtp_from or "").strip()
         self.frontend_url = self.frontend_url.strip() or "http://localhost:5173"
+        self.database_url = self._normalize_database_url(self.database_url)
         if not (self.elfis_ai_default_model or "").strip():
             self.elfis_ai_default_model = self.openai_chat_model or "gpt-4o-mini"
         if not (self.elfis_ai_fast_model or "").strip():
@@ -484,7 +498,7 @@ class Settings(BaseSettings):
             return self
         if self.jwt_secret == "comptapilot-elfis-dev-secret-change-me" or len(self.jwt_secret) < 32:
             raise ValueError("JWT_SECRET doit contenir au moins 32 caractères en production")
-        if self.cors_origins.strip() == "*":
+        if not self.cors_origins.strip() or self.cors_origins.strip() == "*":
             raise ValueError("CORS_ORIGINS doit lister les domaines autorisés en production")
         if not self.firebase_web_api_key or not self.firebase_project_id:
             raise ValueError("Firebase doit être configuré en production")

@@ -6,6 +6,7 @@ export type BankingProvider = {
   message: string
   latency_ms?: number | null
   requires_user_consent?: boolean
+  fictional?: boolean
 }
 
 export type BankConnection = {

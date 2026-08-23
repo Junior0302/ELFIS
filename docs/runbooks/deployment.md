@@ -13,6 +13,8 @@ Déployer une version taguée de l’API et des workers de façon reproductible,
 ## Variantes hébergeur
 Adapter les commandes `deploy` / `restart` à Railway, Render, Fly, Kubernetes, VM systemd, etc. Les étapes métier restent identiques.
 
+Pour la démonstration investisseurs (Firebase Hosting + Render + PostgreSQL), voir [investor-demo-deployment.md](./investor-demo-deployment.md).
+
 ## Procédure
 
 1. **Vérifier branche/tag**

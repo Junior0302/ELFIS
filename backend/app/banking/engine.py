@@ -19,6 +19,7 @@ from app.banking.banking_events import publish_connection_event
 from app.banking.consent_state import ConsentStateError, issue_consent_state, verify_consent_state
 from app.banking.connectors.base import BankConnector, ConnectorError
 from app.banking.connectors import registry
+from app.banking.demo_gate import DEMO_PROVIDER, FICTIONAL_BANK_LABEL, is_demo_bank_enabled
 from app.config import settings
 from app.events.event_types import EventNames
 from app.models import BankAccount, BankTransaction
@@ -48,17 +49,21 @@ class BankingEngine:
     def available_connectors(self) -> list[dict]:
         out: list[dict] = []
         for provider in registry.list_providers():
+            if provider == DEMO_PROVIDER and not is_demo_bank_enabled():
+                continue
             connector = registry.get_connector(provider)
             health = connector.health()
+            fictional = provider == DEMO_PROVIDER
             out.append(
                 {
                     "provider": provider,
-                    "display_name": connector.display_name,
+                    "display_name": FICTIONAL_BANK_LABEL if fictional else connector.display_name,
                     "configured": health.configured,
                     "status": health.status,
-                    "message": health.message,
+                    "message": FICTIONAL_BANK_LABEL if fictional else health.message,
                     "latency_ms": health.latency_ms,
                     "requires_user_consent": bool(connector.requires_user_consent),
+                    "fictional": fictional,
                 }
             )
         return out
@@ -99,6 +104,8 @@ class BankingEngine:
         bank_name: str = "",
         options: dict | None = None,
     ) -> ElfisBankConnection:
+        if provider == DEMO_PROVIDER and not is_demo_bank_enabled():
+            raise BankingEngineError("Banque Démo ELFIS désactivée.")
         connector = registry.get_connector(provider)
         if connector.requires_user_consent:
             raise BankingEngineError(

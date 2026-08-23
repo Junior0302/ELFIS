@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
 import path from 'node:path'
+import { assertProductionFrontendEnv } from './src/buildEnv.js'
 
 // Dev : le frontend appelle "/api/*" (same-origin).
 // Ce proxy relaie vers le backend local — port unique aligné avec start-backend.bat.
@@ -29,25 +30,30 @@ console.info(
   `[ComptaPilot] Vite · branch=${GIT_BRANCH} · sha=${GIT_SHA} · root=${FRONTEND_ROOT} · port=${DEV_PORT} · builtAt=${BUILT_AT}`,
 )
 
-export default defineConfig({
-  plugins: [react()],
-  define: {
-    'import.meta.env.VITE_APP_GIT_SHA': JSON.stringify(GIT_SHA),
-    'import.meta.env.VITE_APP_GIT_BRANCH': JSON.stringify(GIT_BRANCH),
-    'import.meta.env.VITE_APP_BUILT_AT': JSON.stringify(BUILT_AT),
-    'import.meta.env.VITE_APP_FRONTEND_ROOT': JSON.stringify(FRONTEND_ROOT),
-    'import.meta.env.VITE_APP_DEV_PORT': JSON.stringify(String(DEV_PORT)),
-  },
-  server: {
-    host: true,
-    port: DEV_PORT,
-    strictPort: true,
-    proxy: {
-      '/api': {
-        target: API_TARGET,
-        changeOrigin: true,
-        secure: false,
+export default defineConfig(({ command, mode }) => {
+  if (command === 'build' && mode === 'production') {
+    assertProductionFrontendEnv(process.env)
+  }
+  return {
+    plugins: [react()],
+    define: {
+      'import.meta.env.VITE_APP_GIT_SHA': JSON.stringify(GIT_SHA),
+      'import.meta.env.VITE_APP_GIT_BRANCH': JSON.stringify(GIT_BRANCH),
+      'import.meta.env.VITE_APP_BUILT_AT': JSON.stringify(BUILT_AT),
+      'import.meta.env.VITE_APP_FRONTEND_ROOT': JSON.stringify(FRONTEND_ROOT),
+      'import.meta.env.VITE_APP_DEV_PORT': JSON.stringify(String(DEV_PORT)),
+    },
+    server: {
+      host: true,
+      port: DEV_PORT,
+      strictPort: true,
+      proxy: {
+        '/api': {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
-  },
+  }
 })

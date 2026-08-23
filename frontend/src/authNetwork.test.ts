@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   checkBackendHealth,
   getApiRoot,
+  resolveApiRoot,
   mapLoginFailure,
   authDevLog,
   isAbortError,
@@ -13,6 +14,14 @@ import {
 describe('authNetwork', () => {
   it('getApiRoot en DEV utilise /api (proxy Vite)', () => {
     expect(getApiRoot()).toBe('/api')
+  })
+
+  it('resolveApiRoot refuse un build production sans VITE_API_URL', () => {
+    expect(() => resolveApiRoot({ isDev: false })).toThrow(/VITE_API_URL/)
+    expect(resolveApiRoot({ isDev: false, viteApiUrl: 'https://api.example/api' })).toBe(
+      'https://api.example/api',
+    )
+    expect(resolveApiRoot({ isDev: true })).toBe('/api')
   })
 
   it('mapLoginFailure — timeout / réseau', () => {

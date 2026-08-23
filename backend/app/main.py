@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
 from app.database import SessionLocal, init_db
 from app.middleware.security import SecurityHeadersMiddleware
+from app.security.cors_policy import resolve_cors_allow_origins
 from app.routers import (
     accounting,
     admin_audit,
@@ -191,35 +192,19 @@ app = FastAPI(
     **_docs_kwargs,
 )
 
-DEFAULT_CORS_ORIGINS = [
-    "https://elfis-core.com",
-    "https://www.elfis-core.com",
-    "https://elfis-core.web.app",
-    "https://elfis-core.firebaseapp.com",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+_cors_allow_origins = resolve_cors_allow_origins(
+    cors_origins=settings.cors_origins,
+    frontend_url=settings.frontend_url,
+    production=is_production(),
+)
 
 cors_kwargs: dict = {
     "allow_methods": ["*"],
     "allow_headers": ["*"],
     "expose_headers": ["*"],
+    "allow_origins": _cors_allow_origins,
+    "allow_credentials": _cors_allow_origins != ["*"],
 }
-if settings.cors_origin_list == ["*"]:
-    # En prod, on évite "*" + credentials : on liste les origines front.
-    if is_production():
-        cors_kwargs["allow_origins"] = list(
-            dict.fromkeys([*DEFAULT_CORS_ORIGINS, settings.frontend_url.rstrip("/")])
-        )
-        cors_kwargs["allow_credentials"] = True
-    else:
-        cors_kwargs["allow_origins"] = ["*"]
-        cors_kwargs["allow_credentials"] = False
-else:
-    cors_kwargs["allow_origins"] = list(
-        dict.fromkeys([*settings.cors_origin_list, *DEFAULT_CORS_ORIGINS])
-    )
-    cors_kwargs["allow_credentials"] = True
 
 app.add_middleware(CORSMiddleware, **cors_kwargs)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -235,7 +220,7 @@ def _cors_headers_for(request: Request) -> dict[str, str]:
     if allowed == ["*"]:
         headers["Access-Control-Allow-Origin"] = "*"
         return headers
-    if origin and (origin in allowed or origin in DEFAULT_CORS_ORIGINS):
+    if origin and origin in allowed:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
         headers["Vary"] = "Origin"
@@ -386,40 +371,10 @@ app.include_router(jobs.router, prefix="/api")
 
 @app.get("/api/health")
 def health():
-    from app.services.mailer import email_configured, email_transport, mailer_diagnostic, probe_brevo_account
-
-    firebase_ok = bool(settings.firebase_web_api_key and settings.firebase_project_id)
-    stripe_ok = bool(settings.stripe_secret_key and settings.stripe_price_pro)
-    email_probe = probe_brevo_account()
-    mailer = mailer_diagnostic()
+    """Ping public minimal — aucun diagnostic de secrets ni de mailer."""
     return {
         "status": "ok",
         "app": settings.app_name,
         "product": settings.product_name,
-        "details": {
-            "slogan": "Déposez une facture. L'IA prépare votre comptabilité.",
-            "version": "0.8.9",
-            "auth_required": settings.auth_required,
-            "billing_ready": stripe_ok,
-            "auth_ready": firebase_ok,
-            "email_ready": email_configured(),
-            "email_transport": email_transport(),
-            "mailer_enabled": mailer.get("mailer_enabled"),
-            "mailer_provider": mailer.get("provider"),
-            "mailer_configuration_valid": mailer.get("configuration_valid"),
-            "mailer_sender_configured": mailer.get("sender_configured"),
-            "mailer_provider_reachable": email_probe.get("provider_reachable"),
-            "mailer_reason_code": email_probe.get("reason_code") or mailer.get("reason_code"),
-            "platform_email_from": settings.effective_platform_from or "",
-            "brevo_key_looks_valid": bool(email_probe.get("brevo_key_looks_valid")),
-            "brevo_key_prefix": email_probe.get("brevo_key_prefix") or "",
-            "brevo_key_length": email_probe.get("brevo_key_length") or 0,
-            "smtp_ready": bool(email_probe.get("smtp_ready")),
-            "smtp_host": (email_probe.get("smtp_host_value") or "")[:80],
-            "smtp_port": email_probe.get("smtp_port_value"),
-            "smtp_probe_error": (email_probe.get("smtp_probe_error") or "")[:180],
-            "brevo_ok": bool(email_probe.get("brevo_ok")),
-            "brevo_error": (email_probe.get("brevo_error") or "")[:180],
-            "email_hint": (email_probe.get("hint") or "")[:220],
-        },
+        "version": "0.8.9",
     }
