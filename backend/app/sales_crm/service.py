@@ -670,10 +670,14 @@ def create_attachment(
     # Vault document must belong to org — light check if model available
     from app.models_vault import VaultDocument
 
+    vault_document_id = str(data.get("vault_document_id") or "").strip()
+    if not vault_document_id:
+        raise HTTPException(404, detail={"code": "vault_not_found", "message": "Document Vault introuvable"})
+    data = {**data, "vault_document_id": vault_document_id}
     vault = (
         db.query(VaultDocument)
         .filter(
-            VaultDocument.id == int(data["vault_document_id"]),
+            VaultDocument.id == vault_document_id,
             VaultDocument.organization_id == organization_id,
         )
         .first()

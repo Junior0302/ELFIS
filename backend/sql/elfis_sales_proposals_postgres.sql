@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS sales_commercial_proposal_versions (
   readiness_score INTEGER NOT NULL DEFAULT 0,
   readiness_level VARCHAR(32) NOT NULL DEFAULT 'blocked',
   readiness_explanation JSONB NOT NULL DEFAULT '{}',
-  pdf_vault_document_id INTEGER REFERENCES vault_documents(id),
+  pdf_vault_document_id VARCHAR(36) REFERENCES vault_documents(id),
   checksum VARCHAR(64),
   created_by INTEGER REFERENCES users(id),
   created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),

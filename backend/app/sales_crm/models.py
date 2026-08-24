@@ -346,7 +346,9 @@ class SalesAttachment(Base, SalesOrgMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    vault_document_id: Mapped[int] = mapped_column(Integer, ForeignKey("vault_documents.id"), index=True)
+    vault_document_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("vault_documents.id"), index=True
+    )
     entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     label: Mapped[str | None] = mapped_column(String(200), nullable=True)

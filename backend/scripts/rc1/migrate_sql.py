@@ -21,6 +21,7 @@ PHASE_F_INDEXES = BACKEND / "docs" / "performance" / "postgres_indexes_phase_f.s
 
 SQL_ORDER = [
     "vault_postgres.sql",
+    "elfis_sales_crm_postgres.sql",
     "elfis_job_queue_postgres.sql",
     "elfis_event_bus_postgres.sql",
     "elfis_billing_postgres.sql",
@@ -263,6 +264,8 @@ def upgrade_head(database_url: str) -> dict[str, Any]:
     import app.events.event_models  # noqa: F401
     import app.search.search_models  # noqa: F401
     import app.models_vault  # noqa: F401
+    import app.sales_crm.models  # noqa: F401 — sales_attachments FK vault_documents.id
+    import app.sales_proposals.models  # noqa: F401 — pdf_vault_document_id FK
     import app.accounting.accounting_models  # noqa: F401
     import app.document_intelligence.document_models  # noqa: F401
     import app.ai.ai_models  # noqa: F401

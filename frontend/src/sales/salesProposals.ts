@@ -142,7 +142,7 @@ export type ProposalWorkspace = {
     readiness_score: number
     readiness_level: string
     readiness_explanation?: Record<string, unknown>
-    pdf_vault_document_id?: number | null
+    pdf_vault_document_id?: string | null
     checksum?: string | null
     locked_at?: string | null
     updated_at?: string | null

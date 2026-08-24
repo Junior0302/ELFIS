@@ -102,7 +102,7 @@ class ProposalEngineTests(unittest.TestCase):
             "app.sales_proposals.service.archive_or_reuse_pdf"
         ) as archive:
             vault_doc = MagicMock()
-            vault_doc.id = 99
+            vault_doc.id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
             vault_doc.checksum_sha256 = "abc123checksum"
             archive.return_value = (vault_doc, False)
 
@@ -195,7 +195,10 @@ class ProposalEngineTests(unittest.TestCase):
 
             pdf = self.client.post(f"/api/sales/proposals/{proposal_id}/generate-pdf")
             self.assertEqual(pdf.status_code, 200, pdf.text)
-            self.assertEqual(pdf.json()["pdf_vault_document_id"], 99)
+            self.assertEqual(
+                pdf.json()["pdf_vault_document_id"],
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            )
 
             sent = self.client.post(f"/api/sales/proposals/{proposal_id}/mark-sent")
             self.assertEqual(sent.status_code, 200, sent.text)

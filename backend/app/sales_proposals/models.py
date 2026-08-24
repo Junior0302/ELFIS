@@ -113,8 +113,8 @@ class CommercialProposalVersion(Base):
     readiness_score: Mapped[int] = mapped_column(Integer, default=0)
     readiness_level: Mapped[str] = mapped_column(String(32), default="blocked")
     readiness_explanation: Mapped[dict] = mapped_column(_JSON, default=dict)
-    pdf_vault_document_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("vault_documents.id"), nullable=True
+    pdf_vault_document_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("vault_documents.id"), nullable=True
     )
     checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)

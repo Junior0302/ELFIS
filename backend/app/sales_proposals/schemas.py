@@ -165,7 +165,7 @@ class VersionOut(BaseModel):
     readiness_score: int
     readiness_level: str
     readiness_explanation: dict[str, Any] = Field(default_factory=dict)
-    pdf_vault_document_id: Any | None = None
+    pdf_vault_document_id: str | None = None
     checksum: str | None = None
     created_at: datetime
     updated_at: datetime

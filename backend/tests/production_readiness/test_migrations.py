@@ -70,6 +70,48 @@ def test_mig_007_search_gin():
     assert "gin" in search.lower() or "tsvector" in search.lower()
 
 
+def test_mig_sales_attachment_vault_fk_matches_canonical_varchar36():
+    """sales_attachments.vault_document_id must match vault_documents.id (VARCHAR(36))."""
+    from sqlalchemy import String
+
+    from app.models_vault import VaultDocument
+    from app.sales_crm.models import SalesAttachment
+    from app.sales_proposals.models import CommercialProposalVersion
+
+    assert isinstance(VaultDocument.id.type, String)
+    assert VaultDocument.id.type.length == 36
+    assert isinstance(SalesAttachment.vault_document_id.type, String)
+    assert SalesAttachment.vault_document_id.type.length == 36
+    assert isinstance(CommercialProposalVersion.pdf_vault_document_id.type, String)
+    assert CommercialProposalVersion.pdf_vault_document_id.type.length == 36
+
+    attachment_fks = {fk.target_fullname for fk in SalesAttachment.__table__.c.vault_document_id.foreign_keys}
+    proposal_fks = {
+        fk.target_fullname
+        for fk in CommercialProposalVersion.__table__.c.pdf_vault_document_id.foreign_keys
+    }
+    assert "vault_documents.id" in attachment_fks
+    assert "vault_documents.id" in proposal_fks
+    constraint_names = {c.name for c in SalesAttachment.__table__.constraints}
+    assert "uq_sales_attachment_vault" in constraint_names
+
+    runner = Path(__file__).resolve().parents[2] / "scripts" / "rc1" / "migrate_sql.py"
+    runner_text = runner.read_text(encoding="utf-8")
+    assert "elfis_sales_crm_postgres.sql" in runner_text
+
+    render = Path(__file__).resolve().parents[3] / "render.yaml"
+    assert "python -m scripts.rc1.migrate_sql" in render.read_text(encoding="utf-8")
+
+    crm_sql = (SQL_DIR / "elfis_sales_crm_postgres.sql").read_text(encoding="utf-8")
+    assert "vault_document_id VARCHAR(36) NOT NULL REFERENCES vault_documents(id)" in crm_sql
+    assert "CONSTRAINT uq_sales_attachment_vault" in crm_sql
+    assert "vault_document_id INTEGER" not in crm_sql
+
+    proposals_sql = (SQL_DIR / "elfis_sales_proposals_postgres.sql").read_text(encoding="utf-8")
+    assert "pdf_vault_document_id VARCHAR(36) REFERENCES vault_documents(id)" in proposals_sql
+    assert "pdf_vault_document_id INTEGER" not in proposals_sql
+
+
 @pytest.mark.skipif(
     not (os.getenv("ELFIS_PERFORMANCE_DATABASE_URL") or "").lower().startswith("postgres"),
     reason="PostgreSQL migration test NOT EXECUTED — set ELFIS_PERFORMANCE_DATABASE_URL",

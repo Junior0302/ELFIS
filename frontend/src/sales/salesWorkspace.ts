@@ -94,7 +94,7 @@ export type RelationshipWorkspace = {
   }>
   attachments: Array<{
     id: number
-    vault_document_id: number
+    vault_document_id: string
     label?: string | null
     filename?: string | null
     preview_url?: string | null

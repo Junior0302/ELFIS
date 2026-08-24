@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 T = TypeVar("T")
 
@@ -417,17 +417,24 @@ class TagOut(BaseModel):
 
 
 class AttachmentCreate(BaseModel):
-    vault_document_id: int
+    vault_document_id: str = Field(min_length=1, max_length=36)
     entity_type: str = Field(min_length=1, max_length=32)
     entity_id: int
     label: str | None = None
+
+    @field_validator("vault_document_id", mode="before")
+    @classmethod
+    def _vault_document_id_str(cls, value: object) -> object:
+        if value is None:
+            return value
+        return str(value).strip()
 
 
 class AttachmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    vault_document_id: int
+    vault_document_id: str
     entity_type: str
     entity_id: int
     label: str | None = None

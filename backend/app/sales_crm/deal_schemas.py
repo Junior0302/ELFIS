@@ -108,7 +108,7 @@ class DealNoteOut(BaseModel):
 
 class DealAttachmentOut(BaseModel):
     id: int
-    vault_document_id: int
+    vault_document_id: str
     label: str | None = None
     filename: str | None = None
     preview_url: str | None = None
