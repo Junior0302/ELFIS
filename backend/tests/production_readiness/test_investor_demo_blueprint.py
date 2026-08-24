@@ -59,6 +59,8 @@ def test_dockerfile_has_no_sqlite_default_and_ships_migrations():
     assert "COPY sql ./sql" in text
     assert "COPY scripts/rc1/migrate_sql.py" in text
     assert "STORAGE_DIR=/data/storage" in text
+    assert "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001} --proxy-headers" in text
+    assert 'CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"' not in text
 
 
 def test_sql_order_includes_bank2_and_bank3():
