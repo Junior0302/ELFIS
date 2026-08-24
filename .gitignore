@@ -6,7 +6,9 @@ venv/
 *.db
 *.sqlite
 *.sqlite3
-storage/
+# Runtime object blobs only — never backend/app/storage (Python package).
+/storage/
+/backend/storage/
 .env
 **/.env
 **/.env.local

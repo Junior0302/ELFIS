@@ -9,7 +9,12 @@ __pycache__
 *.db
 *.sqlite
 *.sqlite3
-storage
+# Runtime blobs at context root (./storage). A bare `storage` pattern also
+# excludes app/storage, which is application code required at API startup.
+/storage
+/storage/**
+!app/storage
+!app/storage/**
 tests
 scripts/audit
 scripts/processing

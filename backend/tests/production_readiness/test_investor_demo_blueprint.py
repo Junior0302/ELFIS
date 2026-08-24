@@ -25,6 +25,34 @@ def test_render_yaml_has_no_sqlite_and_links_postgres():
         assert leaked not in text
 
 
+def test_ignore_files_do_not_exclude_app_storage_package():
+    """Bare `storage/` would drop the Python package from Git and the Docker image."""
+    init = BACKEND / "app" / "storage" / "__init__.py"
+    integrity = BACKEND / "app" / "storage" / "storage_integrity_service.py"
+    assert init.is_file()
+    assert integrity.is_file()
+
+    dockerignore_lines = [
+        line.strip()
+        for line in (BACKEND / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert "storage" not in dockerignore_lines
+    assert "storage/" not in dockerignore_lines
+    assert any(line.startswith("/storage") for line in dockerignore_lines)
+    assert "!app/storage" in dockerignore_lines or "!app/storage/" in dockerignore_lines
+    assert "!app/storage/**" in dockerignore_lines
+
+    gitignore_lines = [
+        line.strip()
+        for line in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert "storage/" not in gitignore_lines
+    assert "/storage/" in gitignore_lines
+    assert "/backend/storage/" in gitignore_lines
+
+
 def test_dockerfile_has_no_sqlite_default_and_ships_migrations():
     text = (BACKEND / "Dockerfile").read_text(encoding="utf-8")
     assert "sqlite" not in text.lower()
