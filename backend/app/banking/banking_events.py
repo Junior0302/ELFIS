@@ -75,7 +75,7 @@ def publish_transaction_created(
         aggregate_type="bank_transaction",
         aggregate_id=str(tx.id),
         payload=_transaction_payload(tx),
-        idempotency_key=f"banking-tx-created-{tx.account_id}-{tx.external_id}",
+        idempotency_key=f"banking-tx-created-{tx.id}",
         correlation_id=correlation_id,
     )
 

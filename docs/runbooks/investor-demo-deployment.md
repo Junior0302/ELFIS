@@ -54,7 +54,7 @@ Le blueprint déclare :
 preDeployCommand: python -m scripts.rc1.migrate_sql
 ```
 
-Cette commande lit `DATABASE_URL` et appelle `scripts.rc1.migrate_sql.upgrade_head` (inclut BANK-2 et BANK-3 via `SQL_ORDER`).
+Cette commande lit `DATABASE_URL` et appelle `scripts.rc1.migrate_sql.upgrade_head` (inclut BANK-2, BANK-3 et BANK-3.1 via `SQL_ORDER`).
 
 Si la pre-deploy Docker n’est pas exécutée par Render, lancer **une fois** depuis le Shell du service (image déjà construite) :
 

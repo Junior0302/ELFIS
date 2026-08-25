@@ -162,6 +162,10 @@ class SyncIn(BaseModel):
 
 
 def _raise_domain(exc: Exception) -> None:
+    from app.banking.engine import SyncAlreadyInProgressError
+
+    if isinstance(exc, SyncAlreadyInProgressError):
+        raise HTTPException(409, detail=str(exc)) from exc
     raise HTTPException(400, detail=str(exc)) from exc
 
 

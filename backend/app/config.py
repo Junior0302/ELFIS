@@ -156,6 +156,8 @@ class Settings(BaseSettings):
     banking_sync_max_transactions_per_run: int = 10000
     banking_sync_overlap_days: int = 7
     banking_sync_run_timeout_seconds: int = 180
+    # BANK-3.1 — attente max du verrou de connexion avant already_in_progress
+    banking_sync_lock_wait_seconds: float = 2.0
     # Financial Dashboard V1 — cache et seuils d'alertes
     financial_cache_ttl_seconds: int = 60
     financial_treasury_low_threshold: float = 5000.0

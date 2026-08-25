@@ -38,6 +38,10 @@ class BankingEngineError(Exception):
     pass
 
 
+class SyncAlreadyInProgressError(BankingEngineError):
+    """Une synchronisation de la même connexion est déjà en cours (verrou DB)."""
+
+
 class BankingEngine:
     def __init__(self, db: Session):
         self.db = db

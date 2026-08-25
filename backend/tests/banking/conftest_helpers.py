@@ -25,14 +25,19 @@ from app.banking.banking_types import (
 from app.banking.connectors.base import BankConnector, ConnectorError
 
 
-def make_banking_db() -> Session:
+def make_banking_session_factory():
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    return sessionmaker(bind=engine)()
+    return sessionmaker(bind=engine), engine
+
+
+def make_banking_db() -> Session:
+    factory, _engine = make_banking_session_factory()
+    return factory()
 
 
 def seed_org(db: Session, name: str = "Org Test") -> models_saas.Organization:
@@ -65,6 +70,8 @@ class FakeBankConnector(BankConnector):
         page_size: int | None = None,
         fail_on_page: int | None = None,
         repeat_cursor: bool = False,
+        hold_before_page: object | None = None,
+        release_before_page: object | None = None,
     ):
         self.accounts = accounts or [
             NormalizedAccount(
@@ -85,6 +92,8 @@ class FakeBankConnector(BankConnector):
         self.page_size = page_size
         self.fail_on_page = fail_on_page
         self.repeat_cursor = repeat_cursor
+        self.hold_before_page = hold_before_page
+        self.release_before_page = release_before_page
         self._page_calls: dict[str, int] = {}
         self.connect_calls = 0
         self.disconnect_calls = 0
@@ -140,6 +149,10 @@ class FakeBankConnector(BankConnector):
         cursor: str | None = None,
         organization_id: int | None = None,
     ) -> TransactionPage:
+        if self.hold_before_page is not None:
+            self.hold_before_page.set()
+            if self.release_before_page is not None:
+                self.release_before_page.wait(timeout=15)
         if not cursor:
             self._page_calls[account_external_id] = 0
         page_no = self._page_calls.get(account_external_id, 0) + 1

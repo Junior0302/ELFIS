@@ -69,6 +69,7 @@ Règles :
 | `BANKING_POWENS_API_URL` | URL API Powens (domaine dédié) |
 | `BANKING_POWENS_CLIENT_ID` / `BANKING_POWENS_CLIENT_SECRET` | Identifiants Powens |
 | `BANKING_SYNC_MAX_ATTEMPTS` | Tentatives max par sync (défaut 3) |
+| `BANKING_SYNC_LOCK_WAIT_SECONDS` | Attente max du verrou de connexion (défaut 2, puis 409) |
 
 Le connecteur `demo` est hors ligne et déterministe. Il est masqué en production sauf `ELFIS_DEMO_BANK_ENABLED=true` (libellé « données fictives »).
 
@@ -100,6 +101,37 @@ Toutes les transactions utilisent ce modèle, quel que soit le fournisseur :
   dans le journal ; le run suivant repart du curseur (`resumed_from_cursor=True`).
 - **Journalisation** : chaque run est un `ElfisBankSyncRun` (statut, compteurs,
   tentatives, curseur, erreur, durée, correlation_id).
+
+## BANK-3.1 — concurrence et idempotence
+
+Objectif : une transaction fournisseur (`account_id` + `external_id` non vide)
+n'existe qu'une seule fois, même si deux workers synchronisent la même connexion.
+
+- **Index PostgreSQL** `uq_bank_transactions_account_external_id` :
+  `UNIQUE (account_id, external_id) WHERE btrim(COALESCE(external_id, '')) <> ''`.
+  Aucune unicité sur l'empreinte métier. Les `external_id` vides restent des
+  observations distinctes (BANK-3).
+- **Migration** : `backend/sql/elfis_banking_bank31_postgres.sql` (SQL_ORDER,
+  après BANK-3). Additive, idempotente. Preflight : `external_id` non
+  canonique (`<> btrim`) ou groupes `account_id + btrim(external_id)` →
+  échec explicite ; aucun DELETE / fusion / UPDATE automatique.
+  CHECK `ck_bank_transactions_external_id_trimmed` :
+  `external_id IS NULL OR external_id = btrim(external_id)`.
+- **Verrou** : connexion PostgreSQL **dédiée** (`engine.connect()`),
+  `pg_try_advisory_lock(31001, connection_id)` dessus, conservée ouverte
+  jusqu'à `pg_advisory_unlock` puis `close()`. Les `COMMIT` de la Session
+  métier n'y touchent pas — un lock de session n'est jamais pris via
+  `Session.execute`. Timeout 2 s (`BANKING_SYNC_LOCK_WAIT_SECONDS`), poll
+  100 ms, puis `SyncAlreadyInProgressError` → HTTP 409. SQLite : verrou
+  process-local uniquement.
+- **external_id** : `strip()` à l'ingestion (`provider_transaction_id` /
+  `NormalizedTransaction`) ; valeur vide ⇒ `''`. Pas de fusion heuristique.
+- **Upsert** : insert sous savepoint ; collision unique → lecture de la ligne
+  existante + update BANK-3. `pending` → `booked` avec le même `external_id`
+  reste une mise à jour.
+- **Événements** : `banking.transaction.created.v1` uniquement si INSERT réel
+  (clé `banking-tx-created-{tx.id}`) ; `updated` si valeurs métier changées ;
+  aucun événement si inchangé. Pas d'IBAN, token ou secret dans les payloads.
 
 ## Événements (Dashboard & Assistant IA)
 
@@ -143,7 +175,9 @@ Prefixe `/api`, abonnement actif requis, permissions `bank.read` / `bank.connect
 ## Observabilité
 
 - **Logs** : logs structurés `banking_sync_started/completed/failed`,
-  `banking_connection_connected/disconnected` avec `correlation_id`.
+  `banking_sync_lock_acquired` / `banking_sync_lock_contention`,
+  `banking_connection_connected/disconnected` avec `organization_id`,
+  `connection_id`, `correlation_id` (jamais de secret).
 - **Metrics** : taux d'échec, durée moyenne, compteurs par run
   (`/banking/health`, `/platform/banking/overview`).
 - **Tracing** : `correlation_id` par run, propagé dans tous les événements.
@@ -161,4 +195,5 @@ npm test
 
 Couverture : connexion, déconnexion, import initial, resync, doublons
 (external_id + empreinte), retry, reprise après erreur, normalisation,
-endpoints API, santé, isolation multi-org.
+endpoints API, santé, isolation multi-org, BANK-3.1 (unique partiel,
+verrou, concurrence PostgreSQL si `ELFIS_POSTGRES_TESTS_ENABLED=true`).

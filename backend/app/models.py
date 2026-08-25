@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -101,6 +101,17 @@ class BankAccount(Base):
 
 class BankTransaction(Base):
     __tablename__ = "bank_transactions"
+    __table_args__ = (
+        # BANK-3.1 — identité provider uniquement. external_id vide = observations distinctes.
+        Index(
+            "uq_bank_transactions_account_external_id",
+            "account_id",
+            "external_id",
+            unique=True,
+            postgresql_where=text("btrim(COALESCE(external_id, '')) <> ''"),
+            sqlite_where=text("trim(COALESCE(external_id, '')) <> ''"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     account_id: Mapped[int] = mapped_column(Integer, index=True)

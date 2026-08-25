@@ -65,6 +65,29 @@ def test_mig_bank3_postgres_is_additive_and_registered():
     assert "add column if not exists reference" in sql
 
 
+def test_mig_bank31_postgres_is_additive_and_registered():
+    name = "elfis_banking_bank31_postgres.sql"
+    runner = Path(__file__).resolve().parents[2] / "scripts" / "rc1" / "migrate_sql.py"
+    runner_text = runner.read_text(encoding="utf-8")
+    assert name in runner_text
+    assert runner_text.index("elfis_banking_bank3_postgres.sql") < runner_text.index(name)
+    sql = (SQL_DIR / name).read_text(encoding="utf-8")
+    lowered = sql.lower()
+    assert "drop table" not in lowered
+    assert "delete from" not in lowered
+    assert "uq_bank_transactions_account_external_id" in sql
+    assert "ck_bank_transactions_external_id_trimmed" in sql
+    assert "account_id" in sql
+    assert "external_id" in sql
+    assert "CREATE UNIQUE INDEX" in sql
+    assert "btrim(external_id)" in sql
+    ddl = sql.split("CREATE UNIQUE INDEX", 1)[1].lower()
+    assert "fingerprint" not in ddl
+    assert "update " not in lowered
+    checker = Path(__file__).resolve().parents[2] / "scripts" / "production" / "check_migrations.py"
+    assert name in checker.read_text(encoding="utf-8")
+
+
 def test_mig_007_search_gin():
     search = (SQL_DIR / "elfis_search_engine_postgres.sql").read_text(encoding="utf-8")
     assert "gin" in search.lower() or "tsvector" in search.lower()

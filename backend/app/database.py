@@ -183,6 +183,16 @@ def init_db() -> None:
         "reference": "reference VARCHAR(128)",
     }.items():
         _sqlite_add_column_if_missing("bank_transactions", column, ddl)
+    if engine.dialect.name == "sqlite":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_bank_transactions_account_external_id "
+                    "ON bank_transactions(account_id, external_id) "
+                    "WHERE trim(COALESCE(external_id, '')) <> ''"
+                )
+            )
     _sqlite_add_column_if_missing("organizations", "address", "address TEXT DEFAULT ''")
     for column, ddl in {
         "postal_code": "postal_code VARCHAR(32) DEFAULT ''",

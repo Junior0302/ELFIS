@@ -17,6 +17,7 @@ import time
 import uuid
 from datetime import date, datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.banking.banking_events import (
@@ -33,8 +34,9 @@ from app.banking.banking_types import (
     SyncType,
 )
 from app.banking.connectors.base import ConnectorError
-from app.banking.engine import BankingEngine, BankingEngineError
-from app.banking.transaction_identity import business_fingerprint
+from app.banking.engine import BankingEngine, BankingEngineError, SyncAlreadyInProgressError
+from app.banking.sync_lock import acquire_connection_sync_lock, release_connection_sync_lock
+from app.banking.transaction_identity import business_fingerprint, provider_transaction_id
 from app.models import BankAccount, BankTransaction
 from app.services.banking import categorize
 
@@ -48,6 +50,7 @@ class SyncEngine:
         *,
         max_attempts: int | None = None,
         retry_delay_seconds: float = 0.0,
+        lock_wait_seconds: float | None = None,
     ):
         from app.config import settings
 
@@ -62,6 +65,11 @@ class SyncEngine:
         self.overlap_days = max(0, int(getattr(settings, "banking_sync_overlap_days", 7) or 0))
         self.run_timeout_seconds = max(
             1, int(getattr(settings, "banking_sync_run_timeout_seconds", 180) or 180)
+        )
+        configured_wait = getattr(settings, "banking_sync_lock_wait_seconds", 2.0)
+        self.lock_wait_seconds = max(
+            0.0,
+            float(lock_wait_seconds if lock_wait_seconds is not None else configured_wait or 0.0),
         )
 
     # ------------------------------------------------------------------ #
@@ -120,6 +128,24 @@ class SyncEngine:
                 "Connexion bancaire non prête : le consentement doit d'abord aboutir."
             )
 
+        held = acquire_connection_sync_lock(
+            self.db,
+            organization_id=connection.organization_id,
+            connection_id=connection.id,
+            wait_seconds=self.lock_wait_seconds,
+        )
+        if held is None:
+            raise SyncAlreadyInProgressError(
+                "Une synchronisation est déjà en cours pour cette connexion bancaire."
+            )
+        try:
+            return self._sync_connection_locked(connection, trigger=trigger)
+        finally:
+            release_connection_sync_lock(held)
+
+    def _sync_connection_locked(
+        self, connection: ElfisBankConnection, *, trigger: str
+    ) -> ElfisBankSyncRun:
         previous_runs = (
             self.db.query(ElfisBankSyncRun)
             .filter(ElfisBankSyncRun.connection_id == connection.id)
@@ -304,62 +330,153 @@ class SyncEngine:
             .filter(BankTransaction.account_id == account.id)
             .all()
         )
-        existing = {tx.external_id: tx for tx in rows if (tx.external_id or "").strip()}
         fingerprints = {
             business_fingerprint(tx.amount, tx.label, tx.booked_at) for tx in rows
         }
         max_booked = self._cursor_to_date(run.cursor)
         for item in sorted(transactions, key=lambda t: t.booked_at):
             booked_iso = item.booked_at.isoformat()
-            provider_id = (item.external_id or "").strip()
-            current = existing.get(provider_id) if provider_id else None
-            if current:
-                if self._apply_update(current, item, booked_iso):
-                    self.db.add(current)
-                    self.db.commit()
-                    run.transactions_updated += 1
-                    publish_transaction_updated(
-                        self.db,
-                        current,
-                        organization_id=account.organization_id,
-                        correlation_id=run.correlation_id,
-                    )
-                else:
-                    run.duplicates_skipped += 1
-            else:
-                fingerprint = business_fingerprint(item.amount, item.label, booked_iso)
-                tx = BankTransaction(
-                    account_id=account.id,
-                    external_id=provider_id,
-                    booked_at=booked_iso,
-                    value_date=item.value_date.isoformat() if item.value_date else None,
-                    label=item.label,
-                    amount=round(item.amount, 2),
-                    currency=item.currency,
-                    category=item.category or categorize(item.label),
-                    status=item.status.value,
-                    source=item.source,
-                    counterparty_name=item.counterparty_name,
-                    reference=item.reference,
-                    is_duplicate=fingerprint in fingerprints,
+            provider_id = provider_transaction_id(item.external_id)
+            if provider_id:
+                outcome = self._upsert_provider_transaction(
+                    account, item, booked_iso, run, fingerprints
                 )
-                self.db.add(tx)
-                self.db.commit()
-                self.db.refresh(tx)
-                if provider_id:
-                    existing[provider_id] = tx
-                fingerprints.add(fingerprint)
-                run.transactions_created += 1
-                publish_transaction_created(
-                    self.db,
-                    tx,
-                    organization_id=account.organization_id,
-                    correlation_id=run.correlation_id,
+            else:
+                outcome = self._insert_observation(
+                    account, item, booked_iso, provider_id, run, fingerprints
+                )
+            if outcome == "created":
+                fingerprints.add(
+                    business_fingerprint(item.amount, item.label, booked_iso)
                 )
             if max_booked is None or item.booked_at > max_booked:
                 max_booked = item.booked_at
         if max_booked is not None:
             run.cursor = max_booked.isoformat()
+
+    def _find_by_provider_id(
+        self, account_id: int, provider_id: str
+    ) -> BankTransaction | None:
+        provider_id = provider_transaction_id(provider_id)
+        if not provider_id:
+            return None
+        return (
+            self.db.query(BankTransaction)
+            .filter(
+                BankTransaction.account_id == account_id,
+                BankTransaction.external_id == provider_id,
+            )
+            .one_or_none()
+        )
+
+    def _upsert_provider_transaction(
+        self,
+        account: BankAccount,
+        item: NormalizedTransaction,
+        booked_iso: str,
+        run: ElfisBankSyncRun,
+        fingerprints: set,
+    ) -> str:
+        provider_id = provider_transaction_id(item.external_id)
+        current = self._find_by_provider_id(account.id, provider_id)
+        if current is not None:
+            return self._update_existing(current, item, booked_iso, account, run)
+
+        tx = self._new_row(account, item, booked_iso, provider_id, fingerprints)
+        try:
+            with self.db.begin_nested():
+                self.db.add(tx)
+                self.db.flush()
+        except IntegrityError:
+            if tx in self.db:
+                self.db.expunge(tx)
+            with self.db.no_autoflush:
+                current = self._find_by_provider_id(account.id, provider_id)
+            if current is None:
+                raise
+            return self._update_existing(current, item, booked_iso, account, run)
+        self.db.commit()
+        persisted = self._find_by_provider_id(account.id, provider_id)
+        if persisted is None:
+            raise RuntimeError("Insert provider transaction introuvable après commit.")
+        tx = persisted
+        run.transactions_created += 1
+        publish_transaction_created(
+            self.db,
+            tx,
+            organization_id=account.organization_id,
+            correlation_id=run.correlation_id,
+        )
+        return "created"
+
+    def _insert_observation(
+        self,
+        account: BankAccount,
+        item: NormalizedTransaction,
+        booked_iso: str,
+        provider_id: str,
+        run: ElfisBankSyncRun,
+        fingerprints: set,
+    ) -> str:
+        tx = self._new_row(account, item, booked_iso, provider_id, fingerprints)
+        self.db.add(tx)
+        self.db.commit()
+        self.db.refresh(tx)
+        run.transactions_created += 1
+        publish_transaction_created(
+            self.db,
+            tx,
+            organization_id=account.organization_id,
+            correlation_id=run.correlation_id,
+        )
+        return "created"
+
+    def _new_row(
+        self,
+        account: BankAccount,
+        item: NormalizedTransaction,
+        booked_iso: str,
+        provider_id: str,
+        fingerprints: set,
+    ) -> BankTransaction:
+        fingerprint = business_fingerprint(item.amount, item.label, booked_iso)
+        return BankTransaction(
+            account_id=account.id,
+            external_id=provider_id,
+            booked_at=booked_iso,
+            value_date=item.value_date.isoformat() if item.value_date else None,
+            label=item.label,
+            amount=round(item.amount, 2),
+            currency=item.currency,
+            category=item.category or categorize(item.label),
+            status=item.status.value,
+            source=item.source,
+            counterparty_name=item.counterparty_name,
+            reference=item.reference,
+            is_duplicate=fingerprint in fingerprints,
+        )
+
+    def _update_existing(
+        self,
+        current: BankTransaction,
+        item: NormalizedTransaction,
+        booked_iso: str,
+        account: BankAccount,
+        run: ElfisBankSyncRun,
+    ) -> str:
+        if self._apply_update(current, item, booked_iso):
+            self.db.add(current)
+            self.db.commit()
+            run.transactions_updated += 1
+            publish_transaction_updated(
+                self.db,
+                current,
+                organization_id=account.organization_id,
+                correlation_id=run.correlation_id,
+            )
+            return "updated"
+        run.duplicates_skipped += 1
+        return "unchanged"
 
     @staticmethod
     def _apply_update(current: BankTransaction, item: NormalizedTransaction, booked_iso: str) -> bool:
@@ -425,9 +542,12 @@ class SyncEngine:
             "banking_sync_completed",
             extra={
                 "run_id": run.id,
-                "created": run.transactions_created,
-                "updated": run.transactions_updated,
-                "duplicates": run.duplicates_skipped,
+                "organization_id": connection.organization_id,
+                "connection_id": connection.id,
+                "provider": connection.provider,
+                "transactions_created": run.transactions_created,
+                "transactions_updated": run.transactions_updated,
+                "duplicates_skipped": run.duplicates_skipped,
                 "duration_ms": run.duration_ms,
                 "correlation_id": run.correlation_id,
             },

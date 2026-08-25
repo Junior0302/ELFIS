@@ -68,8 +68,12 @@ def test_sql_order_includes_bank2_and_bank3():
 
     assert "elfis_banking_bank2_postgres.sql" in SQL_ORDER
     assert "elfis_banking_bank3_postgres.sql" in SQL_ORDER
+    assert "elfis_banking_bank31_postgres.sql" in SQL_ORDER
     assert SQL_ORDER.index("elfis_banking_bank2_postgres.sql") < SQL_ORDER.index(
         "elfis_banking_bank3_postgres.sql"
+    )
+    assert SQL_ORDER.index("elfis_banking_bank3_postgres.sql") < SQL_ORDER.index(
+        "elfis_banking_bank31_postgres.sql"
     )
     assert missing_sql_files() == []
     for name in SQL_ORDER:
