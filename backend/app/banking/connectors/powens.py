@@ -82,13 +82,23 @@ class PowensBankConnector(BankConnector):
             )
         except httpx.HTTPError as exc:
             raise ConnectorError(f"Powens injoignable: {exc}", retryable=True) from exc
+        if response.status_code == 429:
+            raise ConnectorError(
+                f"Erreur Powens {response.status_code}",
+                retryable=True,
+                status_code=response.status_code,
+            )
         if response.status_code >= 500:
             raise ConnectorError(
-                f"Erreur Powens {response.status_code}", retryable=True
+                f"Erreur Powens {response.status_code}",
+                retryable=True,
+                status_code=response.status_code,
             )
         if response.status_code >= 400:
             raise ConnectorError(
-                f"Requête Powens refusée ({response.status_code})", retryable=False
+                f"Requête Powens refusée ({response.status_code})",
+                retryable=False,
+                status_code=response.status_code,
             )
         return response.json() if response.content else {}
 

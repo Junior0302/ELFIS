@@ -15,6 +15,7 @@ from app import models  # noqa: F401
 from app import models_saas  # noqa: F401
 from app.banking import banking_models  # noqa: F401
 from app.events import event_models  # noqa: F401
+from app.jobs import job_models  # noqa: F401
 from app.banking.banking_types import (
     ConnectorHealth,
     NormalizedAccount,
@@ -69,6 +70,7 @@ class FakeBankConnector(BankConnector):
         fail_on_account: str | None = None,
         page_size: int | None = None,
         fail_on_page: int | None = None,
+        fail_status_code: int | None = None,
         repeat_cursor: bool = False,
         hold_before_page: object | None = None,
         release_before_page: object | None = None,
@@ -91,6 +93,7 @@ class FakeBankConnector(BankConnector):
         self.fail_on_account = fail_on_account
         self.page_size = page_size
         self.fail_on_page = fail_on_page
+        self.fail_status_code = fail_status_code
         self.repeat_cursor = repeat_cursor
         self.hold_before_page = hold_before_page
         self.release_before_page = release_before_page
@@ -127,7 +130,11 @@ class FakeBankConnector(BankConnector):
             self.fail_on_account is None or account_external_id == self.fail_on_account
         ):
             self.fail_times -= 1
-            raise ConnectorError("Panne simulée du fournisseur", retryable=self.fail_retryable)
+            raise ConnectorError(
+                "Panne simulée du fournisseur",
+                retryable=self.fail_retryable,
+                status_code=self.fail_status_code,
+            )
 
     def list_transactions(
         self,

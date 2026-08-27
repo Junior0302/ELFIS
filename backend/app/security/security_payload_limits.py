@@ -34,6 +34,8 @@ def check_content_length(content_length: str | None, *, max_bytes: int | None = 
 def max_bytes_for_path(path: str) -> int:
     if path.startswith("/api/subscriptions/webhook") or path.startswith("/api/webhooks/stripe"):
         return int(getattr(settings, "elfis_billing_webhook_max_bytes", 1_048_576))
+    if path.startswith("/api/banking/connectors/bridge/webhook"):
+        return int(getattr(settings, "banking_webhook_max_bytes", 65_536))
     if path.startswith("/api/vault") or "/upload" in path:
         return max_upload_bytes()
     if path.startswith("/api/ai") or path.startswith("/api/elfis-ai"):

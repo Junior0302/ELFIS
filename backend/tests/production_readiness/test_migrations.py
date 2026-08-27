@@ -88,6 +88,27 @@ def test_mig_bank31_postgres_is_additive_and_registered():
     assert name in checker.read_text(encoding="utf-8")
 
 
+def test_mig_bank4_postgres_is_additive_and_registered():
+    name = "elfis_banking_bank4_postgres.sql"
+    runner = Path(__file__).resolve().parents[2] / "scripts" / "rc1" / "migrate_sql.py"
+    runner_text = runner.read_text(encoding="utf-8")
+    assert name in runner_text
+    assert runner_text.index("elfis_banking_bank31_postgres.sql") < runner_text.index(name)
+    sql = (SQL_DIR / name).read_text(encoding="utf-8")
+    lowered = sql.lower()
+    assert "drop table" not in lowered
+    assert "delete from" not in lowered
+    assert "last_sync_started_at" in sql
+    assert "last_sync_status" in sql
+    assert "consecutive_sync_failures" in sql
+    assert "elfis_bank_webhook_receipts" in sql
+    assert "uq_elfis_bank_webhook_provider_event" in sql
+    assert "client_secret" not in lowered
+    assert "iban" not in lowered
+    checker = Path(__file__).resolve().parents[2] / "scripts" / "production" / "check_migrations.py"
+    assert name in checker.read_text(encoding="utf-8")
+
+
 def test_mig_007_search_gin():
     search = (SQL_DIR / "elfis_search_engine_postgres.sql").read_text(encoding="utf-8")
     assert "gin" in search.lower() or "tsvector" in search.lower()

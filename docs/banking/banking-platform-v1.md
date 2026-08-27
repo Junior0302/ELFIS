@@ -163,7 +163,46 @@ Prefixe `/api`, abonnement actif requis, permissions `bank.read` / `bank.connect
 | GET | `/banking/sync` | Journal des synchronisations |
 | GET | `/banking/status` | Statut global (connexions, comptes, soldes, dernière/prochaine sync) |
 | GET | `/banking/health` | Santé connexions + fournisseurs + métriques |
+| POST | `/banking/connectors/bridge/webhook` | Webhook Bridge (sans auth utilisateur, signature HMAC) |
 | GET | `/platform/banking/overview` | Cockpit Admin (platform admin uniquement) |
+
+## BANK-4 — synchronisation automatique
+
+Job Queue existante uniquement (`banking.sync_connection.v1`, `banking.sync_sweep.v1`).
+Le SyncEngine reste l'autorité de synchronisation ; BANK-3.1 reste le verrou DB.
+
+```
+webhook Bridge (HMAC)
+    → receipt persistante (unique provider+event_id)
+    → enqueue banking.sync_connection.v1
+    → JobWorker
+    → SyncEngine.run_sync (lock BANK-3.1)
+```
+
+- Webhook = primaire (dès credentials Production + secret dashboard).
+- Sweep `banking.sync_sweep.v1` = filet de sécurité (connexions connected/stale, batch + jitter).
+- Sans worker Render (`ELFIS_JOB_WORKER_ENABLED=false`), POST `/banking/sync` et le consentement
+  restent exécutés in-request pour ne pas régresser. Webhook et sweep enqueue seulement.
+
+### Webhook Bridge API (`bridgeapi.io`, pas bridge.xyz)
+
+- Header `BridgeApi-Signature: v1=<HMAC-SHA256 hex uppercase>` du **corps brut**
+- Fail closed si secret absent ou signature invalide
+- Idempotence : table `elfis_bank_webhook_receipts`
+- Encore dépendant de Bridge Production : secret dashboard, URL HTTPS enregistrée,
+  abonnement aux événements `item.refreshed`, workers Job Queue
+
+### Variables
+
+| Variable | Rôle |
+|----------|------|
+| `BANKING_BRIDGE_WEBHOOK_SECRET` | Secret HMAC du webhook dashboard (jamais le Client-Secret) |
+| `BANKING_BRIDGE_WEBHOOK_SECRET_PREVIOUS` | Secret précédent (rotation 24 h) |
+| `BANKING_SYNC_STALE_HOURS` | Seuil de fraîcheur du sweep (défaut 24) |
+| `BANKING_SYNC_SWEEP_BATCH_SIZE` | Taille max d'un lot (défaut 10) |
+| `BANKING_SYNC_SWEEP_JITTER_SECONDS` | Jitter d'enqueue (défaut 90) |
+
+Workers Render restent **désactivés** jusqu'à activation explicite.
 
 ## Frontend
 
@@ -174,10 +213,15 @@ Prefixe `/api`, abonnement actif requis, permissions `bank.read` / `bank.connect
 
 ## Observabilité
 
-- **Logs** : logs structurés `banking_sync_started/completed/failed`,
+- **Logs** : `banking_sync_queued/started/completed/failed`,
+  `banking_webhook_received/rejected/duplicate`, `banking_sync_retry_scheduled`,
   `banking_sync_lock_acquired` / `banking_sync_lock_contention`,
   `banking_connection_connected/disconnected` avec `organization_id`,
-  `connection_id`, `correlation_id` (jamais de secret).
+  `connection_id`, `provider`, `trigger`, `duration_ms` (jamais de secret, token, IBAN).
+- **Metrics** (`MetricsRegistry`) : `elfis_banking_sync_queued_total`,
+  `elfis_banking_sync_success_total`, `elfis_banking_sync_failed_total`,
+  `elfis_banking_sync_duration_ms`, `elfis_banking_webhook_rejected_total`,
+  `elfis_banking_sync_retry_total`.
 - **Metrics** : taux d'échec, durée moyenne, compteurs par run
   (`/banking/health`, `/platform/banking/overview`).
 - **Tracing** : `correlation_id` par run, propagé dans tous les événements.

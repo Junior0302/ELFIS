@@ -37,7 +37,10 @@ from app.banking.connectors.base import ConnectorError
 from app.banking.engine import BankingEngine, BankingEngineError, SyncAlreadyInProgressError
 from app.banking.sync_lock import acquire_connection_sync_lock, release_connection_sync_lock
 from app.banking.transaction_identity import business_fingerprint, provider_transaction_id
+from app.banking.sync_status import mark_sync_failed, mark_sync_started, mark_sync_success
+from app.banking.errors import classify_connector_error, public_sync_error_message
 from app.models import BankAccount, BankTransaction
+from app.observability.metrics import metrics_registry
 from app.services.banking import categorize
 
 logger = logging.getLogger(__name__)
@@ -185,11 +188,15 @@ class SyncEngine:
                 "organization_id": connection.organization_id,
                 "connection_id": connection.id,
                 "provider": connection.provider,
+                "trigger": trigger,
                 "sync_type": run.sync_type,
                 "resumed_from_cursor": run.resumed_from_cursor,
                 "correlation_id": run.correlation_id,
             },
         )
+        mark_sync_started(connection)
+        self.db.add(connection)
+        self.db.commit()
 
         started = time.monotonic()
         last_error: ConnectorError | None = None
@@ -518,13 +525,22 @@ class SyncEngine:
         run.duration_ms = round((time.monotonic() - started) * 1000, 2)
         run.error_message = None
         connection.status = ConnectionStatus.connected.value
-        connection.error_message = None
-        connection.last_sync_at = datetime.utcnow()
+        mark_sync_success(connection)
         self.engine.schedule_next_sync(connection)
         self.db.add(run)
         self.db.add(connection)
         self.db.commit()
         self.db.refresh(run)
+        metrics_registry.incr(
+            "elfis_banking_sync_success_total",
+            labels={"provider": connection.provider, "trigger": run.trigger},
+        )
+        if run.duration_ms is not None:
+            metrics_registry.observe(
+                "elfis_banking_sync_duration_ms",
+                float(run.duration_ms),
+                labels={"provider": connection.provider},
+            )
         publish_sync_completed(
             self.db,
             organization_id=run.organization_id,
@@ -545,6 +561,7 @@ class SyncEngine:
                 "organization_id": connection.organization_id,
                 "connection_id": connection.id,
                 "provider": connection.provider,
+                "trigger": run.trigger,
                 "transactions_created": run.transactions_created,
                 "transactions_updated": run.transactions_updated,
                 "duplicates_skipped": run.duplicates_skipped,
@@ -561,31 +578,43 @@ class SyncEngine:
         error: ConnectorError | None,
     ) -> None:
         message = str(error) if error else "Erreur de synchronisation inconnue"
+        error_code, _retryable = classify_connector_error(error)
+        public_message = public_sync_error_message(error_code)
         run.status = SyncRunStatus.failed.value
         run.finished_at = datetime.utcnow()
         run.duration_ms = round((time.monotonic() - started) * 1000, 2)
-        run.error_message = message
+        run.error_message = message[:500]
         connection.status = ConnectionStatus.error.value
-        connection.error_message = message
+        mark_sync_failed(connection, error_code=error_code, public_message=public_message)
         self.db.add(run)
         self.db.add(connection)
         self.db.commit()
         self.db.refresh(run)
+        metrics_registry.incr(
+            "elfis_banking_sync_failed_total",
+            labels={"provider": connection.provider, "error_code": error_code},
+        )
         publish_sync_failed(
             self.db,
             organization_id=run.organization_id,
             run_id=run.id,
             connection_id=connection.id,
             provider=connection.provider,
-            error_message=message,
+            error_message=public_message,
             correlation_id=run.correlation_id,
         )
         logger.error(
             "banking_sync_failed",
             extra={
                 "run_id": run.id,
+                "organization_id": connection.organization_id,
+                "connection_id": connection.id,
+                "provider": connection.provider,
+                "trigger": run.trigger,
                 "attempts": run.attempt_count,
-                "error": message,
+                "error_code": error_code,
+                "duration_ms": run.duration_ms,
+                "consecutive_sync_failures": connection.consecutive_sync_failures,
                 "correlation_id": run.correlation_id,
             },
         )

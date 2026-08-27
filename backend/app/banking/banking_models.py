@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -35,6 +35,10 @@ class ElfisBankConnection(Base):
     status: Mapped[str] = mapped_column(String(32), default="connected", index=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_sync_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_sync_status: Mapped[str] = mapped_column(String(16), default="never")
+    last_sync_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    consecutive_sync_failures: Mapped[int] = mapped_column(Integer, default=0)
     next_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sync_interval_minutes: Mapped[int] = mapped_column(Integer, default=1440)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -70,3 +74,27 @@ class ElfisBankSyncRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     duration_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ElfisBankWebhookReceipt(Base):
+    """Réception persistante d'un webhook fournisseur — idempotence hors mémoire."""
+
+    __tablename__ = "elfis_bank_webhook_receipts"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "provider_event_id",
+            name="uq_elfis_bank_webhook_provider_event",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    provider: Mapped[str] = mapped_column(String(32), index=True)
+    provider_event_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(128), default="")
+    payload_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="received", index=True)
+    organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    connection_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    job_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

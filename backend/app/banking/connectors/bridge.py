@@ -143,6 +143,12 @@ class BridgeBankConnector(BankConnector):
             )
         except httpx.HTTPError as exc:
             raise ConnectorError(f"Bridge injoignable: {exc}", retryable=True) from exc
+        if response.status_code == 429:
+            raise ConnectorError(
+                f"Erreur Bridge {response.status_code}",
+                retryable=True,
+                status_code=response.status_code,
+            )
         if response.status_code >= 500:
             raise ConnectorError(
                 f"Erreur Bridge {response.status_code}",

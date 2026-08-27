@@ -83,6 +83,10 @@ def bootstrap_job_handlers(registry: JobHandlerRegistry | None = None) -> None:
     register_billing_job_handlers(reg)
     register_reliability_job_handlers(reg)
 
+    from app.jobs.handlers.banking_handlers import register_banking_job_handlers
+
+    register_banking_job_handlers(reg)
+
     if registry is None:
         _handlers_bootstrapped = True
 

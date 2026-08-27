@@ -61,6 +61,7 @@ SQL_ORDER = [
     "elfis_banking_bank2_postgres.sql",
     "elfis_banking_bank3_postgres.sql",
     "elfis_banking_bank31_postgres.sql",
+    "elfis_banking_bank4_postgres.sql",
 ]
 
 EXPECTED_TABLE_FAMILIES = [

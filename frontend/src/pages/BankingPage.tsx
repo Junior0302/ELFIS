@@ -6,6 +6,7 @@ import {
   accountTypeLabel,
   bankingApi,
   connectionStatusLabel,
+  connectionSyncHint,
   syncStatusLabel,
   type BankAccount,
   type BankConnection,
@@ -196,13 +197,17 @@ export default function BankingPage() {
     setInfo('')
     try {
       const res = await bankingApi.triggerSync(token, orgId, connectionId)
-      const created = res.runs.reduce((n, r) => n + r.transactions_created, 0)
-      const updated = res.runs.reduce((n, r) => n + r.transactions_updated, 0)
-      setInfo(
-        res.ok
-          ? `Synchronisation terminée : ${created} créée(s), ${updated} mise(s) à jour.`
-          : 'Synchronisation partielle — consultez le journal.',
-      )
+      if (res.queued) {
+        setInfo('Synchronisation planifiée. L’état se mettra à jour automatiquement.')
+      } else {
+        const created = res.runs.reduce((n, r) => n + r.transactions_created, 0)
+        const updated = res.runs.reduce((n, r) => n + r.transactions_updated, 0)
+        setInfo(
+          res.ok
+            ? `Synchronisation terminée : ${created} créée(s), ${updated} mise(s) à jour.`
+            : 'Synchronisation partielle — consultez le journal.',
+        )
+      }
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Synchronisation impossible')
@@ -379,9 +384,17 @@ export default function BankingPage() {
                     <p className="muted">
                       Fournisseur :{' '}
                       {isFictionalBankProvider(c.provider) ? FICTIONAL_BANK_LABEL : c.provider} ·{' '}
-                      {connectionStatusLabel(c.status)} · Dernière sync : {fmtDate(c.last_sync_at)}
+                      {connectionStatusLabel(c.status)}
+                      {c.last_sync_status
+                        ? ` · ${syncStatusLabel(c.last_sync_status)}`
+                        : ''}{' '}
+                      · Dernière sync : {fmtDate(c.last_sync_completed_at || c.last_sync_at)}
                     </p>
-                    {publicBankingMessage(c.error_message) ? (
+                    {c.needs_reauth ? (
+                      <p className="form-error">{connectionSyncHint(c)}</p>
+                    ) : connectionSyncHint(c) ? (
+                      <p className="muted">{connectionSyncHint(c)}</p>
+                    ) : publicBankingMessage(c.error_message) ? (
                       <p className="form-error">{publicBankingMessage(c.error_message)}</p>
                     ) : null}
                   </div>
@@ -627,7 +640,10 @@ export default function BankingPage() {
                       <td>
                         {isFictionalBankProvider(c.provider) ? FICTIONAL_BANK_LABEL : c.provider}
                       </td>
-                      <td>{connectionStatusLabel(c.status)}</td>
+                      <td>
+                        {connectionStatusLabel(c.status)}
+                        {c.last_sync_status ? ` · ${syncStatusLabel(c.last_sync_status)}` : ''}
+                      </td>
                       <td>{fmtDate(c.last_sync_at)}</td>
                       <td>{fmtDate(c.next_sync_at)}</td>
                       <td>{Math.round(c.failure_rate * 100)} %</td>

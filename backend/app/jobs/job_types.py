@@ -38,6 +38,9 @@ class JobNames:
     RELIABILITY_DETECT_STALE_JOBS = "reliability.detect_stale_jobs.v1"
     RELIABILITY_DETECT_STALE_EVENTS = "reliability.detect_stale_events.v1"
 
+    BANKING_SYNC_CONNECTION = "banking.sync_connection.v1"
+    BANKING_SYNC_SWEEP = "banking.sync_sweep.v1"
+
 
 IMPLEMENTED_JOB_NAMES: frozenset[str] = frozenset(
     {
@@ -62,6 +65,8 @@ IMPLEMENTED_JOB_NAMES: frozenset[str] = frozenset(
         JobNames.DOCUMENT_EXTRACTION_RUN,
         JobNames.BILLING_TRIAL_REMINDERS,
         JobNames.BILLING_SYNC_SUBSCRIPTION,
+        JobNames.BANKING_SYNC_CONNECTION,
+        JobNames.BANKING_SYNC_SWEEP,
     }
 )
 

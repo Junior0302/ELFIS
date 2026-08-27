@@ -16,6 +16,12 @@ export type BankConnection = {
   status: string
   error_message?: string | null
   last_sync_at?: string | null
+  last_sync_completed_at?: string | null
+  last_sync_started_at?: string | null
+  last_sync_status?: string | null
+  last_sync_error_code?: string | null
+  consecutive_sync_failures?: number
+  needs_reauth?: boolean
   next_sync_at?: string | null
   sync_interval_minutes: number
   created_at: string
@@ -89,6 +95,8 @@ export type BankingStatus = {
   last_sync_at?: string | null
   last_sync_status?: string | null
   next_sync_at?: string | null
+  connections_syncing?: number
+  connections_needs_reauth?: number
 }
 
 export type ConnectionHealth = {
@@ -98,6 +106,9 @@ export type ConnectionHealth = {
   status: string
   error_message?: string | null
   last_sync_at?: string | null
+  last_sync_status?: string | null
+  last_sync_error_code?: string | null
+  needs_reauth?: boolean
   next_sync_at?: string | null
   provider_health?: BankingProvider | null
   runs_total: number
@@ -163,8 +174,33 @@ export const syncStatusLabel = (status: string): string => {
     running: 'En cours',
     completed: 'Terminée',
     failed: 'Échec',
+    never: 'Jamais synchronisée',
+    queued: 'En file',
+    syncing: 'Synchronisation en cours',
+    success: 'Réussie',
   }
   return map[status] || status
+}
+
+export const connectionSyncHint = (connection: BankConnection): string => {
+  if (connection.needs_reauth) {
+    return 'Réauthentification bancaire requise.'
+  }
+  if (connection.last_sync_status === 'syncing') {
+    return 'Synchronisation en cours…'
+  }
+  if (connection.last_sync_status === 'queued') {
+    return 'Synchronisation planifiée.'
+  }
+  if (
+    connection.last_sync_status === 'failed' &&
+    ['timeout', 'rate_limited', 'provider_unavailable', 'network'].includes(
+      connection.last_sync_error_code || '',
+    )
+  ) {
+    return 'Incident temporaire — nouvelle tentative automatique.'
+  }
+  return ''
 }
 
 export const accountTypeLabel = (accountType: string): string => {
@@ -258,7 +294,7 @@ export const bankingApi = {
       headers: headers(token, orgId, true),
       body: JSON.stringify(connectionId != null ? { connection_id: connectionId } : {}),
     })
-    return parse<{ ok: boolean; runs: SyncRun[] }>(res)
+    return parse<{ ok: boolean; queued?: boolean; job_ids?: string[]; runs: SyncRun[] }>(res)
   },
 
   async listSyncRuns(token: string, orgId: number, connectionId?: number) {

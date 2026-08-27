@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -29,6 +29,7 @@ from app.banking.iban import iban_last4, mask_iban
 from app.models import BankAccount
 from app.banking.health import BankingHealthService
 from app.banking.sync_engine import SyncEngine
+from app.banking.sync_status import needs_reauth
 from app.config import settings
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context, require_active_subscription, require_platform_admin
@@ -63,11 +64,37 @@ class ConnectionOut(BaseModel):
     status: str
     error_message: str | None
     last_sync_at: datetime | None
+    last_sync_completed_at: datetime | None = None
+    last_sync_started_at: datetime | None = None
+    last_sync_status: str = "never"
+    last_sync_error_code: str | None = None
+    consecutive_sync_failures: int = 0
+    needs_reauth: bool = False
     next_sync_at: datetime | None
     sync_interval_minutes: int
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+def serialize_connection(connection: ElfisBankConnection) -> ConnectionOut:
+    return ConnectionOut(
+        id=connection.id,
+        provider=connection.provider,
+        bank_name=connection.bank_name,
+        status=connection.status,
+        error_message=connection.error_message,
+        last_sync_at=connection.last_sync_at,
+        last_sync_completed_at=connection.last_sync_at,
+        last_sync_started_at=getattr(connection, "last_sync_started_at", None),
+        last_sync_status=getattr(connection, "last_sync_status", None) or "never",
+        last_sync_error_code=getattr(connection, "last_sync_error_code", None),
+        consecutive_sync_failures=int(getattr(connection, "consecutive_sync_failures", 0) or 0),
+        needs_reauth=needs_reauth(connection),
+        next_sync_at=connection.next_sync_at,
+        sync_interval_minutes=connection.sync_interval_minutes,
+        created_at=connection.created_at,
+    )
 
 
 class AccountOut(BaseModel):
@@ -185,7 +212,7 @@ def list_connectors(
     return {
         "providers": engine.available_connectors(),
         "connections": [
-            ConnectionOut.model_validate(c) for c in engine.list_connections(org_id)
+            serialize_connection(c) for c in engine.list_connections(org_id)
         ],
     }
 
@@ -210,7 +237,7 @@ def connect_bank(
             return {
                 "ok": True,
                 "redirect_url": redirect_url,
-                "connection": ConnectionOut.model_validate(connection),
+                "connection": serialize_connection(connection),
                 "accounts": [],
                 "message": "Redirection vers le consentement bancaire.",
             }
@@ -226,7 +253,7 @@ def connect_bank(
         message = f"{FICTIONAL_BANK_LABEL}. Aucune banque réelle n’a été connectée."
     return {
         "ok": True,
-        "connection": ConnectionOut.model_validate(connection),
+        "connection": serialize_connection(connection),
         "accounts": [
             serialize_account(a) for a in engine.accounts_for_connection(connection)
         ],
@@ -238,6 +265,24 @@ def _banking_frontend_redirect(result: str) -> RedirectResponse:
     base = (settings.frontend_url or "http://localhost:5173").rstrip("/")
     safe = result if result in {"ok", "denied", "error"} else "error"
     return RedirectResponse(f"{base}/platform/banking?consent={safe}", status_code=303)
+
+
+@callback_router.post("/webhook")
+async def bridge_webhook(request: Request, db: Session = Depends(get_db)):
+    """Webhook Bridge API — pas d'auth utilisateur ; signature HMAC obligatoire."""
+    from app.banking.webhooks import BridgeWebhookError, ingest_bridge_webhook
+
+    raw = await request.body()
+    header = request.headers.get("BridgeApi-Signature") or request.headers.get(
+        "bridgeapi-signature"
+    )
+    try:
+        return ingest_bridge_webhook(db, raw_body=raw, signature_header=header)
+    except BridgeWebhookError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
 
 
 @callback_router.get("/callback")
@@ -278,7 +323,7 @@ def disconnect_bank(
         _raise_domain(exc)
     return {
         "ok": True,
-        "connection": ConnectionOut.model_validate(connection),
+        "connection": serialize_connection(connection),
         "message": "Banque déconnectée.",
     }
 
@@ -344,16 +389,29 @@ def trigger_sync(
     db: Session = Depends(get_db),
 ):
     auth.require("bank.connect")
+    from app.banking.sync_jobs import request_organization_sync
+
     try:
-        runs = SyncEngine(db).run_sync(
-            auth.require_organization_id(),
+        outcome = request_organization_sync(
+            db,
+            organization_id=auth.require_organization_id(),
             connection_id=payload.connection_id if payload else None,
             trigger="manual",
         )
     except BankingEngineError as exc:
         _raise_domain(exc)
+    if outcome["queued"]:
+        jobs = outcome["jobs"]
+        return {
+            "ok": True,
+            "queued": True,
+            "job_ids": [j.job_id for j in jobs],
+            "runs": [],
+        }
+    runs = outcome["runs"]
     return {
         "ok": all(r.status == "completed" for r in runs),
+        "queued": False,
         "runs": [SyncRunOut.model_validate(r) for r in runs],
     }
 

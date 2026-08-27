@@ -136,6 +136,7 @@ ROUTE_CATEGORY_PREFIXES: tuple[tuple[str, RateLimitCategory], ...] = (
     ("/api/platform", RateLimitCategory.PLATFORM_ADMIN),
     ("/api/subscriptions/webhook", RateLimitCategory.WEBHOOK),
     ("/api/webhooks/stripe", RateLimitCategory.WEBHOOK),
+    ("/api/banking/connectors/bridge/webhook", RateLimitCategory.WEBHOOK),
 )
 
 

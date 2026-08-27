@@ -93,6 +93,8 @@ describe('banking API', () => {
 
   it('traduit les statuts', () => {
     expect(syncStatusLabel('completed')).toBe('Terminée')
+    expect(syncStatusLabel('queued')).toBe('En file')
+    expect(syncStatusLabel('syncing')).toBe('Synchronisation en cours')
     expect(connectionStatusLabel('connected')).toBe('Connectée')
     expect(connectionStatusLabel('error')).toBe('Erreur')
     expect(connectionStatusLabel('preparing')).toBe('Connexion en préparation')

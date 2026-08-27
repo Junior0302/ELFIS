@@ -193,6 +193,13 @@ def init_db() -> None:
                     "WHERE trim(COALESCE(external_id, '')) <> ''"
                 )
             )
+    for column, ddl in {
+        "last_sync_started_at": "last_sync_started_at DATETIME",
+        "last_sync_status": "last_sync_status VARCHAR(16) DEFAULT 'never'",
+        "last_sync_error_code": "last_sync_error_code VARCHAR(64)",
+        "consecutive_sync_failures": "consecutive_sync_failures INTEGER DEFAULT 0",
+    }.items():
+        _sqlite_add_column_if_missing("elfis_bank_connections", column, ddl)
     _sqlite_add_column_if_missing("organizations", "address", "address TEXT DEFAULT ''")
     for column, ddl in {
         "postal_code": "postal_code VARCHAR(32) DEFAULT ''",

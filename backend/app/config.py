@@ -158,6 +158,16 @@ class Settings(BaseSettings):
     banking_sync_run_timeout_seconds: int = 180
     # BANK-3.1 — attente max du verrou de connexion avant already_in_progress
     banking_sync_lock_wait_seconds: float = 2.0
+    # BANK-4 — webhook Bridge (secret dashboard, jamais les Client-Secret)
+    banking_bridge_webhook_secret: str = ""
+    banking_bridge_webhook_secret_previous: str = ""
+    banking_webhook_max_bytes: int = 65_536
+    # BANK-4 — recovery scheduler (job banking.sync_sweep.v1)
+    banking_sync_stale_hours: int = 24
+    banking_sync_sweep_batch_size: int = 10
+    banking_sync_sweep_jitter_seconds: int = 90
+    banking_sync_sweep_reschedule: bool = False
+    banking_sync_job_max_attempts: int = 5
     # Financial Dashboard V1 — cache et seuils d'alertes
     financial_cache_ttl_seconds: int = 60
     financial_treasury_low_threshold: float = 5000.0

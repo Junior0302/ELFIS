@@ -178,6 +178,7 @@ class JobWorker:
             attempt_number=job.attempt_count,
             worker_id=self.worker_id,
             session_factory=self._session_factory,
+            db=self._db,
         )
 
         started = time.monotonic()

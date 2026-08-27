@@ -47,6 +47,14 @@ class BankingHealthService:
                     "status": connection.status,
                     "error_message": connection.error_message,
                     "last_sync_at": connection.last_sync_at,
+                    "last_sync_started_at": getattr(connection, "last_sync_started_at", None),
+                    "last_sync_status": getattr(connection, "last_sync_status", None) or "never",
+                    "last_sync_error_code": getattr(connection, "last_sync_error_code", None),
+                    "consecutive_sync_failures": int(
+                        getattr(connection, "consecutive_sync_failures", 0) or 0
+                    ),
+                    "needs_reauth": (connection.last_sync_error_code or "")
+                    in {"invalid_credentials", "connection_revoked", "consent_expired"},
                     "next_sync_at": connection.next_sync_at,
                     "provider_health": provider_health.get(connection.provider),
                     **metrics,

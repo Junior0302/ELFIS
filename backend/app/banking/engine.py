@@ -334,18 +334,19 @@ class BankingEngine:
             },
         )
 
-        from app.banking.sync_engine import SyncEngine
+        from app.banking.sync_jobs import request_connection_sync
 
         try:
-            SyncEngine(self.db).run_sync(
-                organization_id,
+            request_connection_sync(
+                self.db,
+                organization_id=organization_id,
                 connection_id=connection.id,
                 trigger="consent",
             )
         except Exception as exc:
             logger.warning(
                 "banking_consent_initial_sync_failed",
-                extra={"connection_id": connection.id, "error": str(exc)},
+                extra={"connection_id": connection.id, "error": type(exc).__name__},
             )
         return "ok"
 
@@ -557,6 +558,15 @@ class BankingEngine:
             "last_sync_status": last_run.status if last_run else None,
             "next_sync_at": min(
                 (c.next_sync_at for c in connections if c.next_sync_at), default=None
+            ),
+            "connections_syncing": sum(
+                1 for c in connections if (c.last_sync_status or "") == "syncing"
+            ),
+            "connections_needs_reauth": sum(
+                1
+                for c in connections
+                if (c.last_sync_error_code or "")
+                in {"invalid_credentials", "connection_revoked", "consent_expired"}
             ),
         }
 
