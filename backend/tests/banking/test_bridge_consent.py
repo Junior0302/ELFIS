@@ -71,12 +71,16 @@ class FakeConsentConnector(FakeBankConnector):
         callback_url: str,
         bank_name: str = "",
         context: str = "",
+        provider_item_id: str = "",
+        force_reauthentication: bool = False,
     ) -> ConsentStartResult:
         self.start_calls.append(
             {
                 "organization_id": organization_id,
                 "callback_url": callback_url,
                 "context": context,
+                "provider_item_id": provider_item_id,
+                "force_reauthentication": force_reauthentication,
             }
         )
         return ConsentStartResult(redirect_url=self.redirect_url)

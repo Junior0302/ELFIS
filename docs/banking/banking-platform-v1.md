@@ -204,6 +204,19 @@ webhook Bridge (HMAC)
 
 Workers Render restent **désactivés** jusqu'à activation explicite.
 
+## BANK-5 — consentement, expiration SCA, réauthentification
+
+`connection.status` technique est conservé. L'API expose un état dérivé `consent_status` :
+`valid` | `expiring` | `reauth_required` | `reconnecting` | `unknown`.
+
+- `authentication_expires_at` persisté (jamais de token / payload brut)
+- Alerte `BANKING_REAUTH_WARNING_DAYS` (défaut 7) → `expiring`
+- Date dépassée ou status_code item non nul (1010 SCA documenté, autre non-nul = fail-safe Connect) → `needs_reauth` ; sync et sweep bloqués
+- `POST /banking/connections/{id}/reauthenticate` (`bank.connect`) réutilise Bridge Connect + `item_id`
+- Callback BANK-1 : state HMAC `purpose=connect|reauth`
+- `item.deleted` : connexion `disconnected`, **aucune** suppression des comptes/transactions
+- Notifications in-app via Event Bus, une par fenêtre d'expiration
+
 ## Frontend
 
 - `/banque` (`BankingPage.tsx`) — onglets : Banques, Comptes, Transactions,
@@ -216,8 +229,11 @@ Workers Render restent **désactivés** jusqu'à activation explicite.
 - **Logs** : `banking_sync_queued/started/completed/failed`,
   `banking_webhook_received/rejected/duplicate`, `banking_sync_retry_scheduled`,
   `banking_sync_lock_acquired` / `banking_sync_lock_contention`,
-  `banking_connection_connected/disconnected` avec `organization_id`,
-  `connection_id`, `provider`, `trigger`, `duration_ms` (jamais de secret, token, IBAN).
+  `banking_connection_connected/disconnected`,
+  `banking_consent_expiring`, `banking_reauth_required`, `banking_reauth_started`,
+  `banking_reauth_completed`, `banking_reauth_failed`, `banking_connection_revoked`
+  avec `organization_id`, `connection_id`, `provider`, `reason_code`, `expires_at`
+  (jamais de secret, token, IBAN, `status_code` brut).
 - **Metrics** (`MetricsRegistry`) : `elfis_banking_sync_queued_total`,
   `elfis_banking_sync_success_total`, `elfis_banking_sync_failed_total`,
   `elfis_banking_sync_duration_ms`, `elfis_banking_webhook_rejected_total`,

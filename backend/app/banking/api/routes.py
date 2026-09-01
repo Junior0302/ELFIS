@@ -70,6 +70,11 @@ class ConnectionOut(BaseModel):
     last_sync_error_code: str | None = None
     consecutive_sync_failures: int = 0
     needs_reauth: bool = False
+    consent_status: str = "unknown"
+    authentication_expires_at: datetime | None = None
+    reauth_reason: str | None = None
+    can_reauthenticate: bool = False
+    last_reauth_at: datetime | None = None
     next_sync_at: datetime | None
     sync_interval_minutes: int
     created_at: datetime
@@ -78,6 +83,12 @@ class ConnectionOut(BaseModel):
 
 
 def serialize_connection(connection: ElfisBankConnection) -> ConnectionOut:
+    from app.banking.consent import (
+        can_reauthenticate,
+        consent_status,
+        reauth_reason_for,
+    )
+
     return ConnectionOut(
         id=connection.id,
         provider=connection.provider,
@@ -91,6 +102,11 @@ def serialize_connection(connection: ElfisBankConnection) -> ConnectionOut:
         last_sync_error_code=getattr(connection, "last_sync_error_code", None),
         consecutive_sync_failures=int(getattr(connection, "consecutive_sync_failures", 0) or 0),
         needs_reauth=needs_reauth(connection),
+        consent_status=consent_status(connection),
+        authentication_expires_at=getattr(connection, "authentication_expires_at", None),
+        reauth_reason=reauth_reason_for(connection),
+        can_reauthenticate=can_reauthenticate(connection),
+        last_reauth_at=getattr(connection, "last_reauth_at", None),
         next_sync_at=connection.next_sync_at,
         sync_interval_minutes=connection.sync_interval_minutes,
         created_at=connection.created_at,
@@ -325,6 +341,28 @@ def disconnect_bank(
         "ok": True,
         "connection": serialize_connection(connection),
         "message": "Banque déconnectée.",
+    }
+
+
+@router.post("/connections/{connection_id}/reauthenticate")
+def reauthenticate_bank(
+    connection_id: int,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+):
+    auth.require("bank.connect")
+    try:
+        connection, redirect_url = BankingEngine(db).begin_reauthentication(
+            organization_id=auth.require_organization_id(),
+            connection_id=connection_id,
+        )
+    except BankingEngineError as exc:
+        _raise_domain(exc)
+    return {
+        "ok": True,
+        "redirect_url": redirect_url,
+        "connection": serialize_connection(connection),
+        "message": "Redirection vers le renouvellement bancaire.",
     }
 
 

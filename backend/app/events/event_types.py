@@ -198,6 +198,10 @@ class EventNames:
     BANKING_TRANSACTION_UPDATED = "banking.transaction.updated.v1"
     BANKING_SYNC_COMPLETED = "banking.sync.completed.v1"
     BANKING_SYNC_FAILED = "banking.sync.failed.v1"
+    BANKING_CONSENT_EXPIRING = "banking.consent.expiring.v1"
+    BANKING_REAUTHENTICATION_REQUIRED = "banking.reauthentication.required.v1"
+    BANKING_CONNECTION_REAUTHENTICATED = "banking.connection.reauthenticated.v1"
+    BANKING_CONNECTION_REVOKED = "banking.connection.revoked.v1"
 
     # Financial Dashboard V1
     FINANCIAL_HEALTH_UPDATED = "financial.health.updated.v1"

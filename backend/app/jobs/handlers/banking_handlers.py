@@ -42,6 +42,27 @@ class BankingSyncConnectionJobHandler(JobHandler):
         trigger = str(payload.get("trigger") or "scheduled")
         correlation_id = str(payload.get("correlation_id") or job.correlation_id or "")
 
+        from app.banking.banking_models import ElfisBankConnection
+        from app.banking.consent import needs_reauth, reauth_reason_for, safe_consent_log
+
+        connection = context.db.get(ElfisBankConnection, connection_id)
+        if connection is not None and needs_reauth(connection):
+            reason = reauth_reason_for(connection) or "user_action_required"
+            safe_consent_log("banking_reauth_required", connection, reason_code=reason)
+            return JobExecutionResult(
+                status="completed",
+                progress=100,
+                message="user_action_required",
+                result={
+                    "skipped": True,
+                    "reason": "user_action_required",
+                    "organization_id": organization_id,
+                    "connection_id": connection_id,
+                    "trigger": trigger,
+                    "reauth_reason": reason,
+                },
+            )
+
         try:
             runs = SyncEngine(context.db, max_attempts=1).run_sync(
                 organization_id,
@@ -123,11 +144,12 @@ class BankingSyncSweepJobHandler(JobHandler):
     job_name = JobNames.BANKING_SYNC_SWEEP
 
     def handle(self, job: ElfisJob, context: JobContext) -> JobExecutionResult:
-        from app.banking.sweep import select_stale_connections
-
         payload = job.payload if isinstance(job.payload, dict) else {}
         stale_hours = payload.get("stale_hours")
         limit = payload.get("limit")
+        from app.banking.sweep import select_stale_connections, watch_consent_lifecycle
+
+        watch_consent_lifecycle(context.db)
         connections = select_stale_connections(
             context.db,
             stale_hours=int(stale_hours) if stale_hours is not None else None,
@@ -136,17 +158,23 @@ class BankingSyncSweepJobHandler(JobHandler):
         jitter = max(0, int(settings.banking_sync_sweep_jitter_seconds))
         queued = 0
         skipped = 0
+        from app.banking.sync_jobs import BankingSyncEnqueueError
+
         for connection in connections:
             trigger = "recovery" if connection.status == "error" else "scheduled"
-            result = enqueue_connection_sync(
-                context.db,
-                organization_id=connection.organization_id,
-                connection_id=connection.id,
-                trigger=trigger,
-                scheduled_at=delayed_schedule(jitter),
-                idempotency_key=connection_sync_idempotency_key(connection.id, trigger),
-                provider=connection.provider,
-            )
+            try:
+                result = enqueue_connection_sync(
+                    context.db,
+                    organization_id=connection.organization_id,
+                    connection_id=connection.id,
+                    trigger=trigger,
+                    scheduled_at=delayed_schedule(jitter),
+                    idempotency_key=connection_sync_idempotency_key(connection.id, trigger),
+                    provider=connection.provider,
+                )
+            except BankingSyncEnqueueError:
+                skipped += 1
+                continue
             if result.created:
                 queued += 1
             else:

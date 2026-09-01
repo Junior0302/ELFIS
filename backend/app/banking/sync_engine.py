@@ -130,6 +130,12 @@ class SyncEngine:
             raise BankingEngineError(
                 "Connexion bancaire non prête : le consentement doit d'abord aboutir."
             )
+        from app.banking.consent import needs_reauth
+
+        if needs_reauth(connection):
+            raise BankingEngineError(
+                "Une action utilisateur est requise avant de synchroniser."
+            )
 
         held = acquire_connection_sync_lock(
             self.db,
@@ -584,6 +590,12 @@ class SyncEngine:
         run.finished_at = datetime.utcnow()
         run.duration_ms = round((time.monotonic() - started) * 1000, 2)
         run.error_message = message[:500]
+        from app.banking.errors import error_class, ERROR_CLASS_USER_ACTION
+
+        if error_class(error_code) == ERROR_CLASS_USER_ACTION:
+            from app.banking.consent import mark_reauth_required
+
+            mark_reauth_required(connection, reason=error_code)
         connection.status = ConnectionStatus.error.value
         mark_sync_failed(connection, error_code=error_code, public_message=public_message)
         self.db.add(run)

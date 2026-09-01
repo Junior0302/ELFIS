@@ -17,6 +17,7 @@ from app.banking.banking_models import ElfisBankConnection, ElfisBankSyncRun
 from app.banking.banking_types import ConnectionStatus, NormalizedAccount
 from app.banking.banking_events import publish_connection_event
 from app.banking.consent_state import ConsentStateError, issue_consent_state, verify_consent_state
+from app.banking.consent import needs_reauth as connection_needs_reauth
 from app.banking.connectors.base import BankConnector, ConnectorError
 from app.banking.connectors import registry
 from app.banking.demo_gate import DEMO_PROVIDER, FICTIONAL_BANK_LABEL, is_demo_bank_enabled
@@ -232,6 +233,54 @@ class BankingEngine:
         )
         return connection, started.redirect_url
 
+    def begin_reauthentication(
+        self,
+        *,
+        organization_id: int,
+        connection_id: int,
+    ) -> tuple[ElfisBankConnection, str]:
+        from app.banking.consent import can_reauthenticate, consent_status, safe_consent_log
+
+        connection = self.get_connection(organization_id, connection_id)
+        if not can_reauthenticate(connection):
+            raise BankingEngineError("Cette connexion ne peut pas être réauthentifiée.")
+        callback_base = (settings.banking_bridge_redirect_uri or "").strip()
+        if not callback_base:
+            raise BankingEngineError(
+                "Callback Bridge non configuré (BANKING_BRIDGE_REDIRECT_URI)."
+            )
+        connector = self.get_connector_for(connection)
+        if not connector.requires_user_consent:
+            raise BankingEngineError("Ce fournisseur ne nécessite pas de consentement redirigé.")
+        state = issue_consent_state(
+            organization_id=organization_id,
+            connection_id=connection.id,
+            purpose="reauth",
+        )
+        callback_url = _callback_url_with_state(callback_base, state)
+        force = consent_status(connection) in {"expiring", "reauth_required", "reconnecting"}
+        try:
+            started = connector.start_user_consent(
+                organization_id=organization_id,
+                callback_url=callback_url,
+                bank_name=connection.bank_name,
+                provider_item_id=connection.provider_connection_id,
+                force_reauthentication=force,
+            )
+        except ConnectorError as exc:
+            connection.error_message = str(exc)[:500]
+            self.db.add(connection)
+            self.db.commit()
+            safe_consent_log("banking_reauth_failed", connection, reason_code="connect_session")
+            raise
+        connection.status = ConnectionStatus.awaiting_consent.value
+        connection.error_message = None
+        self.db.add(connection)
+        self.db.commit()
+        self.db.refresh(connection)
+        safe_consent_log("banking_reauth_started", connection)
+        return connection, started.redirect_url
+
     def finalize_bank_consent(
         self,
         *,
@@ -241,6 +290,17 @@ class BankingEngine:
         success: str | None = None,
     ) -> str:
         """Valide le retour fournisseur. Retourne ok | denied | error."""
+        from app.banking.consent import (
+            apply_item_signals,
+            mark_reauthenticated,
+            needs_reauth,
+            safe_consent_log,
+        )
+        from app.banking.banking_events import (
+            publish_connection_reauthenticated,
+            publish_reauthentication_required,
+        )
+
         token = (state or "").strip() or (context or "").strip()
         try:
             claims = verify_consent_state(token)
@@ -250,6 +310,7 @@ class BankingEngine:
 
         organization_id = claims["organization_id"]
         connection_id = claims["connection_id"]
+        purpose = str(claims.get("purpose") or "connect")
         try:
             connection = self.get_connection(organization_id, connection_id)
         except BankingEngineError:
@@ -259,16 +320,45 @@ class BankingEngine:
             )
             return "error"
 
-        if connection.status != ConnectionStatus.awaiting_consent.value:
+        remote_item = str(item_id or "").strip()
+        accepted = str(success or "").strip().lower() in {"1", "true", "yes"}
+
+        if purpose == "reauth":
+            if not (connection.provider_connection_id or "").strip():
+                return "error"
+            if connection.status == ConnectionStatus.disconnected.value:
+                return "error"
+            if (
+                remote_item
+                and remote_item != str(connection.provider_connection_id)
+            ):
+                logger.warning(
+                    "banking_reauth_item_mismatch",
+                    extra={"organization_id": organization_id, "connection_id": connection.id},
+                )
+                return "error"
+            if (
+                connection.status == ConnectionStatus.connected.value
+                and not needs_reauth(connection)
+                and not remote_item
+            ):
+                return "ok"
+        elif connection.status != ConnectionStatus.awaiting_consent.value:
             logger.warning(
                 "banking_consent_replay_refused",
                 extra={"organization_id": organization_id, "connection_id": connection.id},
             )
             return "error"
 
-        accepted = str(success or "").strip().lower() in {"1", "true", "yes"}
-        remote_item = str(item_id or "").strip()
         if not accepted or not remote_item:
+            if purpose == "reauth":
+                if connection.status == ConnectionStatus.awaiting_consent.value:
+                    connection.status = ConnectionStatus.connected.value
+                connection.error_message = "Réauthentification bancaire annulée ou incomplète."
+                self.db.add(connection)
+                self.db.commit()
+                safe_consent_log("banking_reauth_failed", connection, reason_code="denied")
+                return "denied"
             connection.status = ConnectionStatus.error.value
             connection.error_message = "Consentement bancaire annulé ou incomplet."
             self.db.add(connection)
@@ -282,23 +372,61 @@ class BankingEngine:
                 provider_item_id=remote_item,
             )
         except ConnectorError as exc:
-            connection.status = ConnectionStatus.error.value
-            connection.error_message = str(exc)
+            if purpose != "reauth":
+                connection.status = ConnectionStatus.error.value
+            connection.error_message = str(exc)[:500]
             self.db.add(connection)
             self.db.commit()
             logger.warning(
                 "banking_consent_item_rejected",
                 extra={"organization_id": organization_id, "connection_id": connection.id},
             )
+            if purpose == "reauth":
+                safe_consent_log("banking_reauth_failed", connection, reason_code="item_rejected")
+            return "error"
+
+        if purpose == "reauth" and completed.provider_connection_id != str(
+            connection.provider_connection_id
+        ):
+            safe_consent_log("banking_reauth_failed", connection, reason_code="item_mismatch")
             return "error"
 
         connection.provider_connection_id = completed.provider_connection_id
         connection.bank_name = completed.bank_name or connection.bank_name
-        connection.status = ConnectionStatus.connected.value
-        connection.error_message = None
+        if purpose == "reauth":
+            mark_reauthenticated(
+                connection,
+                expires_at=completed.authentication_expires_at,
+            )
+        else:
+            connection.status = ConnectionStatus.connected.value
+            connection.error_message = None
+        signals = apply_item_signals(
+            connection,
+            status_code=completed.status_code,
+            status_code_info=completed.status_code_info,
+            authentication_expires_at=completed.authentication_expires_at,
+        )
         self.db.add(connection)
         self.db.commit()
         self.db.refresh(connection)
+
+        still_blocked = bool(signals.get("item_reason") and signals.get("needs_reauth"))
+        if still_blocked:
+            publish_reauthentication_required(
+                self.db,
+                organization_id=organization_id,
+                connection_id=connection.id,
+                provider=connection.provider,
+                reason=signals["reauth_reason"] or "item_action_required",
+                expires_at=connection.authentication_expires_at,
+            )
+            safe_consent_log(
+                "banking_reauth_required",
+                connection,
+                reason_code=signals["reauth_reason"],
+            )
+            return "ok"
 
         try:
             accounts = connector.list_accounts(
@@ -316,22 +444,32 @@ class BankingEngine:
                 },
             )
 
-        publish_connection_event(
-            self.db,
-            event_name=EventNames.BANKING_CONNECTION_CONNECTED,
-            organization_id=organization_id,
-            connection_id=connection.id,
-            provider=connection.provider,
-            bank_name=connection.bank_name,
-        )
-        logger.info(
-            "banking_connection_connected",
-            extra={
-                "organization_id": organization_id,
-                "provider": connection.provider,
-                "connection_id": connection.id,
-            },
-        )
+        if purpose == "reauth":
+            publish_connection_reauthenticated(
+                self.db,
+                organization_id=organization_id,
+                connection_id=connection.id,
+                provider=connection.provider,
+                bank_name=connection.bank_name,
+            )
+            safe_consent_log("banking_reauth_completed", connection)
+        else:
+            publish_connection_event(
+                self.db,
+                event_name=EventNames.BANKING_CONNECTION_CONNECTED,
+                organization_id=organization_id,
+                connection_id=connection.id,
+                provider=connection.provider,
+                bank_name=connection.bank_name,
+            )
+            logger.info(
+                "banking_connection_connected",
+                extra={
+                    "organization_id": organization_id,
+                    "provider": connection.provider,
+                    "connection_id": connection.id,
+                },
+            )
 
         from app.banking.sync_jobs import request_connection_sync
 
@@ -365,6 +503,8 @@ class BankingEngine:
             .all()
         )
         for row in pending:
+            if (row.provider_connection_id or "").strip():
+                continue
             row.status = ConnectionStatus.error.value
             row.error_message = "Tentative remplacée par une nouvelle connexion."
             self.db.add(row)
@@ -562,10 +702,7 @@ class BankingEngine:
                 1 for c in connections if (c.last_sync_status or "") == "syncing"
             ),
             "connections_needs_reauth": sum(
-                1
-                for c in connections
-                if (c.last_sync_error_code or "")
-                in {"invalid_credentials", "connection_revoked", "consent_expired"}
+                1 for c in connections if connection_needs_reauth(c)
             ),
         }
 

@@ -6,9 +6,9 @@ indépendants du fournisseur.
 Identifiants : BANKING_BRIDGE_CLIENT_ID / BANKING_BRIDGE_CLIENT_SECRET.
 Aucun secret, token ou URL de session n'est journalisé.
 
-BANK-5 : ``authentication_expires_at`` est lu sur l'item au callback
-mais n'est pas persisté — ElfisBankConnection n'a pas de colonne dédiée
-ni de metadata JSON. Ne pas détourner ``provider_connection_id``.
+BANK-5 : ``authentication_expires_at`` et ``status_code`` d'item sont lus
+au callback / webhook puis persistés (dates + codes normalisés uniquement).
+Jamais de token ni de payload brut.
 """
 
 from __future__ import annotations
@@ -156,10 +156,28 @@ class BridgeBankConnector(BankConnector):
                 status_code=response.status_code,
             )
         if response.status_code >= 400:
+            item_status = None
+            info = None
+            try:
+                body = response.json() if response.content else {}
+            except ValueError:
+                body = {}
+            if isinstance(body, dict):
+                raw_status = body.get("status_code")
+                nested = body.get("error") if isinstance(body.get("error"), dict) else {}
+                if raw_status is None:
+                    raw_status = nested.get("status_code")
+                try:
+                    item_status = int(raw_status) if raw_status is not None else None
+                except (TypeError, ValueError):
+                    item_status = None
+                info = str(body.get("status_code_info") or nested.get("code") or "")[:80] or None
             raise ConnectorError(
                 f"Requête Bridge refusée ({response.status_code})",
                 retryable=False,
                 status_code=response.status_code,
+                item_status_code=item_status,
+                provider_code=info,
             )
         return response.json() if response.content else {}
 
@@ -195,6 +213,8 @@ class BridgeBankConnector(BankConnector):
         callback_url: str,
         bank_name: str = "",
         context: str = "",
+        provider_item_id: str = "",
+        force_reauthentication: bool = False,
     ) -> ConsentStartResult:
         token = self._access_token(organization_id)
         payload: dict[str, Any] = {
@@ -203,6 +223,11 @@ class BridgeBankConnector(BankConnector):
         }
         if context:
             payload["context"] = context
+        item_id = str(provider_item_id or "").strip()
+        if item_id:
+            payload["item_id"] = int(item_id) if item_id.isdigit() else item_id
+            if force_reauthentication:
+                payload["force_reauthentication"] = True
         data = self._request(
             "POST",
             "/v3/aggregation/connect-sessions",
@@ -214,7 +239,7 @@ class BridgeBankConnector(BankConnector):
             raise ConnectorError("Bridge n'a pas retourné d'URL Connect.")
         logger.info(
             "banking_bridge_connect_session_created",
-            extra={"organization_id": organization_id},
+            extra={"organization_id": organization_id, "reauth": bool(item_id)},
         )
         return ConsentStartResult(redirect_url=url)
 
@@ -238,6 +263,12 @@ class BridgeBankConnector(BankConnector):
             raise ConnectorError("Item Bridge incohérent avec la tentative de connexion.")
         expires = data.get("authentication_expires_at")
         expires_at = str(expires) if expires else None
+        raw_status = data.get("status_code")
+        try:
+            status_code = int(raw_status) if raw_status is not None else None
+        except (TypeError, ValueError):
+            status_code = None
+        info = str(data.get("status_code_info") or "")[:80] or None
         logger.info(
             "banking_bridge_item_validated",
             extra={"organization_id": organization_id, "item_present": True},
@@ -246,6 +277,8 @@ class BridgeBankConnector(BankConnector):
             provider_connection_id=item_id,
             bank_name=str(data.get("provider_name") or self.display_name),
             authentication_expires_at=expires_at,
+            status_code=status_code,
+            status_code_info=info,
         )
 
     def connect(self, *, organization_id: int, bank_name: str, options: dict | None = None) -> str:

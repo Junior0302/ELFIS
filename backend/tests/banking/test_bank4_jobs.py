@@ -154,7 +154,7 @@ def test_no_retry_permanent_4xx(bank4_ctx):
     job = bank4_ctx["db"].query(ElfisJob).filter(ElfisJob.idempotency_key == "perm-401").one()
     assert job.status == JobStatus.FAILED
     bank4_ctx["db"].refresh(bank4_ctx["connection"])
-    assert bank4_ctx["connection"].last_sync_error_code == "invalid_credentials"
+    assert bank4_ctx["connection"].last_sync_error_code == "provider_unauthorized"
     assert bank4_ctx["connection"].consecutive_sync_failures == 1
 
 

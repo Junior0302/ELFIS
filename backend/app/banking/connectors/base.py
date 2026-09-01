@@ -24,10 +24,20 @@ from app.banking.banking_types import (
 class ConnectorError(Exception):
     """Erreur d'un fournisseur. ``retryable=True`` déclenche le retry du Sync Engine."""
 
-    def __init__(self, message: str, *, retryable: bool = False, status_code: int | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = False,
+        status_code: int | None = None,
+        item_status_code: int | None = None,
+        provider_code: str | None = None,
+    ):
         super().__init__(message)
         self.retryable = retryable
         self.status_code = status_code
+        self.item_status_code = item_status_code
+        self.provider_code = provider_code
 
 
 class ConnectorNotConfiguredError(ConnectorError):
@@ -54,6 +64,8 @@ class BankConnector(ABC):
         callback_url: str,
         bank_name: str = "",
         context: str = "",
+        provider_item_id: str = "",
+        force_reauthentication: bool = False,
     ) -> ConsentStartResult:
         raise ConnectorError("Ce fournisseur ne nécessite pas de consentement redirigé.")
 

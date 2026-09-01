@@ -36,24 +36,25 @@ logger = logging.getLogger(__name__)
 
 BRIDGE_SIGNATURE_HEADER = "bridgeapi-signature"
 BRIDGE_PROVIDER = "bridge"
-# BANK-4 : ces types enqueuent banking.sync_connection.v1
+# BANK-4 : ces types enqueuent banking.sync_connection.v1 si pas de reauth requis
 SYNC_EVENT_TYPES = frozenset(
     {
         "item.refreshed",
         "item.account.updated",
     }
 )
-# Parsables / ignorés proprement (BANK-5 plus tard — pas de 500).
-KNOWN_IGNORED_EVENT_TYPES = frozenset(
+LIFECYCLE_EVENT_TYPES = frozenset(
     {
-        "item.created",
         "item.deleted",
+        "item.created",
         "item.account.created",
         "item.account.deleted",
         "user.deleted",
         "TEST_EVENT",
     }
 )
+# Parsables / ignorés proprement après signature + receipt (jamais 500).
+KNOWN_IGNORED_EVENT_TYPES = LIFECYCLE_EVENT_TYPES
 
 
 class BridgeWebhookError(Exception):
@@ -240,6 +241,7 @@ def ingest_bridge_webhook(
         event_type=event_type,
         item_id=item_id,
         event_id=event_id,
+        content=content,
     )
 
 
@@ -252,6 +254,75 @@ def _receipt_needs_job(receipt: ElfisBankWebhookReceipt) -> bool:
     return True
 
 
+def _apply_webhook_lifecycle(
+    db: Session,
+    connection: ElfisBankConnection | None,
+    *,
+    event_type: str,
+    content: dict[str, Any],
+) -> None:
+    from app.banking.banking_events import (
+        publish_consent_expiring,
+        publish_connection_revoked,
+        publish_reauthentication_required,
+    )
+    from app.banking.consent import (
+        apply_item_signals,
+        mark_revoked,
+        needs_reauth,
+        safe_consent_log,
+    )
+
+    if connection is None:
+        return
+    if event_type == "item.deleted":
+        mark_revoked(connection)
+        db.add(connection)
+        publish_connection_revoked(
+            db,
+            organization_id=connection.organization_id,
+            connection_id=connection.id,
+            provider=connection.provider,
+            bank_name=connection.bank_name,
+        )
+        safe_consent_log("banking_connection_revoked", connection, reason_code="connection_revoked")
+        return
+    if event_type not in SYNC_EVENT_TYPES:
+        return
+    signals = apply_item_signals(
+        connection,
+        status_code=content.get("status_code"),
+        status_code_info=content.get("status_code_info"),
+        authentication_expires_at=content.get("authentication_expires_at"),
+    )
+    db.add(connection)
+    status = signals["consent_status"]
+    if status == "expiring" and connection.authentication_expires_at:
+        publish_consent_expiring(
+            db,
+            organization_id=connection.organization_id,
+            connection_id=connection.id,
+            provider=connection.provider,
+            expires_at=connection.authentication_expires_at,
+        )
+        safe_consent_log("banking_consent_expiring", connection)
+    if needs_reauth(connection):
+        if signals.get("newly_required"):
+            publish_reauthentication_required(
+                db,
+                organization_id=connection.organization_id,
+                connection_id=connection.id,
+                provider=connection.provider,
+                reason=signals["reauth_reason"] or "consent_expired",
+                expires_at=connection.authentication_expires_at,
+            )
+        safe_consent_log(
+            "banking_reauth_required",
+            connection,
+            reason_code=signals["reauth_reason"],
+        )
+
+
 def _enqueue_from_receipt(
     db: Session,
     *,
@@ -259,8 +330,14 @@ def _enqueue_from_receipt(
     event_type: str,
     item_id: str,
     event_id: str,
+    content: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    from app.banking.consent import needs_reauth
+
+    payload = content if isinstance(content, dict) else {}
     connection = _lookup_connection(db, item_id)
+    _apply_webhook_lifecycle(db, connection, event_type=event_type, content=payload)
+
     if event_type not in SYNC_EVENT_TYPES or connection is None:
         receipt.status = "ignored"
         if connection is not None:
@@ -275,6 +352,20 @@ def _enqueue_from_receipt(
             "event_type": event_type,
         }
 
+    if needs_reauth(connection):
+        receipt.status = "ignored"
+        receipt.organization_id = connection.organization_id
+        receipt.connection_id = connection.id
+        db.add(receipt)
+        db.commit()
+        return {
+            "ok": True,
+            "ignored": True,
+            "user_action_required": True,
+            "receipt_id": receipt.id,
+            "event_type": event_type,
+        }
+
     try:
         result = enqueue_connection_sync(
             db,
@@ -284,8 +375,22 @@ def _enqueue_from_receipt(
             idempotency_key=f"banking-sync-webhook-{event_id}",
             provider=connection.provider,
         )
-    except Exception:
-        # Receipt reste 'received' (ou queued sans job_id) : le retry Bridge peut enqueue.
+    except Exception as exc:
+        from app.banking.sync_jobs import BankingSyncEnqueueError
+
+        if isinstance(exc, BankingSyncEnqueueError):
+            receipt.status = "ignored"
+            receipt.organization_id = connection.organization_id
+            receipt.connection_id = connection.id
+            db.add(receipt)
+            db.commit()
+            return {
+                "ok": True,
+                "ignored": True,
+                "user_action_required": True,
+                "receipt_id": receipt.id,
+                "event_type": event_type,
+            }
         db.rollback()
         raise
 

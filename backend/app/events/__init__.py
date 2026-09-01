@@ -122,6 +122,10 @@ def bootstrap_handlers(registry: EventHandlerRegistry | None = None) -> None:
 
     register_billing_event_handlers(reg)
 
+    from app.events.handlers.banking_event_handlers import register_banking_event_handlers
+
+    register_banking_event_handlers(reg)
+
     from app.decision_center.event_handlers import register_decision_center_handlers
 
     register_decision_center_handlers(reg)

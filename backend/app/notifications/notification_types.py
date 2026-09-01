@@ -42,12 +42,18 @@ class NotificationTypes:
     ACCOUNTING_PROPOSAL_REJECTED = "accounting.proposal.rejected"
     ACCOUNTING_PROPOSAL_FAILED = "accounting.proposal.failed"
 
+    BANKING_CONSENT_EXPIRING = "banking.consent.expiring"
+    BANKING_REAUTHENTICATION_REQUIRED = "banking.reauthentication.required"
+    BANKING_CONNECTION_REAUTHENTICATED = "banking.connection.reauthenticated"
+    BANKING_CONNECTION_REVOKED = "banking.connection.revoked"
+
 
 class NotificationCategories:
     BILLING = "billing"
     VAULT = "vault"
     EMAIL = "email"
     ACCOUNTING = "accounting"
+    BANKING = "banking"
     SECURITY = "security"
     SUBSCRIPTION = "subscription"
     SYSTEM = "system"

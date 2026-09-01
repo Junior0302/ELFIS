@@ -179,3 +179,113 @@ def publish_connection_event(
         },
         idempotency_key=f"banking-conn-{event_name}-{connection_id}-{uuid.uuid4().hex[:8]}",
     )
+
+
+def _consent_payload(
+    *,
+    connection_id: int,
+    provider: str,
+    reason: str | None = None,
+    expires_at=None,
+    bank_name: str | None = None,
+) -> dict:
+    payload = {
+        "connection_id": connection_id,
+        "provider": provider,
+    }
+    if reason:
+        payload["reason"] = reason
+    if expires_at is not None:
+        payload["expires_at"] = expires_at.isoformat() if hasattr(expires_at, "isoformat") else str(expires_at)
+    if bank_name:
+        payload["bank_name"] = bank_name
+    return payload
+
+
+def publish_consent_expiring(
+    db: Session,
+    *,
+    organization_id: int,
+    connection_id: int,
+    provider: str,
+    expires_at,
+) -> None:
+    stamp = expires_at.date().isoformat() if hasattr(expires_at, "date") else str(expires_at)[:10]
+    _publish(
+        db,
+        event_name=EventNames.BANKING_CONSENT_EXPIRING,
+        organization_id=organization_id,
+        aggregate_type="bank_connection",
+        aggregate_id=str(connection_id),
+        payload=_consent_payload(
+            connection_id=connection_id, provider=provider, expires_at=expires_at
+        ),
+        idempotency_key=f"banking-consent-expiring-{connection_id}-{stamp}",
+    )
+
+
+def publish_reauthentication_required(
+    db: Session,
+    *,
+    organization_id: int,
+    connection_id: int,
+    provider: str,
+    reason: str,
+    expires_at=None,
+) -> None:
+    _publish(
+        db,
+        event_name=EventNames.BANKING_REAUTHENTICATION_REQUIRED,
+        organization_id=organization_id,
+        aggregate_type="bank_connection",
+        aggregate_id=str(connection_id),
+        payload=_consent_payload(
+            connection_id=connection_id,
+            provider=provider,
+            reason=reason,
+            expires_at=expires_at,
+        ),
+        idempotency_key=f"banking-reauth-required-{connection_id}-{reason}",
+    )
+
+
+def publish_connection_reauthenticated(
+    db: Session,
+    *,
+    organization_id: int,
+    connection_id: int,
+    provider: str,
+    bank_name: str,
+) -> None:
+    _publish(
+        db,
+        event_name=EventNames.BANKING_CONNECTION_REAUTHENTICATED,
+        organization_id=organization_id,
+        aggregate_type="bank_connection",
+        aggregate_id=str(connection_id),
+        payload=_consent_payload(
+            connection_id=connection_id, provider=provider, bank_name=bank_name
+        ),
+        idempotency_key=f"banking-connection-reauthenticated-{connection_id}-{uuid.uuid4().hex[:12]}",
+    )
+
+
+def publish_connection_revoked(
+    db: Session,
+    *,
+    organization_id: int,
+    connection_id: int,
+    provider: str,
+    bank_name: str,
+) -> None:
+    _publish(
+        db,
+        event_name=EventNames.BANKING_CONNECTION_REVOKED,
+        organization_id=organization_id,
+        aggregate_type="bank_connection",
+        aggregate_id=str(connection_id),
+        payload=_consent_payload(
+            connection_id=connection_id, provider=provider, bank_name=bank_name
+        ),
+        idempotency_key=f"banking-connection-revoked-{connection_id}",
+    )

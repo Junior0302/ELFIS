@@ -9,21 +9,15 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.banking.banking_models import ElfisBankConnection
+from app.banking.errors import RETRYABLE_ERROR_CODES, USER_ACTION_ERROR_CODES
 
 CONNECTION_SYNC_STATUSES = frozenset({"never", "queued", "syncing", "success", "failed"})
-USER_ACTION_ERROR_CODES = frozenset(
-    {"invalid_credentials", "connection_revoked", "consent_expired"}
-)
-RETRYABLE_ERROR_CODES = frozenset(
-    {"timeout", "rate_limited", "provider_unavailable", "network"}
-)
 
 
 def needs_reauth(connection: ElfisBankConnection) -> bool:
-    code = (connection.last_sync_error_code or "").strip()
-    if code in USER_ACTION_ERROR_CODES:
-        return True
-    return connection.status in {"awaiting_consent", "error"} and code in USER_ACTION_ERROR_CODES
+    from app.banking.consent import needs_reauth as _needs_reauth
+
+    return _needs_reauth(connection)
 
 
 def mark_sync_queued(connection: ElfisBankConnection) -> None:

@@ -7,6 +7,7 @@ import {
   bankingApi,
   connectionStatusLabel,
   connectionSyncHint,
+  consentStatusLabel,
   syncStatusLabel,
   type BankAccount,
   type BankConnection,
@@ -101,6 +102,7 @@ export default function BankingPage() {
   const [health, setHealth] = useState<BankingHealth | null>(null)
   const [selectedProvider, setSelectedProvider] = useState('')
   const [bankName, setBankName] = useState('')
+  const [reconnectingId, setReconnectingId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     if (!token || orgId == null) return
@@ -248,6 +250,39 @@ export default function BankingPage() {
       providers.some((p) => p.fictional || isFictionalBankProvider(p.provider)),
     [connections, providers],
   )
+  const expiringConnections = useMemo(
+    () => connections.filter((c) => c.consent_status === 'expiring'),
+    [connections],
+  )
+  const reauthConnections = useMemo(
+    () =>
+      connections.filter(
+        (c) => c.needs_reauth || c.consent_status === 'reauth_required' || c.consent_status === 'reconnecting',
+      ),
+    [connections],
+  )
+
+  async function reauthenticate(connection: BankConnection) {
+    if (!token || orgId == null) return
+    setBusy(true)
+    setReconnectingId(connection.id)
+    setError('')
+    setInfo('')
+    try {
+      const res = await bankingApi.reauthenticate(token, orgId, connection.id)
+      if (res.redirect_url) {
+        window.location.assign(res.redirect_url)
+        return
+      }
+      setInfo(res.message)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Renouvellement impossible')
+      setReconnectingId(null)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <>
@@ -273,6 +308,17 @@ export default function BankingPage() {
             Ces mouvements sont générés localement pour la démonstration. Aucune banque réelle
             n’est connectée.
           </p>
+        </div>
+      ) : null}
+
+      {expiringConnections.length ? (
+        <div className="panel" role="status">
+          <p>Votre connexion bancaire devra bientôt être renouvelée.</p>
+        </div>
+      ) : null}
+      {reauthConnections.some((c) => c.consent_status === 'reauth_required' || c.needs_reauth) ? (
+        <div className="panel" role="alert">
+          <p>Une action est nécessaire pour renouveler votre connexion bancaire.</p>
         </div>
       ) : null}
 
@@ -385,13 +431,20 @@ export default function BankingPage() {
                       Fournisseur :{' '}
                       {isFictionalBankProvider(c.provider) ? FICTIONAL_BANK_LABEL : c.provider} ·{' '}
                       {connectionStatusLabel(c.status)}
+                      {consentStatusLabel(c.consent_status)
+                        ? ` · ${consentStatusLabel(c.consent_status)}`
+                        : ''}
                       {c.last_sync_status
                         ? ` · ${syncStatusLabel(c.last_sync_status)}`
                         : ''}{' '}
                       · Dernière sync : {fmtDate(c.last_sync_completed_at || c.last_sync_at)}
                     </p>
-                    {c.needs_reauth ? (
+                    {c.consent_status === 'expiring' ? (
+                      <p className="muted">Votre connexion bancaire devra bientôt être renouvelée.</p>
+                    ) : c.needs_reauth || c.consent_status === 'reauth_required' ? (
                       <p className="form-error">{connectionSyncHint(c)}</p>
+                    ) : c.consent_status === 'reconnecting' || reconnectingId === c.id ? (
+                      <p className="muted">Renouvellement de la connexion en cours…</p>
                     ) : connectionSyncHint(c) ? (
                       <p className="muted">{connectionSyncHint(c)}</p>
                     ) : publicBankingMessage(c.error_message) ? (
@@ -401,7 +454,23 @@ export default function BankingPage() {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {c.status !== 'disconnected' ? (
                       <>
-                        {c.status === 'connected' ? (
+                        {c.can_reauthenticate &&
+                        (c.needs_reauth ||
+                          c.consent_status === 'reauth_required' ||
+                          c.consent_status === 'expiring' ||
+                          c.consent_status === 'reconnecting') ? (
+                          <button
+                            type="button"
+                            className="btn"
+                            disabled={busy}
+                            onClick={() => void reauthenticate(c)}
+                          >
+                            {c.consent_status === 'reconnecting' || reconnectingId === c.id
+                              ? 'Renouvellement…'
+                              : 'Renouveler la connexion bancaire'}
+                          </button>
+                        ) : null}
+                        {c.status === 'connected' && !c.needs_reauth ? (
                           <button type="button" className="btn" disabled={busy} onClick={() => void sync(c.id)}>
                             Synchroniser
                           </button>

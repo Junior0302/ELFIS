@@ -29,7 +29,7 @@ class ElfisBankConnection(Base):
     organization_id: Mapped[int] = mapped_column(Integer, index=True)
     provider: Mapped[str] = mapped_column(String(32), index=True)
     # Identifiant unique côté fournisseur après liaison (item Bridge, etc.).
-    # Ne pas y stocker user UUID, jeton ou date d'expiration.
+    # Ne pas y stocker user UUID, jeton, secret ni payload brut.
     provider_connection_id: Mapped[str] = mapped_column(String(128), default="")
     bank_name: Mapped[str] = mapped_column(String(255), default="")
     status: Mapped[str] = mapped_column(String(32), default="connected", index=True)
@@ -39,6 +39,10 @@ class ElfisBankConnection(Base):
     last_sync_status: Mapped[str] = mapped_column(String(16), default="never")
     last_sync_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     consecutive_sync_failures: Mapped[int] = mapped_column(Integer, default=0)
+    authentication_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reauth_required_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reauth_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_reauth_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sync_interval_minutes: Mapped[int] = mapped_column(Integer, default=1440)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -168,6 +168,8 @@ class Settings(BaseSettings):
     banking_sync_sweep_jitter_seconds: int = 90
     banking_sync_sweep_reschedule: bool = False
     banking_sync_job_max_attempts: int = 5
+    # BANK-5 — alerte avant expiration SCA (jours)
+    banking_reauth_warning_days: int = 7
     # Financial Dashboard V1 — cache et seuils d'alertes
     financial_cache_ttl_seconds: int = 60
     financial_treasury_low_threshold: float = 5000.0

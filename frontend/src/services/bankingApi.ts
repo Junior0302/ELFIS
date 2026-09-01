@@ -22,6 +22,11 @@ export type BankConnection = {
   last_sync_error_code?: string | null
   consecutive_sync_failures?: number
   needs_reauth?: boolean
+  consent_status?: 'valid' | 'expiring' | 'reauth_required' | 'reconnecting' | 'unknown'
+  authentication_expires_at?: string | null
+  reauth_reason?: string | null
+  can_reauthenticate?: boolean
+  last_reauth_at?: string | null
   next_sync_at?: string | null
   sync_interval_minutes: number
   created_at: string
@@ -183,7 +188,13 @@ export const syncStatusLabel = (status: string): string => {
 }
 
 export const connectionSyncHint = (connection: BankConnection): string => {
-  if (connection.needs_reauth) {
+  if (connection.consent_status === 'reconnecting') {
+    return 'Renouvellement de la connexion en cours…'
+  }
+  if (connection.consent_status === 'expiring') {
+    return 'Votre connexion bancaire devra bientôt être renouvelée.'
+  }
+  if (connection.needs_reauth || connection.consent_status === 'reauth_required') {
     return 'Réauthentification bancaire requise.'
   }
   if (connection.last_sync_status === 'syncing') {
@@ -226,6 +237,17 @@ export const connectionStatusLabel = (status: string): string => {
   return map[status] || status
 }
 
+export const consentStatusLabel = (status?: string): string => {
+  const map: Record<string, string> = {
+    valid: 'Consentement valide',
+    expiring: 'À renouveler bientôt',
+    reauth_required: 'Réauthentification requise',
+    reconnecting: 'Renouvellement en cours',
+    unknown: 'État inconnu',
+  }
+  return map[status || ''] || ''
+}
+
 export const bankingApi = {
   async listConnectors(token: string, orgId: number) {
     const res = await fetch(`${apiRoot()}/banking/connectors`, {
@@ -255,6 +277,20 @@ export const bankingApi = {
       { method: 'POST', headers: headers(token, orgId, true), body: '{}' },
     )
     return parse<{ ok: boolean; connection: BankConnection; message: string }>(res)
+  },
+
+  async reauthenticate(token: string, orgId: number, connectionId: number) {
+    const res = await fetch(`${apiRoot()}/banking/connections/${connectionId}/reauthenticate`, {
+      method: 'POST',
+      headers: headers(token, orgId, true),
+      body: '{}',
+    })
+    return parse<{
+      ok: boolean
+      redirect_url: string
+      connection: BankConnection
+      message: string
+    }>(res)
   },
 
   async listAccounts(token: string, orgId: number) {

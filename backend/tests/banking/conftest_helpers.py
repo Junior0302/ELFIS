@@ -16,6 +16,7 @@ from app import models_saas  # noqa: F401
 from app.banking import banking_models  # noqa: F401
 from app.events import event_models  # noqa: F401
 from app.jobs import job_models  # noqa: F401
+from app.notifications import notification_models  # noqa: F401
 from app.banking.banking_types import (
     ConnectorHealth,
     NormalizedAccount,

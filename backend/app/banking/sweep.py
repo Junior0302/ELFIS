@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.banking.banking_models import ElfisBankConnection
 from app.banking.banking_types import ConnectionStatus
-from app.banking.sync_status import USER_ACTION_ERROR_CODES
+from app.banking.consent import needs_reauth
+from app.banking.errors import USER_ACTION_ERROR_CODES
 from app.config import settings
 
 
@@ -45,6 +46,8 @@ def select_stale_connections(
     for connection in rows:
         if (connection.last_sync_status or "") == "syncing":
             continue
+        if needs_reauth(connection, now=moment):
+            continue
         if (connection.last_sync_error_code or "") in USER_ACTION_ERROR_CODES:
             continue
         if connection.status == ConnectionStatus.error.value:
@@ -66,3 +69,60 @@ def select_stale_connections(
         if len(eligible) >= batch:
             break
     return eligible
+
+
+def watch_consent_lifecycle(db: Session, *, now: datetime | None = None) -> dict[str, int]:
+    """Évalue l'expiration SCA et publie les événements métier (idempotents)."""
+    from app.banking.banking_events import (
+        publish_consent_expiring,
+        publish_reauthentication_required,
+    )
+    from app.banking.consent import (
+        consent_status,
+        mark_reauth_required,
+        safe_consent_log,
+    )
+
+    moment = now or datetime.utcnow()
+    rows = (
+        db.query(ElfisBankConnection)
+        .filter(
+            ElfisBankConnection.provider_connection_id != "",
+            ElfisBankConnection.status.in_(
+                [ConnectionStatus.connected.value, ConnectionStatus.error.value]
+            ),
+        )
+        .all()
+    )
+    expiring = 0
+    required = 0
+    for connection in rows:
+        status = consent_status(connection, now=moment)
+        if status == "expiring" and connection.authentication_expires_at:
+            publish_consent_expiring(
+                db,
+                organization_id=connection.organization_id,
+                connection_id=connection.id,
+                provider=connection.provider,
+                expires_at=connection.authentication_expires_at,
+            )
+            safe_consent_log("banking_consent_expiring", connection)
+            expiring += 1
+        elif status == "reauth_required":
+            reason = (connection.reauth_reason or "consent_expired")[:64]
+            newly = mark_reauth_required(connection, reason=reason, now=moment)
+            db.add(connection)
+            publish_reauthentication_required(
+                db,
+                organization_id=connection.organization_id,
+                connection_id=connection.id,
+                provider=connection.provider,
+                reason=reason,
+                expires_at=connection.authentication_expires_at,
+            )
+            if newly:
+                safe_consent_log("banking_reauth_required", connection, reason_code=reason)
+            required += 1
+    if required:
+        db.commit()
+    return {"expiring": expiring, "reauth_required": required}

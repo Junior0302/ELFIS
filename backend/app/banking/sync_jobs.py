@@ -71,6 +71,11 @@ def enqueue_connection_sync(
     if connection is None:
         raise BankingSyncEnqueueError("Connexion bancaire introuvable.")
 
+    from app.banking.consent import needs_reauth
+
+    if needs_reauth(connection) and trigger != "consent":
+        raise BankingSyncEnqueueError("Une action utilisateur est requise avant de synchroniser.")
+
     from app.jobs import bootstrap_job_handlers
 
     bootstrap_job_handlers()
@@ -184,6 +189,9 @@ def request_organization_sync(
             in {ConnectionStatus.connected.value, ConnectionStatus.error.value}
             and (c.provider_connection_id or "").strip()
         ]
+        from app.banking.consent import needs_reauth
+
+        connections = [c for c in connections if not needs_reauth(c)]
     if not connections:
         from app.banking.engine import BankingEngineError
 

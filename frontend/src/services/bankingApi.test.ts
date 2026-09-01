@@ -3,6 +3,8 @@ import {
   accountTypeLabel,
   bankingApi,
   connectionStatusLabel,
+  connectionSyncHint,
+  consentStatusLabel,
   syncStatusLabel,
 } from '../services/bankingApi'
 
@@ -126,5 +128,52 @@ describe('banking API', () => {
     const res = await bankingApi.connect('tok', 1, 'bridge')
     expect(res.redirect_url).toBe('https://connect.bridgeapi.io/session/abc')
     expect(JSON.stringify(res)).not.toMatch(/client_secret|access_token|Client-Secret/i)
+  })
+
+  it('réauthentifie via redirect_url uniquement, sans secret', async () => {
+    mockFetch({
+      ok: true,
+      redirect_url: 'https://connect.bridgeapi.io/session/reauth',
+      connection: {
+        id: 3,
+        provider: 'bridge',
+        bank_name: 'Banque',
+        status: 'awaiting_consent',
+        consent_status: 'reconnecting',
+        needs_reauth: true,
+        can_reauthenticate: true,
+        sync_interval_minutes: 1440,
+        created_at: '2026-08-23',
+      },
+      message: 'Redirection vers le renouvellement bancaire.',
+    })
+    const res = await bankingApi.reauthenticate('tok', 1, 3)
+    expect(res.redirect_url).toBe('https://connect.bridgeapi.io/session/reauth')
+    expect(JSON.stringify(res)).not.toMatch(/client_secret|access_token|Client-Secret|iban/i)
+    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(String(call[0])).toContain('/banking/connections/3/reauthenticate')
+  })
+
+  it('traduit les états de consentement sans code fournisseur brut', () => {
+    expect(consentStatusLabel('valid')).toBe('Consentement valide')
+    expect(consentStatusLabel('expiring')).toBe('À renouveler bientôt')
+    expect(consentStatusLabel('reauth_required')).toBe('Réauthentification requise')
+    expect(consentStatusLabel('reconnecting')).toBe('Renouvellement en cours')
+    expect(consentStatusLabel('unknown')).toBe('État inconnu')
+    expect(connectionSyncHint({ consent_status: 'expiring' } as never)).toBe(
+      'Votre connexion bancaire devra bientôt être renouvelée.',
+    )
+    expect(
+      connectionSyncHint({
+        consent_status: 'reauth_required',
+        needs_reauth: true,
+      } as never),
+    ).toBe('Réauthentification bancaire requise.')
+    expect(connectionSyncHint({ consent_status: 'reconnecting' } as never)).toBe(
+      'Renouvellement de la connexion en cours…',
+    )
+    expect(connectionSyncHint({ consent_status: 'valid', last_sync_status: 'success' } as never)).toBe(
+      '',
+    )
   })
 })

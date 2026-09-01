@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.banking.banking_models import ElfisBankConnection, ElfisBankSyncRun
 from app.banking.banking_types import ConnectionStatus, SyncRunStatus
 from app.banking.engine import BankingEngine
+from app.banking.sync_status import needs_reauth
 
 
 class BankingHealthService:
@@ -53,8 +54,7 @@ class BankingHealthService:
                     "consecutive_sync_failures": int(
                         getattr(connection, "consecutive_sync_failures", 0) or 0
                     ),
-                    "needs_reauth": (connection.last_sync_error_code or "")
-                    in {"invalid_credentials", "connection_revoked", "consent_expired"},
+                    "needs_reauth": needs_reauth(connection),
                     "next_sync_at": connection.next_sync_at,
                     "provider_health": provider_health.get(connection.provider),
                     **metrics,

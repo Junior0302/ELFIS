@@ -32,6 +32,8 @@ class ConsentCompleteResult(BaseModel):
     provider_connection_id: str = Field(min_length=1, max_length=128)
     bank_name: str = ""
     authentication_expires_at: str | None = None
+    status_code: int | None = None
+    status_code_info: str | None = None
 
 
 class SyncType(str, Enum):
