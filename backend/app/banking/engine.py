@@ -210,7 +210,6 @@ class BankingEngine:
                 organization_id=organization_id,
                 callback_url=callback_url,
                 bank_name=bank_name,
-                context=state,
             )
         except ConnectorError as exc:
             connection.status = ConnectionStatus.error.value

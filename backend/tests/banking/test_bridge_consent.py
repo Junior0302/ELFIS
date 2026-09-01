@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
+import time
+from base64 import urlsafe_b64encode
 from datetime import date
 from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
@@ -213,8 +218,14 @@ def test_connect_session_created_and_frontend_gets_only_temp_url(consent_ctx):
     assert body["connection"]["status"] == "awaiting_consent"
     assert "provider_connection_id" not in body["connection"]
     assert consent_ctx["connector"].start_calls
-    callback = consent_ctx["connector"].start_calls[0]["callback_url"]
-    assert "state=" in callback
+    call = consent_ctx["connector"].start_calls[0]
+    callback = call["callback_url"]
+    parsed = urlparse(callback)
+    state = parse_qs(parsed.query)["state"][0]
+    assert callback
+    assert state and "." in state
+    assert state not in (call.get("context") or "")
+    assert not call.get("context")
     row = consent_ctx["db"].query(ElfisBankConnection).one()
     assert row.provider_connection_id == ""
     assert row.organization_id == consent_ctx["org_a"].id
@@ -226,12 +237,14 @@ def test_connect_session_created_and_frontend_gets_only_temp_url(consent_ctx):
     assert sync.status_code == 400
 
 
-def test_bridge_http_creates_connect_session(consent_settings, monkeypatch):
+def _bridge_http_fake(monkeypatch, bodies: list[dict]):
     calls: list[tuple[str, str, dict]] = []
 
     def fake_request(method: str, url: str, headers=None, **kwargs):
         calls.append((method, url, dict(headers or {})))
         path = urlparse(url).path
+        if path.endswith("/connect-sessions"):
+            bodies.append(dict(kwargs.get("json") or {}))
         if path.endswith("/v3/aggregation/users"):
             return httpx.Response(201, json={"uuid": "user-uuid-1", "external_user_id": "elfis-org-9"})
         if path.endswith("/v3/aggregation/authorization/token"):
@@ -251,6 +264,12 @@ def test_bridge_http_creates_connect_session(consent_settings, monkeypatch):
         return httpx.Response(404, json={})
 
     monkeypatch.setattr(httpx, "request", fake_request)
+    return calls
+
+
+def test_bridge_http_creates_connect_session(consent_settings, monkeypatch):
+    bodies: list[dict] = []
+    calls = _bridge_http_fake(monkeypatch, bodies)
     connector = BridgeBankConnector()
     result = connector.start_user_consent(
         organization_id=9,
@@ -266,6 +285,23 @@ def test_bridge_http_creates_connect_session(consent_settings, monkeypatch):
     assert "Client-Id" in session_call
     assert token_call["Client-Id"] == "test-client-id"
     assert bridge_external_user_id(9) == "elfis-org-9"
+    assert bodies[-1]["context"] == "abc"
+
+
+def test_connect_session_payload_omits_signed_state_context(consent_settings, monkeypatch):
+    bodies: list[dict] = []
+    _bridge_http_fake(monkeypatch, bodies)
+    signed = issue_consent_state(organization_id=9, connection_id=3)
+    callback = f"http://test/callback?state={signed}"
+    connector = BridgeBankConnector()
+    connector.start_user_consent(organization_id=9, callback_url=callback)
+    payload = bodies[-1]
+    assert payload["user_email"] == "org-9@banking.elfis.invalid"
+    assert payload["callback_url"] == callback
+    assert "state=" in payload["callback_url"]
+    assert signed in payload["callback_url"]
+    assert "context" not in payload
+    assert signed not in json.dumps({k: v for k, v in payload.items() if k != "callback_url"})
 
 
 def test_valid_callback_links_item_and_runs_sync_engine(consent_ctx):
@@ -426,3 +462,55 @@ def test_connect_response_never_contains_bridge_secrets(consent_ctx):
     assert set(body.keys()) <= {"ok", "redirect_url", "connection", "accounts", "message"}
     assert "client_id" not in str(body).lower()
     assert "token" not in str(body).lower()
+
+
+def _signed_state(*, organization_id: int, connection_id: int, expires: int, purpose: str = "connect") -> str:
+    payload = {
+        "o": int(organization_id),
+        "c": int(connection_id),
+        "e": int(expires),
+        "p": purpose,
+        "n": "testhmacnonce000",
+    }
+    body = urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
+    sig = hmac.new(settings.jwt_secret.encode("utf-8"), body.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
+
+
+def test_tampered_state_refused_on_callback(consent_ctx):
+    client = consent_ctx["client"]
+    org = consent_ctx["org_a"]
+    started = _start(client, org.id)
+    connection_id = started["connection"]["id"]
+    state = parse_qs(urlparse(consent_ctx["connector"].start_calls[0]["callback_url"]).query)["state"][0]
+    tampered = state[:-1] + ("0" if state[-1] != "0" else "1")
+    res = client.get(
+        "/api/banking/connectors/bridge/callback",
+        params={"state": tampered, "item_id": "item-42", "success": "true"},
+    )
+    assert res.status_code == 303
+    assert res.headers["location"].endswith("consent=error")
+    row = consent_ctx["db"].get(ElfisBankConnection, connection_id)
+    assert row.provider_connection_id == ""
+    assert row.status == "awaiting_consent"
+
+
+def test_expired_state_refused_on_callback(consent_ctx):
+    client = consent_ctx["client"]
+    org = consent_ctx["org_a"]
+    started = _start(client, org.id)
+    connection_id = started["connection"]["id"]
+    expired = _signed_state(
+        organization_id=org.id,
+        connection_id=connection_id,
+        expires=int(time.time()) - 30,
+    )
+    res = client.get(
+        "/api/banking/connectors/bridge/callback",
+        params={"state": expired, "item_id": "item-42", "success": "true"},
+    )
+    assert res.status_code == 303
+    assert res.headers["location"].endswith("consent=error")
+    row = consent_ctx["db"].get(ElfisBankConnection, connection_id)
+    assert row.provider_connection_id == ""
+    assert row.status == "awaiting_consent"
