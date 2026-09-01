@@ -17,6 +17,17 @@ def test_production_uses_only_explicit_https_origins():
     assert "*" not in origins
 
 
+def test_production_allows_firebase_hosting_origins():
+    origins = resolve_cors_allow_origins(
+        cors_origins="https://elfis-core.web.app,https://elfis-core.firebaseapp.com",
+        frontend_url="https://elfis-core.web.app",
+        production=True,
+    )
+    assert "https://elfis-core.web.app" in origins
+    assert "https://elfis-core.firebaseapp.com" in origins
+    assert "*" not in origins
+
+
 def test_production_adds_https_frontend_url():
     origins = resolve_cors_allow_origins(
         cors_origins="https://elfis-core.web.app",

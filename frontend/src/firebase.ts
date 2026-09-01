@@ -11,6 +11,12 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth'
 import { deleteDoc, doc, getFirestore, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore'
+import {
+  isUsableFirebaseApiKey,
+  isUsableFirebaseAppId,
+  isUsableFirebaseAuthDomain,
+  isUsableFirebaseProjectId,
+} from './buildEnv'
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
@@ -21,8 +27,19 @@ const config = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
 }
 
+export function isFirebaseWebConfigReady(
+  cfg: Pick<typeof config, 'apiKey' | 'authDomain' | 'projectId' | 'appId'> = config,
+): boolean {
+  return (
+    isUsableFirebaseApiKey(cfg.apiKey) &&
+    isUsableFirebaseAuthDomain(cfg.authDomain) &&
+    isUsableFirebaseProjectId(cfg.projectId) &&
+    isUsableFirebaseAppId(cfg.appId)
+  )
+}
+
 export function isFirebaseConfigured(): boolean {
-  return Boolean(config.apiKey && config.authDomain && config.projectId && config.appId)
+  return isFirebaseWebConfigReady()
 }
 
 let app: FirebaseApp | null = null
@@ -63,9 +80,29 @@ function requireFirebaseUser(): FirebaseUser {
   return user
 }
 
+export function firebaseAuthErrorCode(err: unknown): string {
+  if (typeof err === 'object' && err && 'code' in err) {
+    return String((err as { code: string }).code)
+  }
+  return ''
+}
+
+export function logSafeFirebaseAuthError(err: unknown): void {
+  if (!import.meta.env.DEV) return
+  const code = firebaseAuthErrorCode(err)
+  if (!code) return
+  // eslint-disable-next-line no-console
+  console.info(`firebase_auth_error code=${code}`)
+}
+
 export async function firebaseLogin(email: string, password: string): Promise<FirebaseUser> {
-  const result = await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
-  return result.user
+  try {
+    const result = await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
+    return result.user
+  } catch (err) {
+    logSafeFirebaseAuthError(err)
+    throw err
+  }
 }
 
 export async function firebaseRegister(
@@ -196,6 +233,12 @@ export function mapFirebaseError(err: unknown): string {
     'auth/missing-email': 'Saisissez votre adresse email.',
     'auth/network-request-failed': 'Réseau indisponible. Vérifiez votre connexion.',
     'auth/operation-not-allowed': 'Connexion email / mot de passe non disponible.',
+    'auth/invalid-api-key': 'Configuration Firebase invalide. Contactez le support.',
+    'auth/api-key-not-valid': 'Configuration Firebase invalide. Contactez le support.',
+    'auth/api-key-not-valid.-please-pass-a-valid-api-key.':
+      'Configuration Firebase invalide. Contactez le support.',
+    'auth/unauthorized-domain':
+      'Ce domaine n’est pas autorisé pour la connexion. Contactez le support.',
   }
   if (code && map[code]) return map[code]
   if (err instanceof Error && err.message) {

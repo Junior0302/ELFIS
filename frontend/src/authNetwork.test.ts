@@ -2,6 +2,7 @@
  * Auth network helpers — timeout / health / messages login.
  */
 import { describe, expect, it, vi } from 'vitest'
+import { EXPECTED_PRODUCTION_API_ROOT } from './buildEnv'
 import {
   checkBackendHealth,
   getApiRoot,
@@ -14,6 +15,15 @@ import {
 describe('authNetwork', () => {
   it('getApiRoot en DEV utilise /api (proxy Vite)', () => {
     expect(getApiRoot()).toBe('/api')
+  })
+
+  it('URL API production attendue est HTTPS /api sans double préfixe', () => {
+    expect(EXPECTED_PRODUCTION_API_ROOT).toBe('https://elfis-core-api-4lul.onrender.com/api')
+    expect(EXPECTED_PRODUCTION_API_ROOT.endsWith('/api')).toBe(true)
+    expect(EXPECTED_PRODUCTION_API_ROOT).not.toMatch(/\/api\/api/)
+    expect(resolveApiRoot({ isDev: false, viteApiUrl: EXPECTED_PRODUCTION_API_ROOT })).toBe(
+      EXPECTED_PRODUCTION_API_ROOT,
+    )
   })
 
   it('resolveApiRoot refuse un build production sans VITE_API_URL', () => {
