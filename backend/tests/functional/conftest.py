@@ -8,8 +8,27 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+
+def bind_and_init_recette_schema(engine: Engine, session_factory: sessionmaker) -> None:
+    """Pointe le moteur applicatif + le SessionLocal du lifespan vers la base de test.
+
+    ``app.main`` importe ``SessionLocal`` par nom : un rebind de ``app.database`` seul
+    laisse ``purge_demo_finance_data`` interroger l'ancienne base (souvent un SQLite
+    persistant sans les colonnes BANK-2). ``init_db()`` après rebind applique le
+    même schéma que le démarrage réel (create_all + patches SQLite).
+    """
+    import app.database as database_module
+    import app.main as main_module
+    from app.database import init_db
+
+    database_module.engine = engine
+    database_module.SessionLocal = session_factory
+    main_module.SessionLocal = session_factory
+    init_db()
 
 # Environnement recette avant imports settings
 os.environ.setdefault("APP_ENV", "test")
@@ -54,7 +73,7 @@ def functional_db(tmp_path, monkeypatch):
     settings.openai_api_key = ""
     settings.stripe_secret_key = ""
 
-    from app.database import Base, get_db
+    from app.database import get_db
     from app.main import app
     from tests.functional.seed import assert_safe_environment, seed_functional_fixtures
 
@@ -62,13 +81,7 @@ def functional_db(tmp_path, monkeypatch):
 
     engine = create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
     TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    Base.metadata.create_all(bind=engine)
-    # Rebind le moteur module pour que le lifespan FastAPI n’utilise pas Postgres RC1
-    import app.database as database_module
-
-    database_module.engine = engine
-    database_module.SessionLocal = TestingSession
-    # Pas d'init_db() global : create_all sur le moteur de test suffit.
+    bind_and_init_recette_schema(engine, TestingSession)
 
     db = TestingSession()
     try:

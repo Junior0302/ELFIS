@@ -42,16 +42,16 @@ def client(tmp_path, monkeypatch):
     settings.elfis_csp_enabled = True
     settings.elfis_csp_report_only = True
 
-    from app.database import Base, get_db, init_db
+    from app.database import get_db
     from app.main import app
     from app.security.security_rate_limit import get_rate_limit_backend
+    from tests.functional.conftest import bind_and_init_recette_schema
 
     get_rate_limit_backend().reset()
 
     engine = create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
     TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    Base.metadata.create_all(bind=engine)
-    init_db()
+    bind_and_init_recette_schema(engine, TestingSession)
 
     def _override():
         db = TestingSession()

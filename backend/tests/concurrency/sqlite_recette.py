@@ -44,8 +44,9 @@ def build_concurrency_sqlite_recette(
     settings.openai_api_key = ""
     settings.stripe_secret_key = ""
 
-    from app.database import Base, get_db
+    from app.database import get_db
     from app.main import app
+    from tests.functional.conftest import bind_and_init_recette_schema
     from tests.functional.seed import assert_safe_environment, seed_functional_fixtures
 
     assert_safe_environment(database_url=url, environment="test")
@@ -56,14 +57,11 @@ def build_concurrency_sqlite_recette(
         poolclass=poolclass,
     )
     TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    Base.metadata.create_all(bind=engine)
+    bind_and_init_recette_schema(engine, TestingSession)
+    # Le lifespan a déjà importé init_db par nom : désactiver la 2e init (concurrence).
+    import app.main as main_module
 
-    import app.database as database_module
-
-    database_module.engine = engine
-    database_module.SessionLocal = TestingSession
-    # Évite create_all concurrent si un TestClient déclenche lifespan.
-    monkeypatch.setattr(database_module, "init_db", lambda: None)
+    monkeypatch.setattr(main_module, "init_db", lambda: None)
 
     db = TestingSession()
     try:
