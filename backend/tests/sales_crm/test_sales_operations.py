@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.models_saas import Organization, User
 from app.sales_crm.service import create_company, create_lead, create_person, create_task, ensure_default_pipeline
 from app.sales_operations.router import router
@@ -70,6 +70,7 @@ class SalesOperationsTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_auth_context] = _auth
+        app.dependency_overrides[require_active_subscription] = _auth
         self.client = TestClient(app)
         self._publish = patch("app.sales_operations.service.safe_publish")
         self.publish = self._publish.start()

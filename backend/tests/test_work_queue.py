@@ -20,7 +20,7 @@ from app.decision_center.enums import DecisionExecutionStatus, DecisionStatus
 from app.decision_center.models import ElfisDecisionItem
 from app.decision_center.router import router as decisions_router
 from app.decision_center.service import DecisionCenterService
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.models_saas import Organization, OrganizationMember, Role, User
 from app.services.auth import ROLE_PERMS
 from app.work_queue.buckets import resolve_work_queue_bucket
@@ -80,6 +80,7 @@ class WorkQueueTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_auth_context] = _auth
+        app.dependency_overrides[require_active_subscription] = _auth
         self.client = TestClient(app)
         self.app = app
 

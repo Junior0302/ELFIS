@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.dashboard_command_center.router import router
 from app.database import Base, get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.models_saas import Customer, Organization, OrganizationMember, Role, SalesDocument, User
 from app.models_vault import VaultDocument
 from app.services.auth import ROLE_PERMS
@@ -106,6 +106,7 @@ class CommandCenterTests(unittest.TestCase):
 
         self.app.dependency_overrides[get_db] = _db
         self.app.dependency_overrides[get_auth_context] = _auth
+        self.app.dependency_overrides[require_active_subscription] = _auth
         self.client = TestClient(self.app)
 
         self._access_patch = patch(

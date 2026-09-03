@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.events.event_types import EventNames
 from app.models_saas import Customer, Organization, SalesDocument, User
 from app.sales_crm.service import create_company, create_opportunity, create_person
@@ -75,6 +75,7 @@ class ProposalInvoiceBridgeTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_auth_context] = _auth
+        app.dependency_overrides[require_active_subscription] = _auth
         self.client = TestClient(app)
         self._publish_patcher = patch("app.sales_proposals.events.safe_publish")
         self._archive_patcher = patch("app.sales_proposals.service.archive_or_reuse_pdf")

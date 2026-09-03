@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.events.event_types import EventNames
 from app.models_saas import Organization, User
 from app.sales_crm.deal_service import compute_forecast, compute_line_total
@@ -79,6 +79,7 @@ class SalesDealWorkspaceTests(unittest.TestCase):
 
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_auth_context] = _auth
+        app.dependency_overrides[require_active_subscription] = _auth
         self.client = TestClient(app)
 
     def tearDown(self):
