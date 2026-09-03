@@ -6,12 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.work_queue.enums import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SEARCH_LENGTH
 from app.work_queue.schemas import WorkQueueOut
 from app.work_queue.service import WorkQueueService
 
-router = APIRouter(prefix="/work-queue", tags=["work-queue"])
+router = APIRouter(
+    prefix="/work-queue",
+    tags=["work-queue"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 @router.get("", response_model=WorkQueueOut)

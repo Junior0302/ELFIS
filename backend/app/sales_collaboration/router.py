@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.sales_collaboration.permissions import (
     SALES_ASSIGN,
     SALES_COMMENT,
@@ -41,7 +41,11 @@ from app.sales_collaboration.service import SalesCollaborationService
 from app.sales_crm.permissions import SALES_READ
 from app.services.auth import write_audit
 
-router = APIRouter(prefix="/sales/collab", tags=["sales-collaboration"])
+router = APIRouter(
+    prefix="/sales/collab",
+    tags=["sales-collaboration"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 def _uid(auth: AuthContext) -> int | None:

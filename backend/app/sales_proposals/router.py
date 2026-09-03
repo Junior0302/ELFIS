@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.sales_crm.permissions import SALES_ADMIN, SALES_MANAGE, SALES_READ, SALES_WRITE
 from app.sales_crm.schemas import SalesListResponse
 
@@ -47,7 +47,11 @@ from app.sales_proposals.schemas import (
 )
 from app.sales_proposals.service import ProposalService
 
-router = APIRouter(prefix="/sales/proposals", tags=["sales-proposals"])
+router = APIRouter(
+    prefix="/sales/proposals",
+    tags=["sales-proposals"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 def _has(auth: AuthContext, *codes: str) -> bool:

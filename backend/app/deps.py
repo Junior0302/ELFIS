@@ -141,6 +141,9 @@ def require_active_subscription(
             db.refresh(auth.user)
         return auth
 
+    if not getattr(settings, "elfis_billing_enabled", True):
+        return auth
+
     platform_status = getattr(org, "platform_status", None) or "active"
     if platform_status == "suspended" and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
         raise HTTPException(

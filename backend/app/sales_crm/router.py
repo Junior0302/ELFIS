@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.sales_crm.dashboard_schemas import SalesDashboardOut
 from app.sales_crm.dashboard_service import SalesDashboardService
 from app.sales_crm.pipeline_schemas import PipelineBoardOut, PipelineDrawerOut, PipelineMoveStageIn, PipelineCardOut
@@ -80,7 +80,11 @@ from app.sales_crm.schemas import (
     TaskUpdate,
 )
 
-router = APIRouter(prefix="/sales", tags=["sales-crm"])
+router = APIRouter(
+    prefix="/sales",
+    tags=["sales-crm"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 def _uid(auth: AuthContext) -> int | None:

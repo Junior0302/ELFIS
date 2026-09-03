@@ -15,9 +15,13 @@ from app.decision_center.schemas import (
     DecisionMutationOut,
 )
 from app.decision_center.service import DecisionCenterService
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 
-router = APIRouter(prefix="/decisions", tags=["decision-center"])
+router = APIRouter(
+    prefix="/decisions",
+    tags=["decision-center"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 @router.get("", response_model=DecisionListOut)

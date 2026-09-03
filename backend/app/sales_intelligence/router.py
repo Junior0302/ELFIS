@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.sales_crm.permissions import SALES_ADMIN, SALES_MANAGE, SALES_READ
 from app.sales_intelligence.permissions import INTEL_DISMISS, INTEL_MANAGE, INTEL_READ, INTEL_SYNC
 from app.sales_intelligence.schemas import (
@@ -19,7 +19,11 @@ from app.sales_intelligence.schemas import (
 from app.sales_intelligence.service import SalesIntelligenceService
 from app.services.auth import write_audit
 
-router = APIRouter(prefix="/sales/intelligence", tags=["sales-intelligence"])
+router = APIRouter(
+    prefix="/sales/intelligence",
+    tags=["sales-intelligence"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 def _has(auth: AuthContext, *codes: str) -> bool:

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.sales_crm.permissions import SALES_MANAGE, SALES_READ, SALES_WRITE
 from app.sales_operations.schemas import (
     BulkActionIn,
@@ -28,7 +28,11 @@ from app.sales_operations.schemas import (
 from app.sales_operations.service import SalesOperationsService
 from app.services.auth import write_audit
 
-router = APIRouter(prefix="/sales/ops", tags=["sales-operations"])
+router = APIRouter(
+    prefix="/sales/ops",
+    tags=["sales-operations"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 def _uid(auth: AuthContext) -> int | None:

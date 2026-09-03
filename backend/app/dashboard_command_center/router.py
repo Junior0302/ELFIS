@@ -8,9 +8,13 @@ from sqlalchemy.orm import Session
 from app.dashboard_command_center.schemas import CommandCenterOut
 from app.dashboard_command_center.service import CommandCenterService
 from app.database import get_db
-from app.deps import AuthContext, get_auth_context
+from app.deps import AuthContext, get_auth_context, require_active_subscription
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard-command-center"])
+router = APIRouter(
+    prefix="/dashboard",
+    tags=["dashboard-command-center"],
+    dependencies=[Depends(require_active_subscription)],
+)
 
 
 @router.get("/command-center", response_model=CommandCenterOut)
