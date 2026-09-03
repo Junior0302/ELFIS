@@ -178,6 +178,45 @@ def test_rate_limit_auth_triggers(client):
     assert last.json()["error"]["code"] == "rate_limit_exceeded"
 
 
+def test_auth_path_categories_cover_real_firebase_login():
+    from app.security.security_rate_limit import category_for_path
+    from app.security.security_types import RateLimitCategory
+
+    assert category_for_path("/api/auth/firebase") == RateLimitCategory.AUTH
+    assert category_for_path("/api/auth/firebase/") == RateLimitCategory.AUTH
+    assert category_for_path("/api/auth/firebase-session") == RateLimitCategory.AUTH
+    assert category_for_path("/api/auth/login") == RateLimitCategory.AUTH
+    assert category_for_path("/api/auth/register") == RateLimitCategory.AUTH
+    assert category_for_path("/api/auth/me") is None
+    assert category_for_path("/api/health/live") is None
+
+
+def test_rate_limit_firebase_auth_triggers(client):
+    from app.security.security_rate_limit import get_rate_limit_backend
+
+    get_rate_limit_backend().reset()
+    first = client.post("/api/auth/firebase", json={"id_token": "not-a-valid-firebase-token"})
+    assert first.status_code != 429
+    last = first
+    for _ in range(4):
+        last = client.post("/api/auth/firebase", json={"id_token": "not-a-valid-firebase-token"})
+    assert last.status_code == 429
+    assert last.headers.get("Retry-After")
+    assert last.json()["error"]["code"] == "rate_limit_exceeded"
+
+
+def test_rate_limit_firebase_path_variation_still_auth(client):
+    from app.security.security_rate_limit import get_rate_limit_backend
+
+    get_rate_limit_backend().reset()
+    last = None
+    for _ in range(5):
+        last = client.post("/api/auth/firebase/", json={"id_token": "not-a-valid-firebase-token"})
+    assert last is not None
+    assert last.status_code == 429
+    assert last.json()["error"]["code"] == "rate_limit_exceeded"
+
+
 def test_payload_too_large_declared(client):
     r = client.post(
         "/api/auth/login",

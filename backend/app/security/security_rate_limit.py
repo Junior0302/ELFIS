@@ -123,7 +123,7 @@ def check_rate_limit(
 ROUTE_CATEGORY_PREFIXES: tuple[tuple[str, RateLimitCategory], ...] = (
     ("/api/auth/login", RateLimitCategory.AUTH),
     ("/api/auth/register", RateLimitCategory.AUTH),
-    ("/api/auth/firebase-session", RateLimitCategory.AUTH),
+    ("/api/auth/firebase", RateLimitCategory.AUTH),
     ("/api/vault", RateLimitCategory.UPLOAD),
     ("/api/documents", RateLimitCategory.UPLOAD),
     ("/api/ai", RateLimitCategory.AI),
