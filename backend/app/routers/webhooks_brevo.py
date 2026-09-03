@@ -31,7 +31,9 @@ async def brevo_webhook(
     x_comptapilot_webhook_secret: str | None = Header(default=None),
 ):
     secret = settings.brevo_webhook_secret.strip()
-    if secret and x_comptapilot_webhook_secret != secret:
+    if not secret:
+        raise HTTPException(503, detail="Webhook Brevo non configuré")
+    if x_comptapilot_webhook_secret != secret:
         raise HTTPException(401, detail="Webhook non autorisé")
 
     payload = await request.json()
