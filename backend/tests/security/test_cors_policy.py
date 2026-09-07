@@ -11,7 +11,9 @@ def test_production_uses_only_explicit_https_origins():
         frontend_url="https://elfis-core.web.app",
         production=True,
     )
-    assert origins == ["https://elfis-core.web.app"]
+    assert "https://elfis-core.web.app" in origins
+    assert "https://elfis-core.com" in origins
+    assert "https://www.elfis-core.com" in origins
     assert all(item.startswith("https://") for item in origins)
     assert not any("localhost" in item or "127.0.0.1" in item for item in origins)
     assert "*" not in origins
@@ -34,7 +36,9 @@ def test_production_adds_https_frontend_url():
         frontend_url="https://demo.elfis-core.com",
         production=True,
     )
-    assert origins == ["https://elfis-core.web.app", "https://demo.elfis-core.com"]
+    assert "https://elfis-core.web.app" in origins
+    assert "https://demo.elfis-core.com" in origins
+    assert "https://elfis-core.com" in origins
 
 
 def test_production_rejects_localhost_frontend_url():
@@ -43,7 +47,19 @@ def test_production_rejects_localhost_frontend_url():
         frontend_url="http://localhost:5173",
         production=True,
     )
-    assert origins == ["https://elfis-core.web.app"]
+    assert "https://elfis-core.web.app" in origins
+    assert "http://localhost:5173" not in origins
+
+
+def test_production_always_allows_canonical_custom_domain():
+    origins = resolve_cors_allow_origins(
+        cors_origins="https://elfis-core.web.app",
+        frontend_url="https://elfis-core.web.app",
+        production=True,
+    )
+    assert "https://elfis-core.com" in origins
+    assert "https://www.elfis-core.com" in origins
+    assert "https://elfis-core.firebaseapp.com" in origins
 
 
 def test_development_keeps_localhost_and_wildcard():

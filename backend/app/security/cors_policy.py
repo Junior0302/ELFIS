@@ -7,6 +7,15 @@ DEV_LOCAL_ORIGINS = (
     "http://127.0.0.1:5173",
 )
 
+# Frontends officiels — toujours autorisés en production (CORS_ORIGINS Render
+# ne listait que web.app, donc elfis-core.com cassait le login navigateur).
+OFFICIAL_PRODUCTION_ORIGINS = (
+    "https://elfis-core.com",
+    "https://www.elfis-core.com",
+    "https://elfis-core.web.app",
+    "https://elfis-core.firebaseapp.com",
+)
+
 
 def is_local_origin(origin: str) -> bool:
     raw = (origin or "").strip().lower()
@@ -47,4 +56,5 @@ def resolve_cors_allow_origins(
             origins.append(origin)
     if frontend.startswith("https://") and not is_local_origin(frontend):
         origins.append(frontend)
+    origins.extend(OFFICIAL_PRODUCTION_ORIGINS)
     return list(dict.fromkeys(origins))
