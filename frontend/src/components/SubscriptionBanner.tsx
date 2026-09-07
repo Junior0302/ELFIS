@@ -38,7 +38,7 @@ function bannerMessage(
     case 'checkout_pending':
     case 'incomplete':
       return compactTrialOnboarding
-        ? 'Finalisez votre activation pour débloquer ComptaPilot'
+        ? 'Finalisez votre activation pour débloquer ELFIS Core'
         : 'Paiement non finalisé. Reprenez la souscription sécurisée pour activer l’accès.'
     case 'unpaid':
       return 'Votre abonnement présente un impayé. Une action est requise.'

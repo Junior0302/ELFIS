@@ -5,7 +5,7 @@ export const subscriptionLabels: Record<SubscriptionStatus, string> = {
   active: 'Abonnement actif',
   past_due: 'Paiement à régulariser',
   unpaid: 'Impayé',
-  canceled: 'Abonnement terminé',
+  canceled: 'Abonnement résilié',
   expired: 'Abonnement expiré',
   incomplete: 'Paiement à finaliser',
   incomplete_expired: 'Paiement expiré',
@@ -59,16 +59,43 @@ export function canStartSubscriptionCheckout(status: SubscriptionStatus) {
   ].includes(status)
 }
 
-export function subscriptionCheckoutLabel(status: SubscriptionStatus, trialUsed?: boolean) {
+export function subscriptionCheckoutLabel(
+  status: SubscriptionStatus,
+  trialUsed?: boolean,
+  priceLabel?: string,
+) {
+  const priced = priceLabel ? ` — ${priceLabel}/mois` : ''
   if (status === 'canceled' || status === 'expired') {
-    return trialUsed ? 'Souscrire à nouveau (19 €/mois)' : 'Souscrire à nouveau'
+    return trialUsed ? `Souscrire à nouveau${priced}` : 'Souscrire à nouveau'
   }
   if (status === 'incomplete' || status === 'checkout_pending') {
-    return 'Finaliser la souscription sécurisée'
+    return 'Finaliser la souscription'
   }
   if (status === 'incomplete_expired') return 'Relancer la souscription'
-  if (trialUsed) return 'Souscrire à ComptaPilot IA — 19 €/mois'
-  return 'Commencer mon essai gratuit de 14 jours'
+  if (trialUsed) return `Souscrire à ELFIS Starter${priced}`
+  return 'Démarrer mon essai gratuit'
+}
+
+export function subscriptionPlanDisplay(planCode: string | null | undefined) {
+  const code = (planCode || 'starter').trim().toLowerCase()
+  if (code === 'starter' || code === 'pro') {
+    return { brand: 'ELFIS Core', plan: 'Starter', short: 'ELFIS Starter', code: 'starter' }
+  }
+  if (code === 'professional') {
+    return { brand: 'ELFIS Core', plan: 'Professional', short: 'ELFIS Professional', code }
+  }
+  if (code === 'enterprise') {
+    return { brand: 'ELFIS Core', plan: 'Enterprise', short: 'ELFIS Enterprise', code }
+  }
+  if (code === 'free_trial') {
+    return { brand: 'ELFIS Core', plan: 'Essai', short: 'ELFIS Starter', code }
+  }
+  return { brand: 'ELFIS Core', plan: planCode || 'Starter', short: 'ELFIS Core', code }
+}
+
+export function publicPlanDescription(raw: string | null | undefined, fallback: string) {
+  const text = (raw || '').replace(/ComptaPilot(?:\s+IA)?/gi, 'ELFIS Core').trim()
+  return text || fallback
 }
 
 export function subscriptionDeadline(subscription: SubscriptionInfo | null | undefined) {

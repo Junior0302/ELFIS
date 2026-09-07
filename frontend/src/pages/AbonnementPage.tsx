@@ -8,12 +8,13 @@ import {
   canStartSubscriptionCheckout,
   countdownParts,
   formatDate,
-  formatDateTime,
   hasProductAccess,
+  publicPlanDescription,
   remainingTime,
   subscriptionCheckoutLabel,
   subscriptionDeadline,
   subscriptionLabels,
+  subscriptionPlanDisplay,
   subscriptionTone,
 } from '../subscription'
 
@@ -34,11 +35,14 @@ type QuotaRow = {
 }
 
 const FEATURES = [
-  'Analyse intelligente de documents comptables',
-  'Extraction des informations de factures',
-  'Assistance comptable par intelligence artificielle',
-  'Gestion des factures, devis, clients et catalogue',
-  'Tableaux de bord, historique et exports',
+  'Accès à la plateforme ELFIS Core',
+  'Espace Finance et gestion de facturation',
+  'Gestion des clients, relations et documents',
+  'Tableaux de bord et pilotage de l’activité',
+  'Synchronisation bancaire lorsque disponible',
+  'Fonctionnalités intelligentes ELFIS selon les modules activés',
+  'Gestion de l’organisation, des membres et des permissions',
+  'Stockage sécurisé des documents',
 ]
 
 const TABS: { id: TabId; label: string }[] = [
@@ -57,14 +61,47 @@ function openBillingUrl(url: string) {
   window.location.assign(target.toString())
 }
 
+function statusBadgeLabel(sub: SubscriptionInfo, checkoutReturnPending: boolean) {
+  if (sub.platform_bypass) return 'Accès ELF Admin'
+  if (checkoutReturnPending) return 'Activation en cours'
+  return sub.label || subscriptionLabels[sub.status]
+}
+
+function statusDescription(sub: SubscriptionInfo): string {
+  switch (sub.status) {
+    case 'none':
+      return 'Votre compte ELFIS est actif. Démarrez votre essai gratuit pour accéder aux fonctionnalités incluses dans votre formule.'
+    case 'checkout_pending':
+    case 'incomplete':
+      return 'La souscription n’est pas encore confirmée. Finalisez le paiement pour ouvrir l’accès à ELFIS Core.'
+    case 'trialing':
+      return `Votre essai est actif jusqu’au ${formatDate(sub.trial_end)}.`
+    case 'active':
+      return `Votre abonnement se renouvelle automatiquement le ${formatDate(sub.current_period_end || sub.next_billing_at)}.`
+    case 'cancel_scheduled':
+      return `Résiliation enregistrée. Accès conservé jusqu’au ${formatDate(sub.access_ends_at || sub.current_period_end)}.`
+    case 'past_due':
+      return `Paiement à régulariser. Mettez à jour votre moyen de paiement avant le ${formatDate(sub.grace_until)}.`
+    case 'admin_revoked':
+      return `Accès suspendu par l’administration. Motif : ${sub.admin_revoked_reason_public || 'non précisé'}.`
+    case 'canceled':
+    case 'expired':
+      return 'Votre abonnement n’est plus actif. Vos données sont conservées ; les fonctions incluses sont désactivées.'
+    default:
+      return sub.label || subscriptionLabels[sub.status]
+  }
+}
+
+function formatQuotaLabel(code: string) {
+  return code.replace(/\./g, ' · ').replace(/_/g, ' ')
+}
+
 function CountdownBoard({
   deadline,
   now,
-  label,
 }: {
   deadline: string | null
   now: number
-  label: string
 }) {
   const parts = countdownParts(deadline, now)
   if (!parts) {
@@ -73,62 +110,35 @@ function CountdownBoard({
   if (parts.ended) {
     return (
       <div className="trial-countdown ended">
-        <span className="trial-countdown-label">{label}</span>
+        <span className="trial-countdown-label">Temps restant sur l’essai</span>
         <strong>Terminé</strong>
       </div>
     )
   }
   return (
     <div className="trial-countdown">
-      <span className="trial-countdown-label">{label}</span>
+      <span className="trial-countdown-label">Temps restant sur l’essai</span>
       <div className="trial-countdown-grid" aria-label={remainingTime(deadline, now) || undefined}>
         <div>
           <strong>{parts.days}</strong>
-          <span>jours</span>
+          <span>Jours</span>
         </div>
         <div>
           <strong>{String(parts.hours).padStart(2, '0')}</strong>
-          <span>heures</span>
+          <span>Heures</span>
         </div>
         <div>
           <strong>{String(parts.minutes).padStart(2, '0')}</strong>
-          <span>min</span>
+          <span>Minutes</span>
         </div>
         <div>
           <strong>{String(parts.seconds).padStart(2, '0')}</strong>
-          <span>sec</span>
+          <span>Secondes</span>
         </div>
       </div>
-      <p className="trial-countdown-date">Jusqu’au {formatDateTime(deadline)}</p>
+      <p className="trial-countdown-date">Votre essai ELFIS Core se termine le {formatDate(deadline)}.</p>
     </div>
   )
-}
-
-function statusDescription(sub: SubscriptionInfo): string {
-  switch (sub.status) {
-    case 'none':
-      return 'Votre compte est actif, mais aucun abonnement ComptaPilot IA n’est associé à cette organisation.'
-    case 'checkout_pending':
-    case 'incomplete':
-      return 'La souscription n’est pas encore confirmée. Finalisez le paiement sécurisé pour ouvrir l’accès.'
-    case 'trialing':
-      return `Essai actif jusqu’au ${formatDateTime(sub.trial_end)}. Renouvellement automatique ensuite, sauf annulation avant cette date.`
-    case 'cancel_scheduled':
-      return `Résiliation enregistrée. Accès conservé jusqu’au ${formatDateTime(sub.access_ends_at || sub.current_period_end)}.`
-    case 'past_due':
-      return `Le renouvellement a échoué. Mettez à jour votre moyen de paiement avant le ${formatDate(sub.grace_until)}.`
-    case 'admin_revoked':
-      return `Accès suspendu par l’administration. Motif : ${sub.admin_revoked_reason_public || 'non précisé'}.`
-    case 'canceled':
-    case 'expired':
-      return 'Votre abonnement n’est plus actif. Vos données sont conservées ; les fonctions premium sont désactivées.'
-    default:
-      return sub.label || subscriptionLabels[sub.status]
-  }
-}
-
-function formatQuotaLabel(code: string) {
-  return code.replace(/\./g, ' · ').replace(/_/g, ' ')
 }
 
 export default function AbonnementPage() {
@@ -189,7 +199,7 @@ export default function AbonnementPage() {
     void (async () => {
       if (checkoutReturn === 'success') {
         setCheckoutReturnPending(true)
-        setReturnNotice('Vérification du paiement…')
+        setReturnNotice('Votre abonnement ELFIS est en cours d’activation.')
         setError('')
         let current = await refresh({ syncSessionId: sessionId })
         if (!hasProductAccess(current)) {
@@ -197,13 +207,13 @@ export default function AbonnementPage() {
           current = await refresh({ syncSessionId: sessionId })
         }
         if (hasProductAccess(current)) {
-          setReturnNotice('Essai activé. Votre accès ComptaPilot IA est ouvert.')
+          setReturnNotice('Votre abonnement ELFIS est activé.')
           setCheckoutReturnPending(false)
           const { trackProductEvent } = await import('../productEvents')
           trackProductEvent('trial_activation_completed', { path: '/abonnement' })
         } else {
           setReturnNotice(
-            'Le paiement a bien été reçu. L’activation peut prendre quelques instants — cliquez sur Actualiser.',
+            'Votre abonnement ELFIS est en cours d’activation. Cliquez sur Actualiser si l’état n’apparaît pas encore.',
           )
           setCheckoutReturnPending(false)
         }
@@ -211,7 +221,7 @@ export default function AbonnementPage() {
         return
       }
       if (checkoutReturn === 'cancel') {
-        setReturnNotice('Paiement interrompu. Vous pouvez reprendre quand vous voulez.')
+        setReturnNotice('Le paiement a été annulé. Aucun abonnement n’a été créé.')
         setCheckoutReturnPending(false)
         await refresh()
         await loadEngine()
@@ -231,7 +241,7 @@ export default function AbonnementPage() {
     return () => window.clearInterval(timer)
   }, [subscription?.status])
 
-  const startAction = async (kind: 'checkout' | 'portal', planCode?: string) => {
+  const startAction = async (kind: 'checkout' | 'portal') => {
     if (!token || !orgId) return
     if (kind === 'checkout' && (!renewalOk || !termsOk)) {
       setError('Veuillez accepter le renouvellement automatique et les conditions.')
@@ -242,38 +252,15 @@ export default function AbonnementPage() {
     try {
       const result =
         kind === 'checkout'
-          ? await api.saasBillingCheckout(
-              {
-                plan_code: planCode || selectedPlan,
-                automatic_renewal_accepted: renewalOk,
-                terms_accepted: termsOk,
-              },
-              token,
-              orgId,
-            )
-          : await api.saasBillingPortal(token, orgId)
+          ? await api.createSubscriptionCheckout(token, orgId, {
+              automatic_renewal_accepted: renewalOk,
+              terms_accepted: termsOk,
+            })
+          : await api.createSubscriptionPortal(token, orgId)
       openBillingUrl(result.url)
     } catch (reason) {
-      // Fallback legacy si checkout V2 indisponible
-      try {
-        const fallback =
-          kind === 'checkout'
-            ? await api.createSubscriptionCheckout(token, orgId, {
-                automatic_renewal_accepted: renewalOk,
-                terms_accepted: termsOk,
-              })
-            : await api.createSubscriptionPortal(token, orgId)
-        openBillingUrl(fallback.url)
-      } catch (fallbackReason) {
-        setError(
-          fallbackReason instanceof Error
-            ? fallbackReason.message
-            : reason instanceof Error
-              ? reason.message
-              : 'Redirection paiement impossible',
-        )
-        setAction(null)
-      }
+      setError(reason instanceof Error ? reason.message : 'Redirection paiement impossible')
+      setAction(null)
     }
   }
 
@@ -294,22 +281,28 @@ export default function AbonnementPage() {
   const deadline = subscriptionDeadline(subscription)
   const isTrialing = subscription?.status === 'trialing'
   const isActiveAccess = hasProductAccess(subscription)
-  const planCode = String(engineOverview?.plan_code || subscription?.plan || 'starter')
-  const trialDaysLeft =
-    typeof engineOverview?.trial_days_remaining === 'number'
-      ? engineOverview.trial_days_remaining
-      : null
+  const planCode = String(engineOverview?.plan_code || subscription?.plan_code || subscription?.plan || 'starter')
+  const planDisplay = subscriptionPlanDisplay(planCode)
+  const selectedCatalog = plans.find((plan) => String(plan.plan_code || '') === selectedPlan)
+  const catalogPrice = Number(
+    selectedCatalog?.price_amount ?? subscription?.price_eur ?? 0,
+  )
+  const priceLabel = catalogPrice > 0 ? formatEuro(catalogPrice) : null
+  const trialDays = Number(selectedCatalog?.trial_days || 14) || 14
+  const checkoutCta = subscription
+    ? subscriptionCheckoutLabel(subscription.status, subscription.trial_used, priceLabel || undefined)
+    : 'Démarrer mon essai gratuit'
 
   const quotaEntries = Object.entries(quotas)
 
   return (
-    <>
+    <div className="page elfis-billing-page">
       <div className="page-head">
         <div>
+          <p className="home-eyebrow">ELFIS Core</p>
           <h2>Abonnement et facturation</h2>
           <p>
-            Billing System V2 — plans, essai, quotas et droits pilotés par l’Entitlement Engine.
-            Stripe synchronise les paiements ; il n’est pas la source de vérité.
+            Gérez votre formule ELFIS Core, votre période d’essai et vos informations de facturation.
           </p>
         </div>
       </div>
@@ -329,59 +322,50 @@ export default function AbonnementPage() {
         ))}
       </div>
 
-      {returnNotice && <div className="subscription-return">{returnNotice}</div>}
+      {returnNotice && (
+        <div className="subscription-return" role="status">
+          {returnNotice}
+        </div>
+      )}
       {isElfAdmin && (
-        <div className="subscription-return">
+        <div className="subscription-return" role="status">
           Compte ELF Admin : accès complet, sans abonnement requis.
         </div>
       )}
-      {error && <div className="auth-alert auth-alert-error">{error}</div>}
+      {error && (
+        <div className="auth-alert auth-alert-error" role="alert">
+          {error}
+        </div>
+      )}
 
       {tab === 'abonnement' && (
         <>
-          {engineOverview && (
-            <section className="panel" style={{ marginBottom: '1rem' }}>
-              <h3>État Billing Engine</h3>
-              <p className="muted">
-                Plan <strong>{planCode}</strong> · Statut{' '}
-                <strong>{String(engineOverview.status || '—')}</strong>
-                {engineOverview.is_trial ? (
-                  <>
-                    {' '}
-                    · Essai
-                    {trialDaysLeft != null ? ` · ${trialDaysLeft} j restants` : ''}
-                  </>
-                ) : null}
-                {' · '}
-                Accès produit : {engineOverview.has_product_access ? 'oui' : 'non'}
-                {engineLoading ? ' · Actualisation…' : ''}
-              </p>
-            </section>
-          )}
-
           {loading && !subscription ? (
             <div className="loading">Vérification du statut…</div>
           ) : isActiveAccess && subscription ? (
-            <section className="panel subscription-active-panel">
+            <section className="panel subscription-active-panel" aria-labelledby="elfis-sub-title">
+              <p className="home-eyebrow">Votre abonnement</p>
               <div className="subscription-status-line">
+                <div>
+                  <h3 id="elfis-sub-title">{planDisplay.short}</h3>
+                  <p className="muted">
+                    {planDisplay.brand} · {priceLabel || formatEuro(subscription.price_eur || 0)} / mois
+                  </p>
+                </div>
                 <span className={`subscription-badge ${subscriptionTone(subscription.status)}`}>
-                  {subscription.platform_bypass
-                    ? 'Accès ELF Admin'
-                    : subscription.label || subscriptionLabels[subscription.status]}
+                  {statusBadgeLabel(subscription, checkoutReturnPending)}
                 </span>
-                <strong>
-                  {planCode} · {formatEuro(subscription.price_eur || 0)} / mois (catalogue)
-                </strong>
               </div>
 
               <p className="muted">{statusDescription(subscription)}</p>
+              {engineLoading ? <p className="muted">Actualisation…</p> : null}
 
               {isTrialing ? (
-                <CountdownBoard deadline={deadline} now={now} label="Temps restant sur l’essai" />
+                <CountdownBoard deadline={deadline} now={now} />
               ) : (
                 <div className="subscription-active-meta">
                   <p>
-                    {subscription.status === 'cancel_scheduled' ? 'Fin d’accès' : 'Prochaine échéance'}{' '}
+                    {subscription.status === 'cancel_scheduled' ? 'Fin d’accès' : 'Prochain renouvellement'}{' '}
                     : <strong>{formatDate(deadline)}</strong>
                   </p>
                   {deadline && <p className="muted">{remainingTime(deadline, now)} restant</p>}
@@ -396,7 +380,7 @@ export default function AbonnementPage() {
                     disabled={Boolean(action)}
                     onClick={() => void startAction('portal')}
                   >
-                    {action === 'portal' ? 'Ouverture…' : 'Gérer la carte, annuler ou factures'}
+                    {action === 'portal' ? 'Ouverture…' : 'Gérer mon abonnement'}
                   </button>
                 )}
                 {canManage && (
@@ -430,16 +414,25 @@ export default function AbonnementPage() {
             </section>
           ) : (
             <div className="subscription-grid">
-              <section className="panel pricing-card">
-                <span className="home-eyebrow">Offre catalogue</span>
-                <h3>ComptaPilot IA</h3>
+              <section className="panel pricing-card" aria-labelledby="elfis-offer-title">
+                <span className="home-eyebrow">Formule</span>
+                <p className="elfis-billing-brand">{planDisplay.brand}</p>
+                <h3 id="elfis-offer-title">{planDisplay.plan}</h3>
+                <div className="pricing-amount">
+                  <strong>{priceLabel || '—'}</strong>
+                  {priceLabel ? <span>/ mois</span> : null}
+                </div>
                 <p className="muted">
-                  Essai gratuit · Renouvellement mensuel · Prix affichés via le catalogue plans (pas
-                  codés en dur Stripe).
+                  Essai gratuit de {trialDays} jours. Renouvellement mensuel. Sans engagement,
+                  résiliable avant le prochain renouvellement.
                 </p>
+                <p className="elfis-billing-features-title">Inclus dans {planDisplay.short}</p>
                 <ul className="pricing-features">
                   {FEATURES.map((item) => (
-                    <li key={item}>{item}</li>
+                    <li key={item}>
+                      <span className="elfis-billing-check" aria-hidden="true" />
+                      {item}
+                    </li>
                   ))}
                 </ul>
 
@@ -451,8 +444,8 @@ export default function AbonnementPage() {
                         checked={renewalOk}
                         onChange={(e) => setRenewalOk(e.target.checked)}
                       />
-                      J’ai compris l’essai gratuit et le renouvellement automatique au tarif du plan
-                      choisi, sauf annulation avant la fin de l’essai.
+                      J’ai compris que mon essai gratuit se transformera automatiquement en
+                      abonnement mensuel au tarif indiqué, sauf résiliation avant la fin de l’essai.
                     </label>
                     <label className="checkbox-inline">
                       <input
@@ -460,8 +453,8 @@ export default function AbonnementPage() {
                         checked={termsOk}
                         onChange={(e) => setTermsOk(e.target.checked)}
                       />
-                      J’accepte les conditions générales d’utilisation, les conditions de
-                      l’abonnement et la politique de confidentialité.
+                      J’accepte les Conditions générales d’utilisation, les conditions d’abonnement
+                      et la Politique de confidentialité.
                     </label>
                     <button
                       className="btn subscription-main-action"
@@ -472,17 +465,21 @@ export default function AbonnementPage() {
                         !renewalOk ||
                         !termsOk
                       }
-                      onClick={() => void startAction('checkout', selectedPlan)}
+                      onClick={() => void startAction('checkout')}
                     >
                       {action === 'checkout'
                         ? 'Ouverture du paiement sécurisé…'
                         : subscription?.configured === false
                           ? 'Paiement bientôt disponible'
-                          : subscriptionCheckoutLabel(
-                              subscription!.status,
-                              subscription?.trial_used,
-                            )}
+                          : checkoutCta}
                     </button>
+                    {subscription?.configured !== false && (
+                      <p className="muted elfis-billing-cta-hint">
+                        {trialDays} jours gratuits
+                        {priceLabel ? ` · puis ${priceLabel}/mois` : ''}
+                        {' · résiliable à tout moment'}
+                      </p>
+                    )}
                   </div>
                 )}
                 {DevActivateTrialPanel &&
@@ -499,20 +496,23 @@ export default function AbonnementPage() {
                 )}
               </section>
 
-              <section className="panel subscription-status-card">
-                <h3>Statut actuel</h3>
+              <section className="panel subscription-status-card" aria-labelledby="elfis-status-title">
+                <p className="home-eyebrow">Votre abonnement</p>
+                <h3 id="elfis-status-title">
+                  {subscription?.status === 'none' || !subscription
+                    ? 'Aucun abonnement actif'
+                    : planDisplay.short}
+                </h3>
                 {subscription ? (
                   <>
                     <div className="subscription-status-line">
                       <span className={`subscription-badge ${subscriptionTone(subscription.status)}`}>
-                        {checkoutReturnPending
-                          ? 'Activation en cours'
-                          : subscription.label || subscriptionLabels[subscription.status]}
+                        {statusBadgeLabel(subscription, checkoutReturnPending)}
                       </span>
                     </div>
                     <p className="muted" style={{ marginTop: '1rem' }}>
                       {checkoutReturnPending
-                        ? 'Nous confirmons votre paiement.'
+                        ? 'Votre abonnement ELFIS est en cours d’activation.'
                         : statusDescription(subscription)}
                     </p>
                   </>
@@ -527,10 +527,10 @@ export default function AbonnementPage() {
 
       {tab === 'consommation' && (
         <section className="panel">
-          <h3>Quotas & consommation</h3>
-          <p className="muted">Utilisé · restant · limite · pourcentage — via Entitlement Engine.</p>
+          <h3>Consommation</h3>
+          <p className="muted">Suivi des volumes utilisés par votre organisation.</p>
           {quotaEntries.length === 0 ? (
-            <p className="muted">Aucun quota publié pour cette organisation.</p>
+            <p className="muted">Aucune donnée de consommation pour le moment.</p>
           ) : (
             <div className="platform-request-list">
               {quotaEntries.map(([code, row]) => {
@@ -571,8 +571,8 @@ export default function AbonnementPage() {
 
       {tab === 'historique' && (
         <section className="panel">
-          <h3>Historique billing</h3>
-          <p className="muted">Événements journalisés (webhooks idempotents inclus).</p>
+          <h3>Historique</h3>
+          <p className="muted">Événements liés à votre abonnement ELFIS.</p>
           {history.length === 0 ? (
             <p className="muted">Aucun événement pour le moment.</p>
           ) : (
@@ -592,8 +592,8 @@ export default function AbonnementPage() {
         <section className="panel">
           <h3>Paiements</h3>
           <p className="muted">
-            Cartes, factures Stripe et annulation : portail client. L’état métier reste dans le Billing
-            Engine.
+            Gérez votre carte, vos factures et votre résiliation depuis l’espace de facturation
+            sécurisé.
           </p>
           {canManage && (
             <button
@@ -602,12 +602,12 @@ export default function AbonnementPage() {
               disabled={Boolean(action) || !canUsePortal}
               onClick={() => void startAction('portal')}
             >
-              {action === 'portal' ? 'Ouverture…' : 'Ouvrir le portail de paiement'}
+              {action === 'portal' ? 'Ouverture…' : 'Gérer la facturation'}
             </button>
           )}
           {!canUsePortal && (
             <p className="muted" style={{ marginTop: '0.75rem' }}>
-              Portail indisponible pour le statut actuel.
+              L’espace de facturation sera disponible dès qu’un abonnement sera associé à ce compte.
             </p>
           )}
         </section>
@@ -616,23 +616,29 @@ export default function AbonnementPage() {
       {tab === 'plans' && (
         <section className="panel">
           <h3>Changer de plan</h3>
-          <p className="muted">
-            Catalogue public — prix catalogue indicatifs ; facturation réelle via Stripe Price ID
-            (configuration serveur).
-          </p>
+          <p className="muted">Choisissez la formule ELFIS Core adaptée à votre organisation.</p>
           <div className="subscription-grid">
             {plans.map((plan) => {
               const code = String(plan.plan_code || '')
+              const display = subscriptionPlanDisplay(code)
               const price = Number(plan.price_amount || 0)
               const purchasable = Boolean(plan.purchasable)
+              const interval = String(plan.billing_interval || 'month')
+              const intervalLabel = interval === 'month' ? 'mois' : interval
               return (
                 <article key={code} className="panel pricing-card">
-                  <h3>{String(plan.name || code)}</h3>
+                  <p className="elfis-billing-brand">{display.brand}</p>
+                  <h3>{display.plan}</h3>
                   <div className="pricing-amount">
                     <strong>{price > 0 ? formatEuro(price) : 'Sur devis'}</strong>
-                    {price > 0 && <span>/ {String(plan.billing_interval || 'month')}</span>}
+                    {price > 0 && <span>/ {intervalLabel}</span>}
                   </div>
-                  <p className="muted">{String(plan.description || '')}</p>
+                  <p className="muted">
+                    {publicPlanDescription(
+                      String(plan.description || ''),
+                      'Formule ELFIS Core, renouvellement mensuel.',
+                    )}
+                  </p>
                   {canManage && purchasable && (
                     <button
                       className="btn secondary"
@@ -640,15 +646,15 @@ export default function AbonnementPage() {
                       onClick={() => {
                         setSelectedPlan(code)
                         setTab('abonnement')
-                        setReturnNotice(`Plan sélectionné : ${plan.name || code}. Lancez le checkout.`)
+                        setReturnNotice(`Formule sélectionnée : ${display.short}. Lancez l’essai.`)
                       }}
                     >
-                      {planCode === code ? 'Plan actuel / sélectionné' : 'Choisir'}
+                      {planCode === code || planDisplay.code === code
+                        ? 'Formule actuelle / sélectionnée'
+                        : 'Choisir'}
                     </button>
                   )}
-                  {!purchasable && (
-                    <p className="muted">Contact commercial requis.</p>
-                  )}
+                  {!purchasable && <p className="muted">Contact commercial requis.</p>}
                 </article>
               )
             })}
@@ -661,7 +667,8 @@ export default function AbonnementPage() {
                   checked={renewalOk}
                   onChange={(e) => setRenewalOk(e.target.checked)}
                 />
-                Renouvellement automatique accepté
+                J’ai compris que mon essai gratuit se transformera automatiquement en abonnement
+                mensuel au tarif indiqué, sauf résiliation avant la fin de l’essai.
               </label>
               <label className="checkbox-inline">
                 <input
@@ -669,20 +676,25 @@ export default function AbonnementPage() {
                   checked={termsOk}
                   onChange={(e) => setTermsOk(e.target.checked)}
                 />
-                Conditions acceptées
+                J’accepte les Conditions générales d’utilisation, les conditions d’abonnement et la
+                Politique de confidentialité.
               </label>
               <button
                 className="btn"
                 type="button"
                 disabled={Boolean(action) || !renewalOk || !termsOk}
-                onClick={() => void startAction('checkout', selectedPlan)}
+                onClick={() => void startAction('checkout')}
               >
-                Souscrire au plan {selectedPlan}
+                {subscriptionCheckoutLabel(
+                  subscription?.status || 'none',
+                  subscription?.trial_used,
+                  priceLabel || undefined,
+                )}
               </button>
             </div>
           )}
         </section>
       )}
-    </>
+    </div>
   )
 }
