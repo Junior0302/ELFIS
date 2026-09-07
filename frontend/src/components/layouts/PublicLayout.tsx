@@ -3,17 +3,21 @@ import { useAuth } from '../../auth'
 
 /**
  * Shell « pré-workspace » — Welcome, Abonnement, Compte (sans sidebar métier).
+ * Identité ELFIS Core (même lockup que login / landing).
  * Les providers sont fournis par le parent (AppShellProviders / Layout).
  */
 export default function PublicLayout() {
   const { user, logout } = useAuth()
 
   return (
-    <div className="public-shell">
+    <div className="public-shell" data-product="elfis-core">
       <header className="public-shell-header">
-        <Link to="/welcome" className="public-shell-brand" title="ComptaPilot IA">
-          <img src="/favicon.svg" alt="" />
-          <span>ComptaPilot IA</span>
+        <Link to="/welcome" className="public-shell-brand" aria-label="ELFIS Core — accueil">
+          <img src="/elfis-core-mark.svg" alt="" width={32} height={32} decoding="async" />
+          <span>
+            <strong>ELFIS Core</strong>
+            <small>Plateforme</small>
+          </span>
         </Link>
         <div className="public-shell-actions">
           {user ? (

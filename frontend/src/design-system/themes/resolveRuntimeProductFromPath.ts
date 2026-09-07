@@ -18,7 +18,6 @@ const PUBLIC_EXACT = new Set(['/', '/login', '/register', '/forgot-password'])
 
 const COMPTAPILOT_PREFIXES = [
   '/dashboard',
-  '/welcome',
   '/work-queue',
   '/decisions',
   '/clients',
@@ -48,6 +47,7 @@ const COMPTAPILOT_PREFIXES = [
 ] as const
 
 const PLATFORM_EXACT = new Set([
+  '/welcome',
   '/organisation',
   '/compte',
   '/abonnement',

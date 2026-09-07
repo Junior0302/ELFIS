@@ -774,12 +774,44 @@ textarea {
 }
 
 .public-shell {
+  /* Isole le chrome pré-workspace de :root ComptaPilot (vert / Fraunces / mint). */
+  --public-navy: #0b1f3a;
+  --public-navy-950: #071629;
+  --public-navy-900: #102746;
+  --public-accent: #2764e7;
+  --public-muted: #58657a;
+  --forest: var(--public-navy);
+  --forest-deep: var(--public-navy-950);
+  --mint: var(--public-accent);
+  --mint-soft: #eaf1ff;
+  --ink: #101828;
+  --sand: #f5f7fa;
+  --sand-deep: #eef2f7;
+  --white: #ffffff;
+  --line: #dde4ee;
+  --shadow: 0 18px 50px rgba(7, 22, 41, 0.08);
+  --font-display: var(--font-body);
+  --pilot-primary: var(--public-navy-950);
+  --pilot-primary-hover: var(--public-navy-900);
+  --pilot-primary-active: var(--public-navy-950);
+  --pilot-primary-contrast: #ffffff;
+  --pilot-secondary: #eaf1ff;
+  --pilot-accent: var(--public-accent);
+  --pilot-accent-soft: #eaf1ff;
+  --pilot-surface: #eaf1ff;
+  --pilot-surface-hover: #eaf1ff;
+  --pilot-border: #dde4ee;
+  --pilot-focus: var(--public-accent);
+  --pilot-text: #101828;
+  --pilot-text-muted: var(--public-muted);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at 12% 0%, rgba(123, 196, 160, 0.12), transparent 42%),
-    linear-gradient(180deg, #f7faf8 0%, #f3f6f4 100%);
+    radial-gradient(circle at 88% 0%, rgba(39, 100, 231, 0.14), transparent 42%),
+    radial-gradient(circle at 8% 100%, rgba(7, 22, 41, 0.05), transparent 48%),
+    linear-gradient(180deg, #f5f7fa 0%, #eef2f7 100%);
+  color: #101828;
 }
 
 .public-shell-header {
@@ -788,23 +820,39 @@ textarea {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.85rem 1.5rem;
-  border-bottom: 1px solid rgba(11, 61, 46, 0.08);
-  background: rgba(255, 253, 248, 0.82);
-  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #dde4ee;
+  background: #ffffff;
 }
 
 .public-shell-brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  color: var(--forest);
-  font-weight: 700;
+  gap: 0.75rem;
+  color: var(--public-navy);
   text-decoration: none;
 }
 
 .public-shell-brand img {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+.public-shell-brand span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.12;
+}
+
+.public-shell-brand strong {
+  font-size: 0.98rem;
+  letter-spacing: -0.03em;
+}
+
+.public-shell-brand small {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--public-muted);
 }
 
 .public-shell-actions {
@@ -816,6 +864,7 @@ textarea {
 
 .public-shell-user {
   font-size: 0.88rem;
+  color: var(--public-muted);
 }
 
 .public-shell-main {
@@ -823,6 +872,61 @@ textarea {
   width: min(1120px, 100%);
   margin: 0 auto;
   padding: 1.5rem 1.25rem 3rem;
+}
+
+.public-shell .page-head h2,
+.public-shell .panel h3,
+.public-shell .pricing-card h3,
+.public-shell .pricing-amount strong {
+  font-family: var(--font-body);
+  color: var(--public-navy);
+}
+
+.public-shell .page-head p,
+.public-shell .muted {
+  color: var(--public-muted);
+}
+
+.public-shell .home-eyebrow {
+  color: var(--public-navy);
+}
+
+.public-shell .panel,
+.public-shell .pricing-card {
+  background: #ffffff;
+  border-color: #dde4ee;
+  box-shadow: var(--shadow);
+}
+
+.public-shell .btn {
+  background: var(--public-navy-950);
+  color: #fff;
+}
+
+.public-shell .btn:hover {
+  background: var(--public-navy-900);
+}
+
+.public-shell .btn:focus-visible {
+  outline-color: var(--public-accent);
+}
+
+.public-shell .btn.secondary {
+  background: #fff;
+  color: var(--public-navy);
+  border-color: #dde4ee;
+}
+
+.public-shell .btn.secondary:hover {
+  background: #eaf1ff;
+}
+
+.public-shell .linkish {
+  color: var(--public-accent);
+}
+
+.public-shell .linkish:focus-visible {
+  outline-color: var(--public-accent);
 }
 
 
@@ -1702,6 +1806,24 @@ textarea {
 
 .elfis-billing-page .home-eyebrow {
   margin-bottom: 0.35rem;
+  color: var(--elfis-navy-signature, #0b1f3a);
+}
+
+.elfis-billing-page .page-head h2,
+.elfis-billing-page .panel h3,
+.elfis-billing-page .pricing-card h3,
+.elfis-billing-page .pricing-amount strong {
+  font-family: var(--font-body);
+  color: var(--elfis-navy-signature, #0b1f3a);
+}
+
+.elfis-billing-page .page-head p {
+  color: var(--elfis-text-secondary, #58657a);
+}
+
+.elfis-billing-page .panel {
+  background: var(--elfis-surface, #ffffff);
+  border-color: var(--elfis-border, #dde4ee);
 }
 
 .elfis-billing-brand {
@@ -1752,10 +1874,10 @@ textarea {
   gap: 1rem;
   padding: 0.85rem 1rem;
   margin-bottom: 1rem;
-  border: 1px solid rgba(11, 61, 46, 0.18);
+  border: 1px solid var(--elfis-border, #dde4ee);
   border-radius: 14px;
-  background: rgba(123, 196, 160, 0.2);
-  color: var(--forest);
+  background: var(--elfis-blue-100, #eaf1ff);
+  color: var(--elfis-navy-signature, #0b1f3a);
 }
 
 .global-subscription-banner.past_due,
@@ -1774,8 +1896,8 @@ textarea {
 .global-subscription-banner.none,
 .global-subscription-banner.canceled,
 .global-subscription-banner.paused {
-  background: rgba(16, 36, 28, 0.08);
-  color: rgba(16, 36, 28, 0.78);
+  background: #eef2f7;
+  color: var(--elfis-text-secondary, #58657a);
 }
 
 .global-subscription-banner a {
@@ -1786,7 +1908,7 @@ textarea {
 
 .subscription-return {
   justify-content: flex-start;
-  background: rgba(255, 253, 248, 0.82);
+  background: var(--elfis-surface, #ffffff);
 }
 
 .subscription-grid {
@@ -1797,8 +1919,8 @@ textarea {
 }
 
 .pricing-card {
-  border-color: rgba(11, 61, 46, 0.26);
-  background: linear-gradient(145deg, rgba(255, 253, 248, 0.95), rgba(231, 242, 236, 0.78));
+  border-color: var(--elfis-border, #dde4ee);
+  background: var(--elfis-surface, #ffffff);
 }
 
 .pricing-card h3 {
@@ -1864,7 +1986,7 @@ textarea {
   align-items: flex-start;
   font-size: 0.88rem;
   line-height: 1.45;
-  color: rgba(16, 36, 28, 0.78);
+  color: var(--elfis-text-secondary, #58657a);
 }
 
 .subscription-consents .checkbox-inline input {
@@ -1947,8 +2069,8 @@ textarea {
   width: fit-content;
   padding: 0.35rem 0.65rem;
   border-radius: 999px;
-  background: rgba(123, 196, 160, 0.22);
-  color: var(--forest);
+  background: var(--elfis-blue-100, #eaf1ff);
+  color: var(--elfis-navy-signature, #0b1f3a);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -1964,13 +2086,13 @@ textarea {
 }
 
 .subscription-badge.neutral {
-  background: rgba(16, 36, 28, 0.08);
-  color: rgba(16, 36, 28, 0.7);
+  background: #eef2f7;
+  color: var(--elfis-text-secondary, #58657a);
 }
 
 .subscription-trust {
   margin: 1.2rem 0 0;
-  color: rgba(16, 36, 28, 0.5);
+  color: var(--elfis-text-secondary, #58657a);
   font-size: 0.78rem;
   line-height: 1.5;
 }
@@ -1998,9 +2120,8 @@ textarea {
   margin: 1.4rem 0 0.5rem;
   padding: 1.15rem 1.2rem;
   border-radius: 18px;
-  border: 1px solid rgba(11, 61, 46, 0.16);
-  background:
-    linear-gradient(160deg, rgba(123, 196, 160, 0.18), rgba(255, 253, 248, 0.92));
+  border: 1px solid var(--elfis-border, #dde4ee);
+  background: var(--elfis-surface-muted, #f8fafc);
 }
 
 .trial-countdown.ended {
@@ -2015,7 +2136,7 @@ textarea {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(16, 36, 28, 0.62);
+  color: var(--elfis-text-secondary, #58657a);
 }
 
 .trial-countdown-grid {
@@ -2030,33 +2151,33 @@ textarea {
   justify-items: center;
   padding: 0.7rem 0.35rem;
   border-radius: 14px;
-  background: rgba(255, 253, 248, 0.82);
-  border: 1px solid rgba(11, 61, 46, 0.1);
+  background: #ffffff;
+  border: 1px solid var(--elfis-border, #dde4ee);
 }
 
 .trial-countdown-grid strong {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: clamp(1.6rem, 4vw, 2.2rem);
   line-height: 1;
   letter-spacing: -0.04em;
-  color: var(--forest);
+  color: var(--elfis-navy-signature, #0b1f3a);
 }
 
 .trial-countdown-grid span {
   font-size: 0.72rem;
-  color: rgba(16, 36, 28, 0.55);
+  color: var(--elfis-text-secondary, #58657a);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .trial-countdown-date {
   margin: 0.9rem 0 0;
-  color: rgba(16, 36, 28, 0.62);
+  color: var(--elfis-text-secondary, #58657a);
   font-size: 0.92rem;
 }
 
 .global-subscription-banner.trialing {
-  background: rgba(123, 196, 160, 0.22);
+  background: var(--elfis-blue-100, #eaf1ff);
 }
 
 .organisation-subscription {

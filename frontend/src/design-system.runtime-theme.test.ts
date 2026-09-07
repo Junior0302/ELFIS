@@ -52,6 +52,18 @@ describe('resolveRuntimeProductFromPath', () => {
   it('pages publiques ne persiste pas', () => {
     expect(resolveRuntimeProductFromPath('/login').persist).toBe(false)
   })
+
+  it('/abonnement → elfis-core', () => {
+    const r = resolveRuntimeProductFromPath('/abonnement')
+    expect(r.productId).toBe('elfis-core')
+    expect(r.surface).toBe('platform')
+    expect(r.persist).toBe(false)
+  })
+
+  it('/welcome et /compte → elfis-core (pré-workspace)', () => {
+    expect(resolveRuntimeProductFromPath('/welcome').productId).toBe('elfis-core')
+    expect(resolveRuntimeProductFromPath('/compte').productId).toBe('elfis-core')
+  })
 })
 
 describe('theme engine stability', () => {
