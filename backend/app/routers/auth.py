@@ -14,6 +14,7 @@ from app.config import settings
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context
 from app.models_saas import User
+from app.security.antivirus import AntivirusError, http_detail, require_clean_user_upload
 from app.services.auth import (
     create_access_token,
     get_user_memberships,
@@ -446,6 +447,15 @@ async def upload_avatar(
     if not auth.user:
         raise HTTPException(401, detail="Non authentifié")
     extension = AVATAR_TYPES.get(file.content_type or "")
+    name_lower = (file.filename or "").lower()
+    if name_lower.endswith(".svg") or (file.content_type or "").lower() == "image/svg+xml":
+        raise HTTPException(
+            400,
+            detail={
+                "code": "unsupported_file_type",
+                "message": "SVG utilisateur refusé. Formats acceptés : JPG, PNG ou WebP",
+            },
+        )
     if not extension:
         raise HTTPException(400, detail="Formats acceptés : JPG, PNG ou WebP")
     content = await file.read()
@@ -453,6 +463,10 @@ async def upload_avatar(
         raise HTTPException(400, detail="Photo vide")
     if len(content) > MAX_AVATAR_BYTES:
         raise HTTPException(400, detail="La photo ne doit pas dépasser 5 Mo")
+    try:
+        require_clean_user_upload(data=content, upload_type="avatar")
+    except AntivirusError as exc:
+        raise HTTPException(exc.http_status, detail=http_detail(exc)) from exc
 
     user = db.get(User, auth.user.id)
     if not user:

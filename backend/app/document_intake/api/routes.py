@@ -57,7 +57,16 @@ def _http(exc: Exception) -> HTTPException:
     if isinstance(exc, DocumentIntakeConflictError):
         return HTTPException(status_code=409, detail={"code": exc.code, "message": exc.message})
     if isinstance(exc, DocumentIntakeValidationError):
-        return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
+        av_status = {
+            "file_infected": 422,
+            "antivirus_unavailable": 503,
+            "file_scan_failed": 422,
+            "file_scan_required": 409,
+        }.get(exc.code)
+        return HTTPException(
+            status_code=av_status or 400,
+            detail={"code": exc.code, "message": exc.message},
+        )
     if isinstance(exc, DocumentIntakeError):
         return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
     return HTTPException(

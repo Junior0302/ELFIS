@@ -56,6 +56,10 @@ class ElfisStorageObject(Base):
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     metadata_json = Column(JSON, nullable=True)
+    scan_status = Column(String(32), nullable=False, default="unknown")
+    scan_engine = Column(String(64), nullable=True)
+    scan_signature = Column(String(128), nullable=True)
+    scan_at = Column(DateTime, nullable=True)
 
 
 class ElfisDocumentRecord(Base):

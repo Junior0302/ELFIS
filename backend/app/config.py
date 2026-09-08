@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     storage_quarantine_enabled: bool = False
     storage_quarantine_namespace: str = "quarantine"
     storage_upload_chunk_size_bytes: int = 65_536
+    # Antivirus production — clamd séparé (INSTREAM). Pas de hostname de prod en dur.
+    elfis_antivirus_enabled: bool = False
+    elfis_antivirus_engine: str = "clamd"
+    elfis_antivirus_fail_closed: bool = True
+    clamd_host: str = ""
+    clamd_port: int = 3310
+    elfis_antivirus_timeout_seconds: float = 20.0
+    elfis_antivirus_max_bytes: int = 0  # 0 → aligné sur storage_max_file_size_bytes
     storage_disk_degraded_percent: float = 85.0
     storage_disk_unhealthy_percent: float = 95.0
     storage_probe_timeout_seconds: float = 5.0

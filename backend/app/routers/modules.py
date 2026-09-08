@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import AuthContext, get_auth_context, require_active_subscription
 from app.modules.registry import get_module, get_modules
+from app.security.antivirus import AntivirusError, http_detail, require_clean_user_upload
 from app.services.banking import (
     bank_overview,
     cashflow_forecast,
@@ -175,6 +176,10 @@ async def banque_import_csv(
         raise HTTPException(400, detail="Le fichier CSV est vide.")
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(400, detail="Le fichier CSV dépasse 5 Mo.")
+    try:
+        require_clean_user_upload(data=content, upload_type="bank_csv")
+    except AntivirusError as exc:
+        raise HTTPException(exc.http_status, detail=http_detail(exc)) from exc
     try:
         result = import_bank_csv(
             db,

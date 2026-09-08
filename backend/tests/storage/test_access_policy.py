@@ -54,6 +54,7 @@ def test_quarantine_requires_special_perm():
         size_bytes=10,
         status=StorageObjectStatus.QUARANTINED.value,
         organization_id=org.id,
+        scan_status="clean",
     )
     with pytest.raises(DocumentAccessDeniedError):
         policy.assert_can_download(_auth(user, org.id, ["documents.download"]), doc, obj)

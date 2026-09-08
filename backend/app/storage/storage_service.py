@@ -20,6 +20,7 @@ from app.storage.storage_models import ElfisStorageObject
 from app.storage.storage_provider import StorageProvider
 from app.storage.storage_repository import StorageObjectRepository
 from app.storage.storage_types import EncryptionStatus, StorageObjectStatus
+from app.security.antivirus import persist_scan_fields
 from app.storage.storage_upload import StreamingUploadPipeline, StreamedUploadResult
 
 logger = logging.getLogger(__name__)
@@ -167,6 +168,7 @@ class StorageService:
             created_by_user_id=created_by_user_id,
             organization_id=organization_id,
             metadata_json=sanitize_document_metadata(metadata),
+            **(persist_scan_fields(streamed.scan) if streamed.scan is not None else {}),
         )
         try:
             self._repo.create(row, commit=False)

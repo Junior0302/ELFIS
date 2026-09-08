@@ -69,6 +69,11 @@ class VaultRepository:
         supplier_id: int | None = None,
         archived_by_user_id: int | None = None,
         email_status: str = "not_sent",
+        scan_status: str = "unknown",
+        scan_engine: str | None = None,
+        scan_signature: str | None = None,
+        scan_at: Any = None,
+        content_origin: str = "unknown",
     ) -> VaultDocument:
         now = datetime.utcnow()
         doc = VaultDocument(
@@ -96,6 +101,11 @@ class VaultRepository:
             archived_at=now,
             created_at=now,
             updated_at=now,
+            scan_status=scan_status,
+            scan_engine=scan_engine,
+            scan_signature=scan_signature,
+            scan_at=scan_at,
+            content_origin=content_origin,
         )
         try:
             self._db.add(doc)

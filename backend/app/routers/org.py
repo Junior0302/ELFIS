@@ -31,6 +31,7 @@ from app.services.invitations import (
     resend_invitation,
     serialize_invitation,
 )
+from app.security.antivirus import AntivirusError, http_detail, require_clean_user_upload
 from app.services.plan_features import (
     ROLE_LABELS_FR,
     can_invite_more,
@@ -42,11 +43,12 @@ router = APIRouter(prefix="/org", tags=["organisation"])
 
 MANAGEABLE_ROLES = {"admin", "cfo", "comptable", "employe", "auditeur"}
 MAX_LOGO_BYTES = 2 * 1024 * 1024
+# V1 production : SVG utilisateur refusé (pas de sanitizer XSS). Raster uniquement.
 LOGO_TYPES = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/jpg": ".jpg",
-    "image/svg+xml": ".svg",
+    "image/webp": ".webp",
 }
 
 
@@ -295,21 +297,33 @@ async def upload_organization_logo(
 
     extension = LOGO_TYPES.get((file.content_type or "").lower())
     name_lower = (file.filename or "").lower()
+    if name_lower.endswith(".svg") or (file.content_type or "").lower() == "image/svg+xml":
+        raise HTTPException(
+            400,
+            detail={
+                "code": "unsupported_file_type",
+                "message": "SVG utilisateur refusé. Formats acceptés : PNG, JPG, JPEG ou WebP",
+            },
+        )
     if not extension:
-        if name_lower.endswith(".svg"):
-            extension = ".svg"
-        elif name_lower.endswith(".png"):
+        if name_lower.endswith(".png"):
             extension = ".png"
         elif name_lower.endswith((".jpg", ".jpeg")):
             extension = ".jpg"
+        elif name_lower.endswith(".webp"):
+            extension = ".webp"
         else:
-            raise HTTPException(400, detail="Formats acceptés : PNG, JPG, JPEG ou SVG")
+            raise HTTPException(400, detail="Formats acceptés : PNG, JPG, JPEG ou WebP")
 
     content = await file.read()
     if not content:
         raise HTTPException(400, detail="Fichier vide")
     if len(content) > MAX_LOGO_BYTES:
         raise HTTPException(400, detail="Le logo ne doit pas dépasser 2 Mo")
+    try:
+        require_clean_user_upload(data=content, upload_type="org_logo")
+    except AntivirusError as exc:
+        raise HTTPException(exc.http_status, detail=http_detail(exc)) from exc
 
     logo_dir = settings.storage_path / "logos"
     logo_dir.mkdir(parents=True, exist_ok=True)

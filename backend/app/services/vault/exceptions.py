@@ -48,3 +48,12 @@ class VaultNotFoundError(VaultError):
 
 class VaultValidationError(VaultError):
     """Paramètres de requête invalides."""
+
+
+class VaultAntivirusError(VaultError):
+    """Rejet antivirus (infected / unavailable / scan requis)."""
+
+    def __init__(self, code: str, message: str, http_status: int) -> None:
+        self.code = code
+        self.http_status = http_status
+        super().__init__(message)

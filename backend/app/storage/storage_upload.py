@@ -16,6 +16,7 @@ from app.storage.providers.local_storage_provider import LocalStorageProvider, n
 from app.storage.storage_exceptions import StorageError, StorageProviderError, StorageValidationError
 from app.storage.storage_provider import StorageProvider
 from app.storage.storage_reject_codes import StorageRejectCode
+from app.security.antivirus import AntivirusError, AntivirusScanResult, require_clean_user_upload
 from app.storage.storage_security import validate_filename_only, validate_upload_head_and_meta
 from app.storage.storage_security import FileValidationResult
 
@@ -34,6 +35,7 @@ class StreamedUploadResult:
     validation: FileValidationResult
     temp_cleaned: bool = True
     provider: str = "local"
+    scan: AntivirusScanResult | None = None
 
 
 @dataclass
@@ -200,6 +202,16 @@ class StreamingUploadPipeline:
             checksum_sha256=checksum,
         )
 
+        try:
+            scan = require_clean_user_upload(
+                path=self._temp.path,
+                upload_type="document_registry",
+                size_hint=size,
+            )
+        except AntivirusError as exc:
+            self._abort_temp(already_closed=True)
+            raise StorageValidationError(exc.code, exc.message) from exc
+
         final_ns = self._final_namespace(validation.quarantined)
         final_key = new_object_key(extension=validation.extension)
         # Pour Supabase : clés structurées documents/{org}/yyyy/mm/uuid
@@ -241,6 +253,7 @@ class StreamingUploadPipeline:
             head=head,
             validation=validation,
             provider=self._provider.name,
+            scan=scan,
         )
 
     def _final_namespace(self, quarantined: bool) -> str:

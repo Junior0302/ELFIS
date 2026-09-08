@@ -38,6 +38,10 @@ class Invoice(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    scan_status: Mapped[str] = mapped_column(String(32), default="unknown")
+    scan_engine: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scan_signature: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    scan_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class ElfisAnalysis(Base):

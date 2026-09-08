@@ -96,6 +96,9 @@ def _add_doc(
         archived_at=now,
         created_at=now,
         updated_at=now,
+        scan_status="clean",
+        scan_engine="test_clean",
+        content_origin="user_upload",
     )
     db.add(doc)
     db.commit()

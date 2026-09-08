@@ -129,6 +129,26 @@ def test_mig_bank5_postgres_is_additive_and_registered():
     assert name in checker.read_text(encoding="utf-8")
 
 
+def test_mig_antivirus_scan_status_is_additive_and_registered():
+    name = "elfis_antivirus_scan_status_postgres.sql"
+    runner = Path(__file__).resolve().parents[2] / "scripts" / "rc1" / "migrate_sql.py"
+    runner_text = runner.read_text(encoding="utf-8")
+    assert name in runner_text
+    assert runner_text.index("elfis_banking_bank5_postgres.sql") < runner_text.index(name)
+    sql = (SQL_DIR / name).read_text(encoding="utf-8")
+    lowered = sql.lower()
+    assert "drop table" not in lowered
+    assert "delete from" not in lowered
+    assert "update " not in lowered
+    assert "scan_status" in lowered
+    assert "default 'unknown'" in lowered
+    assert "generated_by_elfis" in lowered
+    assert "add column if not exists content_origin varchar(32) not null default 'unknown'" in lowered
+    assert "add column if not exists content_origin varchar(32) not null default 'user_upload'" not in lowered
+    checker = Path(__file__).resolve().parents[2] / "scripts" / "production" / "check_migrations.py"
+    assert name in checker.read_text(encoding="utf-8")
+
+
 def test_mig_007_search_gin():
     search = (SQL_DIR / "elfis_search_engine_postgres.sql").read_text(encoding="utf-8")
     assert "gin" in search.lower() or "tsvector" in search.lower()

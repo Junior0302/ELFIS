@@ -26,6 +26,10 @@ class ErrorCode:
     METHOD_NOT_ALLOWED = "method_not_allowed"
     INVALID_HEADER = "invalid_header"
     CROSS_TENANT_DENIED = "cross_tenant_denied"
+    FILE_INFECTED = "file_infected"
+    ANTIVIRUS_UNAVAILABLE = "antivirus_unavailable"
+    FILE_SCAN_FAILED = "file_scan_failed"
+    FILE_SCAN_REQUIRED = "file_scan_required"
 
 
 class RateLimitCategory(str, Enum):

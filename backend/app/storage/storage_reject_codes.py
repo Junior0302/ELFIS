@@ -16,6 +16,10 @@ class StorageRejectCode(str, Enum):
     UPLOAD_INTERRUPTED = "UPLOAD_INTERRUPTED"
     METADATA_INVALID = "METADATA_INVALID"
     ORGANIZATION_REQUIRED = "ORGANIZATION_REQUIRED"
+    FILE_INFECTED = "file_infected"
+    ANTIVIRUS_UNAVAILABLE = "antivirus_unavailable"
+    FILE_SCAN_FAILED = "file_scan_failed"
+    FILE_SCAN_REQUIRED = "file_scan_required"
 
 
 # Mapping codes internes historiques → codes stables
@@ -32,6 +36,10 @@ _LEGACY_MAP = {
     "security_policy_rejected": StorageRejectCode.SECURITY_POLICY_REJECTED,
     "metadata_invalid": StorageRejectCode.METADATA_INVALID,
     "organization_required": StorageRejectCode.ORGANIZATION_REQUIRED,
+    "file_infected": StorageRejectCode.FILE_INFECTED,
+    "antivirus_unavailable": StorageRejectCode.ANTIVIRUS_UNAVAILABLE,
+    "file_scan_failed": StorageRejectCode.FILE_SCAN_FAILED,
+    "file_scan_required": StorageRejectCode.FILE_SCAN_REQUIRED,
 }
 
 

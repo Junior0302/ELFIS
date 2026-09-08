@@ -28,6 +28,7 @@ from app.document_intake.exceptions import (
     DocumentIntakeQuotaError,
     DocumentIntakeValidationError,
 )
+from app.security.antivirus import AntivirusError
 from app.document_intake.fingerprint import FileFingerprintService
 from app.document_intake.format_registry import list_formats
 from app.document_intake.inventory import inventory_summary
@@ -217,11 +218,14 @@ class DocumentIntakeService:
                 ) from exc
             raise
         checksum = fingerprint["sha256"]
-        scan = self._scanner.scan(
-            filename=validation.normalized_filename,
-            head=content[:4096],
-            size_bytes=len(content),
-        )
+        try:
+            scan = self._scanner.require_clean(
+                filename=validation.normalized_filename,
+                content=content,
+                size_bytes=len(content),
+            )
+        except AntivirusError as exc:
+            raise DocumentIntakeValidationError(exc.code, exc.message) from exc
 
         is_duplicate = False
         duplicate_of_id = None
@@ -240,6 +244,13 @@ class DocumentIntakeService:
             duplicate_type = DuplicateType.EXACT.value
             duplicate_confidence = 1.0
             duplicate_reason = "exact_sha256"
+
+        if scan.verdict != "clean":
+            # Défense en profondeur : unavailable/infected ne deviennent jamais clean.
+            raise DocumentIntakeValidationError(
+                "file_scan_failed" if scan.verdict != "infected" else "file_infected",
+                "Fichier refusé par le scan antivirus",
+            )
 
         if validation.mime_mismatch or scan.verdict == "suspicious":
             quarantine_reason = (
@@ -300,6 +311,9 @@ class DocumentIntakeService:
             quarantine_reason=quarantine_reason,
             reject_reason=reject_reason,
             scan_verdict=scan.verdict,
+            scan_engine=scan.engine,
+            scan_signature=scan.signature,
+            scan_at=datetime.utcnow() if scan.scanned or scan.engine else None,
             extract_later=validation.extract_later,
             preview_allowed=validation.preview_allowed,
             analysis_allowed=False,
@@ -346,7 +360,7 @@ class DocumentIntakeService:
             )
         else:
             self._lifecycle.mark_validated(row, reason_code="content_ok", **actor_kw)
-            if not validation.extract_later:
+            if not validation.extract_later and scan.verdict == "clean":
                 self._lifecycle.mark_ready_for_analysis(
                     row, reason_code="prepared", **actor_kw
                 )

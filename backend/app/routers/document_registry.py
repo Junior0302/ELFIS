@@ -52,14 +52,28 @@ def _svc(db: Session) -> DocumentRegistryService:
     return DocumentRegistryService(db, audit_logger=AuditLogger(db), access_policy=_policy)
 
 
+_AV_HTTP = {
+    "file_infected": 422,
+    "antivirus_unavailable": 503,
+    "file_scan_failed": 422,
+    "file_scan_required": 409,
+}
+
+
 def _http_from_storage(exc: StorageError) -> HTTPException:
     if isinstance(exc, StorageValidationError):
-        return HTTPException(400, detail={"code": exc.code, "message": exc.message})
+        status = _AV_HTTP.get(exc.code, 400)
+        return HTTPException(status, detail={"code": exc.code, "message": exc.message})
     if isinstance(exc, DocumentAccessDeniedError):
         if exc.code == "permission_denied":
             return HTTPException(
                 403,
                 detail={"code": "permission_denied", "message": exc.message},
+            )
+        if exc.code in _AV_HTTP:
+            return HTTPException(
+                _AV_HTTP[exc.code],
+                detail={"code": exc.code, "message": exc.message},
             )
         return HTTPException(404, detail={"code": "not_found", "message": "Document introuvable"})
     if isinstance(exc, (DocumentNotFoundError, StorageNotFoundError)):

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.deps import AuthContext
+from app.security.antivirus import AntivirusError, assert_scan_allows_download
 from app.storage.storage_exceptions import DocumentAccessDeniedError, StorageValidationError
 from app.storage.storage_models import ElfisDocumentRecord, ElfisDocumentVersion, ElfisStorageObject
 from app.storage.storage_reject_codes import StorageRejectCode
@@ -88,6 +89,13 @@ class DocumentAccessPolicy:
                 raise DocumentAccessDeniedError("object_quarantined", "Document introuvable")
         elif obj.status != StorageObjectStatus.AVAILABLE.value:
             raise DocumentAccessDeniedError("object_unavailable", "Document introuvable")
+        try:
+            assert_scan_allows_download(
+                scan_status=getattr(obj, "scan_status", None),
+                source=getattr(doc, "source", None),
+            )
+        except AntivirusError as exc:
+            raise DocumentAccessDeniedError(exc.code, exc.message) from exc
 
     def assert_can_archive(self, auth: AuthContext, doc: ElfisDocumentRecord) -> None:
         org_id = auth.require_organization_id()

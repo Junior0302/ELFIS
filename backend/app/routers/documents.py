@@ -11,6 +11,13 @@ from app.models import Invoice
 from app.schemas import InvoiceOut, InvoiceUpdate
 from app.services.ocr import ALLOWED_EXT
 from app.services.serializers import serialize_invoice
+from app.security.antivirus import (
+    AntivirusError,
+    assert_scan_allows_download,
+    http_detail,
+    persist_scan_fields,
+    require_clean_user_upload,
+)
 from app.services.storage import resolve_stored, save_upload
 from pathlib import Path
 
@@ -56,6 +63,11 @@ async def upload_document(
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(400, detail="Fichier trop volumineux (max 15 Mo)")
 
+    try:
+        scan = require_clean_user_upload(data=content, upload_type="legacy_invoice")
+    except AntivirusError as exc:
+        raise HTTPException(exc.http_status, detail=http_detail(exc)) from exc
+
     stored = await save_upload(file.filename, content)
     invoice = Invoice(
         organization_id=auth.require_organization_id(),
@@ -63,6 +75,7 @@ async def upload_document(
         stored_path=str(stored),
         mime_type=file.content_type or "application/octet-stream",
         status="processing",
+        **persist_scan_fields(scan),
     )
     db.add(invoice)
     db.commit()
@@ -162,6 +175,13 @@ def download_original(
 ):
     auth.require("documents.read")
     invoice = _organization_invoice(db, invoice_id, auth.require_organization_id())
+    try:
+        assert_scan_allows_download(
+            scan_status=getattr(invoice, "scan_status", None),
+            source="upload",
+        )
+    except AntivirusError as exc:
+        raise HTTPException(exc.http_status, detail=http_detail(exc)) from exc
     path = resolve_stored(invoice.stored_path)
     if not path.exists():
         raise HTTPException(404, detail="Fichier introuvable sur le stockage")

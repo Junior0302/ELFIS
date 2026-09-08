@@ -179,7 +179,14 @@ def validate_uploaded_file(
 
 
 class AntivirusScannerProtocol:
-    """Interface future — non implémentée en V1."""
+    """Délègue au scanner partagé (clamd INSTREAM)."""
 
     def scan(self, content: bytes, *, filename: str) -> dict:
-        return {"status": "skipped", "engine": "none"}
+        from app.security.antivirus import scan_user_upload
+
+        result = scan_user_upload(data=content, upload_type="security_file")
+        return {
+            "status": result.verdict.value,
+            "engine": result.engine,
+            "scanned": result.scanned,
+        }

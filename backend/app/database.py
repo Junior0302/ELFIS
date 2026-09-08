@@ -343,3 +343,23 @@ def init_db() -> None:
         "last_activity_at": "last_activity_at DATETIME",
     }.items():
         _sqlite_add_column_if_missing("elfis_decision_items", column, ddl)
+
+    _av_scan_columns = {
+        "scan_status": "scan_status VARCHAR(32) DEFAULT 'unknown'",
+        "scan_engine": "scan_engine VARCHAR(64)",
+        "scan_signature": "scan_signature VARCHAR(128)",
+        "scan_at": "scan_at DATETIME",
+    }
+    for column, ddl in _av_scan_columns.items():
+        _sqlite_add_column_if_missing("elfis_storage_objects", column, ddl)
+        _sqlite_add_column_if_missing("vault_documents", column, ddl)
+        _sqlite_add_column_if_missing("invoices", column, ddl)
+    _sqlite_add_column_if_missing(
+        "vault_documents", "content_origin", "content_origin VARCHAR(32) DEFAULT 'unknown'"
+    )
+    for column, ddl in {
+        "scan_engine": "scan_engine VARCHAR(64)",
+        "scan_signature": "scan_signature VARCHAR(128)",
+        "scan_at": "scan_at DATETIME",
+    }.items():
+        _sqlite_add_column_if_missing("elfis_document_intake_items", column, ddl)

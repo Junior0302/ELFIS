@@ -26,6 +26,7 @@ from app.schemas_vault import (
 )
 from app.services.vault.exceptions import (
     VaultAccessDeniedError,
+    VaultAntivirusError,
     VaultDatabaseError,
     VaultDuplicateDocumentError,
     VaultFileTooLargeError,
@@ -186,6 +187,11 @@ async def archive_vault_document(
         )
     except VaultFileTooLargeError as exc:
         return JSONResponse(status_code=413, content={"detail": str(exc)})
+    except VaultAntivirusError as exc:
+        return JSONResponse(
+            status_code=exc.http_status,
+            content={"detail": {"code": exc.code, "message": str(exc)}},
+        )
     except VaultInvalidFileError as exc:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
     except ValidationError as exc:
@@ -296,6 +302,11 @@ def create_vault_download_url(
         return JSONResponse(status_code=403, content={"detail": ORG_ACCESS_DENIED_MESSAGE})
     except VaultNotFoundError:
         return JSONResponse(status_code=404, content={"detail": DOCUMENT_NOT_FOUND_MESSAGE})
+    except VaultAntivirusError as exc:
+        return JSONResponse(
+            status_code=exc.http_status,
+            content={"detail": {"code": exc.code, "message": str(exc)}},
+        )
     except VaultStorageError:
         return JSONResponse(
             status_code=503,

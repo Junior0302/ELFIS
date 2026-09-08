@@ -26,7 +26,18 @@ from app.schemas_vault import (
     VaultSortOrder,
 )
 from app.services.vault.checksum_service import calculate_sha256
+from app.security.antivirus import (
+    AntivirusError,
+    CONTENT_ORIGIN_GENERATED,
+    CONTENT_ORIGIN_USER_UPLOAD,
+    ENGINE_ELFIS_GENERATED,
+    SCAN_STATUS_CLEAN,
+    assert_scan_allows_download,
+    persist_scan_fields,
+    require_clean_user_upload,
+)
 from app.services.vault.exceptions import (
+    VaultAntivirusError,
     VaultDatabaseError,
     VaultDuplicateDocumentError,
     VaultFileTooLargeError,
@@ -126,6 +137,11 @@ def archive_document(
     if duplicate:
         raise VaultDuplicateDocumentError(duplicate.id)
 
+    try:
+        scan = require_clean_user_upload(data=content, upload_type="vault")
+    except AntivirusError as exc:
+        raise VaultAntivirusError(exc.code, exc.message, exc.http_status) from exc
+
     original_filename = Path(filename or "document.pdf").name
     storage_path = build_storage_path(
         organization_id=meta.tenant_id,
@@ -161,6 +177,8 @@ def archive_document(
             customer_id=meta.customer_id,
             supplier_id=meta.supplier_id,
             archived_by_user_id=user_id,
+            content_origin=CONTENT_ORIGIN_USER_UPLOAD,
+            **persist_scan_fields(scan),
         )
     except VaultDatabaseError:
         storage_svc.delete_file(storage_path=storage_path)
@@ -400,6 +418,14 @@ def create_download_url(
     if not doc or doc.archive_status == VaultArchiveStatus.deleted.value:
         raise VaultNotFoundError(DOCUMENT_NOT_FOUND_MESSAGE)
 
+    try:
+        assert_scan_allows_download(
+            scan_status=getattr(doc, "scan_status", None),
+            content_origin=getattr(doc, "content_origin", None),
+        )
+    except AntivirusError as exc:
+        raise VaultAntivirusError(exc.code, exc.message, exc.http_status) from exc
+
     ttl = expires_in if expires_in is not None else settings.elfis_vault_signed_url_ttl_seconds
     ttl = max(60, min(900, int(ttl)))
 
@@ -517,6 +543,9 @@ def archive_or_reuse_pdf(
             customer_id=customer_id,
             archived_by_user_id=user_id,
             email_status=email_status,
+            scan_status=SCAN_STATUS_CLEAN,
+            scan_engine=ENGINE_ELFIS_GENERATED,
+            content_origin=CONTENT_ORIGIN_GENERATED,
         )
     except VaultDatabaseError:
         storage_svc.delete_file(storage_path=storage_path)
