@@ -264,7 +264,9 @@ def assert_scan_allows_download(
 def parse_clamd_response(raw: bytes | str) -> AntivirusScanResult:
     engine = ENGINE_CLAMD
     text = raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
+    text = text.rstrip("\x00\r\n")
     line = text.strip().splitlines()[0].strip() if text.strip() else ""
+    line = line.rstrip("\x00\r\n")
     if not line:
         return _error_result(reason="empty_response", engine=engine)
     lowered = line.lower()

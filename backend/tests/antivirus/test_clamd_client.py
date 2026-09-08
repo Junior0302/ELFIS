@@ -20,6 +20,19 @@ def test_parse_ok():
     assert result.engine == "clamd"
 
 
+def test_parse_ok_nul():
+    result = parse_clamd_response(b"stream: OK\x00")
+    assert result.verdict == AntivirusVerdict.CLEAN
+    assert result.scanned is True
+    assert result.engine == "clamd"
+
+
+def test_parse_ok_newline():
+    result = parse_clamd_response(b"stream: OK\n")
+    assert result.verdict == AntivirusVerdict.CLEAN
+    assert result.scanned is True
+
+
 def test_parse_eicar_found():
     result = parse_clamd_response(b"stream: Eicar-Test-File FOUND\n")
     assert result.verdict == AntivirusVerdict.INFECTED
@@ -27,9 +40,28 @@ def test_parse_eicar_found():
     assert result.scanned is True
 
 
+def test_parse_found_nul():
+    result = parse_clamd_response(b"stream: Eicar-Test-Signature FOUND\x00")
+    assert result.verdict == AntivirusVerdict.INFECTED
+    assert result.signature == "Eicar-Test-Signature"
+    assert result.scanned is True
+
+
+def test_parse_found_newline():
+    result = parse_clamd_response(b"stream: Eicar-Test-Signature FOUND\n")
+    assert result.verdict == AntivirusVerdict.INFECTED
+    assert result.signature == "Eicar-Test-Signature"
+
+
 def test_parse_error():
     result = parse_clamd_response(b"INSTREAM size limit exceeded. ERROR\n")
     assert result.verdict == AntivirusVerdict.ERROR
+
+
+def test_parse_error_nul():
+    result = parse_clamd_response(b"stream: Some error ERROR\x00")
+    assert result.verdict == AntivirusVerdict.ERROR
+    assert result.details.get("reason") == "clamd_error"
 
 
 def test_parse_malformed():
@@ -41,6 +73,7 @@ def test_parse_malformed():
 def test_parse_empty():
     result = parse_clamd_response(b"")
     assert result.verdict == AntivirusVerdict.ERROR
+    assert result.details.get("reason") == "empty_response"
 
 
 def test_instream_sends_full_file_and_zero_chunk(monkeypatch):
