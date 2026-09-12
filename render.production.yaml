@@ -1,0 +1,260 @@
+# ELFIS Core — production Render Blueprint
+# REFERENCE / DISASTER RECOVERY / FUTURE PROVISIONING ONLY
+#
+# DO NOT attach or Sync this file to the live Frankfurt stack
+# without an explicit operational review.
+# Live services are not Blueprint-managed.
+#
+# Existing production PostgreSQL: elfis-core-db
+# (PostgreSQL 16, Basic-256mb / 0.1c-256mb, 15 GB, Frankfurt).
+# This file does NOT declare databases: — a databases: block can create
+# a new instance. Bind DATABASE_URL manually (sync: false).
+#
+# Aucun secret réel. Aucun disque API. Aucun generateValue JWT.
+# Syntaxe limitée aux clés Blueprint Render documentées + render.yaml existant.
+
+services:
+  - type: web
+    name: elfis-core-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: 0.5c-512mb
+    region: frankfurt
+    numInstances: 1
+    healthCheckPath: /api/health/ready
+    autoDeployTrigger: "off"
+    preDeployCommand: python -m scripts.rc1.migrate_sql
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: ELFIS_ENVIRONMENT
+        value: production
+      - key: AUTH_REQUIRED
+        value: "true"
+      - key: ELFIS_BILLING_ENABLED
+        value: "true"
+      - key: ELFIS_DEMO_BANK_ENABLED
+        value: "false"
+      - key: ELFIS_AI_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_PROVIDER
+        value: disabled
+      - key: ELFIS_AUTO_TEXT_EXTRACTION_ENABLED
+        value: "false"
+      - key: ELFIS_AUTO_AI_ANALYSIS_ENABLED
+        value: "false"
+      - key: DOCUMENT_EXTRACTION_ENABLED
+        value: "false"
+      - key: BANKING_SYNC_SWEEP_RESCHEDULE
+        value: "false"
+      - key: ELFIS_JOB_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_EVENT_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_DEV_TRIAL_ENABLED
+        value: "false"
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_STORAGE_BUCKET
+        value: elfis-documents
+      - key: ELFIS_VAULT_BUCKET
+        value: elfis-vault
+      - key: ELFIS_ANTIVIRUS_ENABLED
+        value: "true"
+      - key: ELFIS_ANTIVIRUS_ENGINE
+        value: clamd
+      - key: ELFIS_ANTIVIRUS_FAIL_CLOSED
+        value: "true"
+      - key: CLAMD_HOST
+        value: elfis-clamav
+      - key: CLAMD_PORT
+        value: "3310"
+      - key: ELFIS_ANTIVIRUS_TIMEOUT_SECONDS
+        value: "20"
+      - key: ELFIS_ANTIVIRUS_MAX_BYTES
+        value: "15728640"
+      - key: SYSTEM_HEALTH_USE_REAL_PROVIDERS
+        value: "true"
+      - key: ELFIS_HSTS_ENABLED
+        value: "true"
+      - key: PLATFORM_EMAIL_FROM_NAME
+        value: ELFIS Core
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_WEB_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: PLATFORM_ADMIN_EMAILS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: SUBSCRIPTION_CRON_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_WEBHOOK_SECRET
+        sync: false
+      - key: PLATFORM_EMAIL_FROM
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: BANKING_BRIDGE_CLIENT_ID
+        sync: false
+      - key: BANKING_BRIDGE_CLIENT_SECRET
+        sync: false
+      - key: BANKING_BRIDGE_WEBHOOK_SECRET
+        sync: false
+      - key: BANKING_BRIDGE_REDIRECT_URI
+        sync: false
+      - key: EMAIL_CREDENTIALS_ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_OAUTH_REDIRECT_URI
+        sync: false
+
+  - type: worker
+    name: elfis-job-worker
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python -m app.jobs.job_worker
+    plan: 0.5c-512mb
+    region: frankfurt
+    numInstances: 1
+    autoDeployTrigger: "off"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: ELFIS_ENVIRONMENT
+        value: production
+      - key: ELFIS_JOB_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_EVENT_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_AI_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_PROVIDER
+        value: disabled
+      - key: ELFIS_AUTO_TEXT_EXTRACTION_ENABLED
+        value: "false"
+      - key: ELFIS_AUTO_AI_ANALYSIS_ENABLED
+        value: "false"
+      - key: DOCUMENT_EXTRACTION_ENABLED
+        value: "false"
+      - key: BANKING_SYNC_SWEEP_RESCHEDULE
+        value: "false"
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_STORAGE_BUCKET
+        value: elfis-documents
+      - key: ELFIS_VAULT_BUCKET
+        value: elfis-vault
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BANKING_BRIDGE_CLIENT_ID
+        sync: false
+      - key: BANKING_BRIDGE_CLIENT_SECRET
+        sync: false
+      - key: EMAIL_CREDENTIALS_ENCRYPTION_KEY
+        sync: false
+
+  - type: worker
+    name: elfis-event-worker
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python -m app.events.event_worker
+    plan: 0.5c-512mb
+    region: frankfurt
+    numInstances: 1
+    autoDeployTrigger: "off"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: ELFIS_ENVIRONMENT
+        value: production
+      - key: ELFIS_JOB_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_EVENT_WORKER_ENABLED
+        value: "false"
+      - key: ELFIS_AI_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_ENABLED
+        value: "false"
+      - key: ELFIS_OCR_PROVIDER
+        value: disabled
+      - key: DOCUMENT_EXTRACTION_ENABLED
+        value: "false"
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_STORAGE_BUCKET
+        value: elfis-documents
+      - key: ELFIS_VAULT_BUCKET
+        value: elfis-vault
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_CREDENTIALS_ENCRYPTION_KEY
+        sync: false
+
+  # Private TCP 3310 (clamd default, documented in runbook + CLAMD_PORT). No disk. No secrets.
+  - type: pserv
+    name: elfis-clamav
+    runtime: image
+    plan: 2c-4g
+    region: frankfurt
+    numInstances: 1
+    image:
+      url: docker.io/clamav/clamav:1.5.4

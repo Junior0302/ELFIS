@@ -1,4 +1,9 @@
-# ELFIS Core — investor-demo / production API (Render Blueprint)
+# INVESTOR DEMO ONLY
+# NOT PRODUCTION
+# DO NOT SYNC WITH ELFIS LIVE PRODUCTION
+#
+# ELFIS Core — investor-demo API (Render Blueprint)
+# La production versionnée est render.production.yaml (référence uniquement).
 # Aucun secret, mot de passe ou URL de base réelle dans ce fichier.
 # DATABASE_URL est injecté par Render depuis la base déclarée ci-dessous.
 
