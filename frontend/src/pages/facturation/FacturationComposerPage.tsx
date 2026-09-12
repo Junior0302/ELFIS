@@ -1117,7 +1117,7 @@ export default function FacturationComposerPage({
     }
   }, [])
 
-  const sendDoc = async () => {
+  const sendDoc = useCallback(async () => {
     if (!token || !draft.createdDocId) {
       setActionError('Enregistrez d’abord un brouillon pour pouvoir envoyer.')
       return
@@ -1134,7 +1134,7 @@ export default function FacturationComposerPage({
     } finally {
       setBusy(false)
     }
-  }
+  }, [token, orgId, draft.createdDocId])
 
   const downloadPdf = async () => {
     if (!token || !draft.createdDocId) {
@@ -1288,7 +1288,7 @@ export default function FacturationComposerPage({
       })
     }
     return actions.slice(0, 1)
-  }, [busy, autosave.status, draft.createdDocId, blockingErrors, docSent, saveDraft])
+  }, [busy, autosave.status, draft.createdDocId, blockingErrors, docSent, saveDraft, sendDoc])
 
   const secondaryActions: ComposerActionDef[] = useMemo(() => {
     const actions: ComposerActionDef[] = [

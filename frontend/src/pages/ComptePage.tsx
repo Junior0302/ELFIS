@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api, type OrgInvitation, type TeamNotificationItem } from '../api'
 import { useAuth } from '../auth'
@@ -37,6 +37,7 @@ export default function ComptePage() {
   const [invitations, setInvitations] = useState<OrgInvitation[]>([])
   const [notifications, setNotifications] = useState<TeamNotificationItem[]>([])
   const [inviteBusy, setInviteBusy] = useState<number | string | null>(null)
+  const inviteHandledRef = useRef<string | null>(null)
 
   useEffect(() => {
     const checkout = new URLSearchParams(location.search).get('checkout')
@@ -54,6 +55,8 @@ export default function ComptePage() {
   useEffect(() => {
     const inviteToken = new URLSearchParams(location.search).get('invite')
     if (!inviteToken || !token) return
+    if (inviteHandledRef.current === inviteToken) return
+    inviteHandledRef.current = inviteToken
     setInviteBusy(inviteToken)
     void api
       .acceptInvitation({ token: inviteToken }, token, orgId)
@@ -66,10 +69,11 @@ export default function ComptePage() {
         await refreshSession()
       })
       .catch((reason) => {
+        inviteHandledRef.current = null
         setError(reason instanceof Error ? reason.message : 'Invitation invalide')
       })
       .finally(() => setInviteBusy(null))
-  }, [location.search, token])
+  }, [location.search, token, orgId, refreshSession, navigate, setMemberships, setOrgId])
 
   useEffect(() => {
     if (!user) return
