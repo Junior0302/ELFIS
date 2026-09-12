@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type Membership, type AuthUser } from './api'
 import { authDevLog, getApiRoot, mapLoginFailure } from './authNetwork'
 import { closeAllOverlays } from './design-system/overlays/manager/overlayLifecycle'
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(Boolean(token))
   const firebaseReady = isFirebaseConfigured()
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     if (!token) return
     const data = await api.me(token, orgId)
     setUser(data.user)
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOrgIdState(data.current_organization_id)
       localStorage.setItem(ORG_KEY, String(data.current_organization_id))
     }
-  }
+  }, [token, orgId])
 
   useEffect(() => {
     if (!token) {
@@ -204,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMemberships,
       refreshSession,
     }),
-    [token, user, memberships, orgId, loading, firebaseReady],
+    [token, user, memberships, orgId, loading, firebaseReady, refreshSession],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

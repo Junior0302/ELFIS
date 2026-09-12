@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
@@ -25,7 +25,7 @@ export default function NotificationBell({ compact }: Props) {
 
   const count = unreadNotifications
 
-  const refreshPreview = async () => {
+  const refreshPreview = useCallback(async () => {
     if (!token || !orgId) return
     setLoading(true)
     try {
@@ -41,7 +41,7 @@ export default function NotificationBell({ compact }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token, orgId, refresh])
 
   useEffect(() => {
     if (!open) return
@@ -51,7 +51,7 @@ export default function NotificationBell({ compact }: Props) {
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
-  }, [open])
+  }, [open, refreshPreview])
 
   useEffect(() => {
     const onCloseChrome = () => setOpen(false)
