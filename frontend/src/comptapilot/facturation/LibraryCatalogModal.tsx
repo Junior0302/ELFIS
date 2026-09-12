@@ -101,7 +101,11 @@ export function LibraryCatalogModal({
         style={{ zIndex: FP_OVERLAY_Z.submodalBackdrop }}
         onClick={() => {
           if (createOpen) return
-          mgr?.requestClose(overlayId, 'backdrop') ?? onClose()
+          if (mgr) {
+            mgr.requestClose(overlayId, 'backdrop')
+          } else {
+            onClose()
+          }
         }}
       >
         <div
