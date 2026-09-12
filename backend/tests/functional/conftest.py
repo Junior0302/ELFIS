@@ -23,11 +23,15 @@ def bind_and_init_recette_schema(engine: Engine, session_factory: sessionmaker) 
     """
     import app.database as database_module
     import app.main as main_module
+    import app.routers.webhooks_brevo as webhooks_brevo_module
     from app.database import init_db
 
     database_module.engine = engine
     database_module.SessionLocal = session_factory
     main_module.SessionLocal = session_factory
+    # webhooks_brevo importe SessionLocal par nom — sans rebind, le handler
+    # interroge l'ancien moteur (souvent un SQLite local déjà migré).
+    webhooks_brevo_module.SessionLocal = session_factory
     init_db()
 
 # Environnement recette avant imports settings

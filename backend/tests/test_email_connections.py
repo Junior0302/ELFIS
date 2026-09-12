@@ -45,8 +45,14 @@ def db(monkeypatch):
     key = Fernet.generate_key().decode()
     monkeypatch.setattr("app.config.settings.email_credentials_encryption_key", key)
     monkeypatch.setattr("app.config.settings.jwt_secret", "test-jwt-secret-for-oauth-state-32c")
-    monkeypatch.setattr("app.config.settings.brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(
+        "app.config.settings.brevo_api_key",
+        "xkeysib-test-ci-dummy-not-a-real-secret-000000",
+    )
     monkeypatch.setattr("app.config.settings.platform_email_from", "documents@elfiscore.com")
+    monkeypatch.setattr("app.config.settings.smtp_host", "")
+    monkeypatch.setattr("app.config.settings.smtp_user", "")
+    monkeypatch.setattr("app.config.settings.smtp_password", "")
     monkeypatch.setattr("app.config.settings.app_env", "development")
     return _session()
 
