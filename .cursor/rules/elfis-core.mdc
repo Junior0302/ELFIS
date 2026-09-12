@@ -28,3 +28,27 @@ Frontend changes should use the existing Design System, Unified Platform and Pla
 Backend changes should respect existing domain boundaries, services, events and job infrastructure.
 
 Run appropriate tests after changes and report failures rather than hiding them.
+
+## Git & GitHub — Protected Main Workflow
+
+`main` is protected. Direct push is rejected (GH013). Required PR status checks: backend, frontend, docker.
+
+Never develop or commit on `main`. Never `git push origin main`. Never force-push `main`. Never bypass the ruleset or disable CI checks to merge.
+
+If HEAD is `main`, create a branch **before** editing files:
+
+`feat/` `fix/` `test/` `ci/` `chore/` `docs/` `security/` + short kebab-case
+(e.g. `fix/clamav-response-parser`, `ci/frontend-jsdom`).
+
+Flow: update `main` → branch → changes → targeted then full tests → `git diff --check` → Conventional Commit on the branch → `git push origin <branch>` → PR to `main` → wait for backend, frontend, and docker PASS → merge.
+
+Do not merge or recommend merge while any required check is red. Fix on the same branch, push, wait for the new run.
+
+PR title: `feat:` `fix:` `test:` `ci:` `security:` `chore:` `docs:` …
+PR body: objective, domains/files, tests, risks/migrations, production impact. No secrets.
+
+After merge: `git checkout main` then `git pull --ff-only origin main`. Delete the local branch if unused.
+
+A merge to `main` is not an automatic Render deploy. Redeploy only the runtime services that actually changed. Docs/runbooks/reference blueprints often need no deploy.
+
+Never commit, display, or put secrets in a PR, test log, or `render.production.yaml`.
