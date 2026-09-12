@@ -9,7 +9,6 @@ import {
   assertProductThemeContext,
   buildLegacyPilotTokenMap,
   buildPilotTokens,
-  clearPersistedProductId,
   clearProductTheme,
   createThemeEngine,
   getThemeBrandingAsset,
