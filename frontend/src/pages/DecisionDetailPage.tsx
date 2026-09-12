@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -77,20 +77,23 @@ export default function DecisionDetailPage() {
   const [confirmBalanced, setConfirmBalanced] = useState(false)
   const [confirmReviewed, setConfirmReviewed] = useState(false)
 
-  const load = () => {
+  const load = useCallback(async () => {
     if (!token || orgId == null || !decisionId) return
     setLoading(true)
     setError('')
-    void api
-      .getDecision(decisionId, token, orgId)
-      .then((res) => setDecision(res))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Impossible de charger la décision'))
-      .finally(() => setLoading(false))
-  }
+    try {
+      const res = await api.getDecision(decisionId, token, orgId)
+      setDecision(res)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Impossible de charger la décision')
+    } finally {
+      setLoading(false)
+    }
+  }, [token, orgId, decisionId])
 
   useEffect(() => {
-    load()
-  }, [token, orgId, decisionId])
+    void load()
+  }, [load])
 
   useEffect(() => {
     if (statusMessage && liveRef.current) {

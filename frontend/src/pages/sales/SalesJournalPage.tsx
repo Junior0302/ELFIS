@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
@@ -11,25 +11,26 @@ export default function SalesJournalPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const load = () => {
+  const load = useCallback(async () => {
     if (!token || orgId == null) return
     setLoading(true)
-    void api
-      .getSalesJournal(token, orgId, 80)
-      .then((res) => setItems(res.items))
-      .catch((err: unknown) => {
-        setError(
-          err && typeof err === 'object' && 'message' in err
-            ? String((err as { message: unknown }).message)
-            : 'Journal indisponible',
-        )
-      })
-      .finally(() => setLoading(false))
-  }
+    try {
+      const res = await api.getSalesJournal(token, orgId, 80)
+      setItems(res.items)
+    } catch (err: unknown) {
+      setError(
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Journal indisponible',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [token, orgId])
 
   useEffect(() => {
-    load()
-  }, [token, orgId])
+    void load()
+  }, [load])
 
   return (
     <Container className="sales-workspace">
