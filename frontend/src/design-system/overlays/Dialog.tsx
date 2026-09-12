@@ -103,7 +103,11 @@ export function Dialog({
         role="presentation"
         onClick={() => {
           if (closeOnBackdrop && dismissible) {
-            mgr?.requestClose(overlayId, 'backdrop') ?? onClose()
+            if (mgr) {
+              mgr.requestClose(overlayId, 'backdrop')
+            } else {
+              onClose()
+            }
           }
         }}
       >

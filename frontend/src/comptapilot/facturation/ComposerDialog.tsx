@@ -138,7 +138,11 @@ export function DocumentCreationModalRoot({
         style={{ zIndex: FP_OVERLAY_Z.composerBackdrop }}
         onClick={() => {
           if (closeOnBackdrop && dismissible) {
-            mgr?.requestClose(overlayId, 'backdrop') ?? handleClose('backdrop')
+            if (mgr) {
+              mgr.requestClose(overlayId, 'backdrop')
+            } else {
+              handleClose('backdrop')
+            }
           }
         }}
       >
