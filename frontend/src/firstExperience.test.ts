@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { createElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { renderToStaticMarkup } from 'react-dom/server'
