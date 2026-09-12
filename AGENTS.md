@@ -106,14 +106,68 @@ Human validation must remain available for consequential actions.
 
 Never deploy, migrate production data, rotate secrets or make destructive infrastructure changes without an explicit verification step.
 
-## Git
+## Git & GitHub — Protected Main Workflow
 
-Main development branch is currently `main`.
+Remote: https://github.com/Junior0302/ELFIS.git
 
-Git remote:
-https://github.com/Junior0302/ELFIS.git
+`main` is **protected**. A GitHub Ruleset blocks direct pushes (GH013), force pushes, and deletion. Pull requests are required. Required status checks: **backend**, **frontend**, **docker**.
 
-Do not rewrite Git history unless explicitly required.
+### Never on main
+
+Do not develop, commit, or `git push origin main`.
+Do not force-push `main`, bypass the ruleset, or disable required CI checks to merge.
+
+### Before any code change
+
+If HEAD is `main`, create a dedicated branch **before** editing files:
+
+`feat/` `fix/` `test/` `ci/` `chore/` `docs/` `security/` + short kebab-case.
+
+Examples: `fix/clamav-response-parser`, `ci/frontend-jsdom`, `security/upload-antivirus`, `feat/finance-dashboard`.
+
+### Required flow
+
+1. Update `main` (`git pull --ff-only origin main`).
+2. Create the branch.
+3. Make changes.
+4. Run targeted tests, then the appropriate full suites.
+5. `git diff --check`.
+6. Conventional Commit on the feature branch (one coherent subject per commit).
+7. `git push origin <branch>` — never `origin main`.
+8. Open a Pull Request to `main`.
+9. Wait for GitHub Actions: backend PASS, frontend PASS, docker PASS.
+10. Merge only when all three are green. If a check fails: fix on the **same** branch, commit, push, wait for the new run.
+
+Do not recommend or perform a merge while any required check is red.
+
+### Pull requests
+
+Title: `feat:` `fix:` `test:` `ci:` `security:` `chore:` `docs:` …
+
+Body: objective, domains/files, tests run, risks/migrations, production impact if any. **No secrets.**
+
+The owner may merge after green checks. Agents cannot bypass the ruleset.
+
+After merge:
+
+```
+git checkout main
+git pull --ff-only origin main
+```
+
+Delete the local branch if it is no longer needed.
+
+### Commits
+
+Use Conventional Commits (`feat(...)`, `fix(...)`, `test(...)`, `ci(...)`, `security(...)`, `chore(...)`, `docs(...)`). Do not mix unrelated subjects. Do not rewrite history unless explicitly required.
+
+### Production
+
+A merge to `main` is **not** an automatic Render deploy. Confirm the change affects runtime, name the services to redeploy, and skip unused workers. Docs / runbooks / reference blueprints often need **no** deploy.
+
+### Secrets
+
+Never commit, print, or put secrets in a PR, test log, or `render.production.yaml`.
 
 ## Handoff
 
