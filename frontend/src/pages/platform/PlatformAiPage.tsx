@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
 import { EmptyState, ErrorState, ProgressBar, Skeleton, UiBadge } from '../../ui/UiStates'
@@ -21,7 +21,7 @@ export default function PlatformAiPage() {
   >([])
   const [executionsFailed, setExecutionsFailed] = useState(0)
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return
     setLoading(true)
     setError('')
@@ -37,11 +37,11 @@ export default function PlatformAiPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
 
   useEffect(() => {
     void load()
-  }, [token])
+  }, [load])
 
   const totals = useMemo(() => {
     const tokens = usage.reduce((s, r) => s + Number(r.total_tokens || 0), 0)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
 import { EmptyState, ErrorState, Skeleton } from '../../ui/UiStates'
@@ -10,7 +10,7 @@ export default function PlatformNotificationsAdminPage() {
   const [items, setItems] = useState<Array<Record<string, unknown>>>([])
   const [jobsFailed, setJobsFailed] = useState(0)
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return
     setLoading(true)
     setError('')
@@ -26,11 +26,11 @@ export default function PlatformNotificationsAdminPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
 
   useEffect(() => {
     void load()
-  }, [token])
+  }, [load])
 
   return (
     <>
