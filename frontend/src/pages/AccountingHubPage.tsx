@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -26,7 +26,7 @@ export default function AccountingHubPage() {
     void api.markAccountingDiscovered(token, orgId).catch(() => undefined)
   }, [token, orgId])
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token || orgId == null) return
     setLoading(true)
     setError('')
@@ -42,11 +42,11 @@ export default function AccountingHubPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token, orgId])
 
   useEffect(() => {
     void load()
-  }, [token, orgId])
+  }, [load])
 
   return (
     <div className="page">
