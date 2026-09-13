@@ -97,4 +97,16 @@ describe('mailtoComposer — filename', () => {
       'Facture-FAC-1-Org.pdf',
     )
   })
+
+  it('remplace C0 et caractères Windows interdits', () => {
+    const dirty = `a\u0000b\tc\nd\re\u001ff<>:"/\\|?*g`
+    const out = sanitizePdfDownloadName(dirty, 'fallback.pdf')
+    expect(out).toBe('a-b-c-d-e-f-g.pdf')
+    for (let code = 0; code <= 0x1f; code += 1) {
+      expect(out.includes(String.fromCharCode(code))).toBe(false)
+    }
+    for (const ch of '<>:"/\\|?*') {
+      expect(out.includes(ch)).toBe(false)
+    }
+  })
 })

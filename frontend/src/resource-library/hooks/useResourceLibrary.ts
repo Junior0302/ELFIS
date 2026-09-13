@@ -94,6 +94,7 @@ export function useResourceLibrary(initial?: Partial<SmartLibraryFilters>) {
   }, [filters.section, source.capabilities.packs])
 
   const load = useCallback(async () => {
+    void reloadTick
     if (!token) return
     if (isMetaSection(filters.section) || filters.section === 'packs') {
       setResult({ items: [], total: 0, page: 1, pageSize: 24, hasMore: false })
