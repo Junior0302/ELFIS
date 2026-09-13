@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type PlatformIncident } from '../../api'
 import { useAuth } from '../../auth'
 import { EmptyState, ErrorState, Skeleton, UiBadge } from '../../ui/UiStates'
@@ -26,19 +26,22 @@ export default function PlatformIncidentsPage() {
   const [serviceFilter, setServiceFilter] = useState('all')
   const [q, setQ] = useState('')
 
-  const reload = () => {
-    if (!token) return Promise.resolve()
+  const reload = useCallback(async () => {
+    if (!token) return
     setLoading(true)
-    return api
-      .platformIncidents(token)
-      .then((r) => setItems(r.incidents))
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Incidents indisponibles'))
-      .finally(() => setLoading(false))
-  }
+    try {
+      const r = await api.platformIncidents(token)
+      setItems(r.incidents)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Incidents indisponibles')
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
 
   useEffect(() => {
     void reload()
-  }, [token])
+  }, [reload])
 
   const services = useMemo(() => {
     const set = new Set(items.map((i) => i.incident_type).filter(Boolean))

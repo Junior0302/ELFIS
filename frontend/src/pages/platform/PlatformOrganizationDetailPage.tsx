@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type PlatformOrgOpsDetail } from '../../api'
 import { useAuth } from '../../auth'
@@ -13,17 +13,19 @@ export default function PlatformOrganizationDetailPage() {
   const [message, setMessage] = useState('')
   const orgId = Number(organizationId)
 
-  const reload = () => {
+  const reload = useCallback(async () => {
     if (!token || !orgId) return
-    return api
-      .platformOrgOpsDetail(orgId, token)
-      .then(setDetail)
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Fiche indisponible'))
-  }
+    try {
+      const next = await api.platformOrgOpsDetail(orgId, token)
+      setDetail(next)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Fiche indisponible')
+    }
+  }, [token, orgId])
 
   useEffect(() => {
     void reload()
-  }, [token, orgId])
+  }, [reload])
 
   const runAction = async (kind: 'suspend' | 'restore') => {
     if (!token || !orgId) return
