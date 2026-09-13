@@ -89,8 +89,11 @@ export function openMailtoUrl(url: string): void {
 
 /** Sanitize a download filename for Content-Disposition / <a download>. */
 export function sanitizePdfDownloadName(name: string, fallback: string): string {
-  const cleaned = (name || '')
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
+  const withoutControls = Array.from(name || '', (ch) => (ch.charCodeAt(0) <= 0x1f ? '-' : ch)).join(
+    '',
+  )
+  const cleaned = withoutControls
+    .replace(/[<>:"/\\|?*]/g, '-')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')

@@ -118,12 +118,14 @@ export function WorkspaceSidebar({
     () => findActiveWorkspaceGroup(location.pathname, visibleGroups, preferActiveGroup),
     [location.pathname, visibleGroups, preferActiveGroup],
   )
+  const activeGroupId = activeGroup?.id
+  const activeGroupHasChildren = Boolean(activeGroup?.children.length)
 
   useEffect(() => {
-    if (activeGroup && workspaceGroupHasChildren(activeGroup)) {
-      setExpandedId(activeGroup.id)
+    if (activeGroupId && activeGroupHasChildren) {
+      setExpandedId(activeGroupId)
     }
-  }, [location.pathname, activeGroup?.id])
+  }, [location.pathname, activeGroupId, activeGroupHasChildren])
 
   useEffect(() => {
     setFlyoutId(null)
