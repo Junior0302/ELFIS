@@ -42,8 +42,10 @@ export type ElfisGlobalNavigationProps = {
 
 function useElfisNavPermission() {
   const { memberships, orgId } = useAuth()
-  const active = memberships.find((m) => m.organization_id === orgId)
-  const perms = active?.permissions ?? []
+  const perms = useMemo(() => {
+    const active = memberships.find((m) => m.organization_id === orgId)
+    return active?.permissions ?? []
+  }, [memberships, orgId])
   return useCallback(
     (permission?: string) => {
       if (!permission) return true

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
@@ -12,7 +12,7 @@ export default function PlatformLogsPage() {
   const [logs, setLogs] = useState<unknown>(null)
   const [audit, setAudit] = useState<unknown>(null)
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return
     setLoading(true)
     setError('')
@@ -28,11 +28,11 @@ export default function PlatformLogsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
 
   useEffect(() => {
     void load()
-  }, [token])
+  }, [load])
 
   return (
     <>
