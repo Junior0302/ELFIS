@@ -119,13 +119,13 @@ export default function MigrationWizardPage() {
 
   const activeStep = Math.min(Math.max(step, 1), 8)
 
-  const persistLocal = (id: string) => {
+  const persistLocal = useCallback((id: string) => {
     try {
       localStorage.setItem(MIGRATION_SESSION_LS_KEY, id)
     } catch {
       /* ignore */
     }
-  }
+  }, [])
 
   const loadCatalog = useCallback(async () => {
     if (!token || orgId == null) return
@@ -152,7 +152,7 @@ export default function MigrationWizardPage() {
     [token, orgId],
   )
 
-  const hydrateFromSession = (s: MigrationSession) => {
+  const hydrateFromSession = useCallback((s: MigrationSession) => {
     setSession(s)
     setMode((s.mode as MigrationMode) || 'initial_migration')
     if (s.company_profile) setProfile({ ...emptyProfile(), ...s.company_profile })
@@ -163,7 +163,7 @@ export default function MigrationWizardPage() {
     else setStep(Math.min(s.current_step || 1, 6))
     persistLocal(s.id)
     void loadSessionExtras(s.id)
-  }
+  }, [loadSessionExtras, persistLocal])
 
   useEffect(() => {
     let cancelled = false
@@ -193,7 +193,7 @@ export default function MigrationWizardPage() {
     return () => {
       cancelled = true
     }
-  }, [token, orgId, routeSessionId, isNew, loadCatalog])
+  }, [token, orgId, routeSessionId, isNew, loadCatalog, hydrateFromSession])
 
   const scheduleSaveProfile = (next: CompanyProfile, sess: MigrationSession) => {
     if (!token || orgId == null) return
