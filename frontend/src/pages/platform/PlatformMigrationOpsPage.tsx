@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type PlatformOrganization } from '../../api'
 import { useAuth } from '../../auth'
@@ -30,7 +30,7 @@ export default function PlatformMigrationOpsPage() {
       .finally(() => setLoading(false))
   }, [token])
 
-  async function loadOrg(id: number) {
+  const loadOrg = useCallback(async (id: number) => {
     if (!token) return
     setError('')
     setLoading(true)
@@ -51,11 +51,11 @@ export default function PlatformMigrationOpsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
 
   useEffect(() => {
     if (typeof orgId === 'number') void loadOrg(orgId)
-  }, [orgId, token])
+  }, [orgId, loadOrg])
 
   return (
     <>

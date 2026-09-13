@@ -580,20 +580,23 @@ export function DeveloperDiagnosticsPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const run = () => {
+  const run = useCallback(async () => {
     if (!token) return
     setLoading(true)
     setError('')
-    developerApi
-      .diagnostics(token)
-      .then((r) => setChecks(r.checks))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Diagnostics KO'))
-      .finally(() => setLoading(false))
-  }
+    try {
+      const r = await developerApi.diagnostics(token)
+      setChecks(r.checks)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Diagnostics KO')
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
 
   useEffect(() => {
-    run()
-  }, [token])
+    void run()
+  }, [run])
 
   return (
     <DevPage title="Diagnostics">

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -60,26 +61,7 @@ export default function CountryCombobox({
     }
   }, [value])
 
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        closeList(true)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open, query, value])
-
-  const openList = () => {
-    if (disabled) return
-    setOpen(true)
-    const nextOptions = countriesForCombobox(query)
-    const selectedIdx = nextOptions.findIndex((item) => item.code === value)
-    setActiveIndex(selectedIdx >= 0 ? selectedIdx : 0)
-  }
-
-  const closeList = (revertUnconfirmed: boolean) => {
+  const closeList = useCallback((revertUnconfirmed: boolean) => {
     setOpen(false)
     if (revertUnconfirmed && !confirmedRef.current) {
       if (canSubmitCountry(value)) {
@@ -91,6 +73,25 @@ export default function CountryCombobox({
     } else if (confirmedRef.current && canSubmitCountry(value)) {
       setQuery(getCountryLabel(value))
     }
+  }, [value])
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        closeList(true)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open, query, value, closeList])
+
+  const openList = () => {
+    if (disabled) return
+    setOpen(true)
+    const nextOptions = countriesForCombobox(query)
+    const selectedIdx = nextOptions.findIndex((item) => item.code === value)
+    setActiveIndex(selectedIdx >= 0 ? selectedIdx : 0)
   }
 
   const selectOption = (country: IsoCountry) => {
