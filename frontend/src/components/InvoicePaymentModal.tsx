@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { formatEuro, type SalesDoc } from '../api'
+import { isoDateToPaidAt } from './invoicePaymentDate'
 
 type Props = {
   doc: SalesDoc
@@ -19,13 +20,6 @@ function todayIso(): string {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
-}
-
-/** Convertit YYYY-MM-DD → DD-MM-YYYY (format stocké BE). */
-export function isoDateToPaidAt(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  if (!y || !m || !d) return iso
-  return `${d}-${m}-${y}`
 }
 
 export default function InvoicePaymentModal({ doc, busy, onClose, onSubmit }: Props) {

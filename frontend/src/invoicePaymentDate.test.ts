@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isoDateToPaidAt } from './components/InvoicePaymentModal'
+import { isoDateToPaidAt } from './components/invoicePaymentDate'
 
 describe('isoDateToPaidAt', () => {
   it('convertit ISO vers DD-MM-YYYY', () => {
