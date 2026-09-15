@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
@@ -21,13 +21,15 @@ export default function PlatformAccountingPage() {
   >([])
   const [reviewsTotal, setReviewsTotal] = useState(0)
   const [orgFilter, setOrgFilter] = useState('')
+  const orgFilterRef = useRef(orgFilter)
+  orgFilterRef.current = orgFilter
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return
     setLoading(true)
     setError('')
     try {
-      const orgId = orgFilter ? Number(orgFilter) : undefined
+      const orgId = orgFilterRef.current ? Number(orgFilterRef.current) : undefined
       const [props, reviews] = await Promise.all([
         api.platformAccountingProposals(token, {
           organization_id: orgId,
@@ -43,11 +45,11 @@ export default function PlatformAccountingPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
 
   useEffect(() => {
     void load()
-  }, [token])
+  }, [load])
 
   return (
     <>
