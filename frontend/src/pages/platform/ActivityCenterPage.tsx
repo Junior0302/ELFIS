@@ -4,11 +4,12 @@ import { useAuth } from '../../auth'
 import AuditEmptyState from '../../components/audit/AuditEmptyState'
 import AuditErrorState from '../../components/audit/AuditErrorState'
 import AuditEventDetailsDrawer from '../../components/audit/AuditEventDetailsDrawer'
-import AuditFiltersBar, {
+import AuditFiltersBar from '../../components/audit/AuditFiltersBar'
+import {
   DEFAULT_AUDIT_FILTERS,
   filtersBarToApi,
   type AuditFiltersBarValue,
-} from '../../components/audit/AuditFiltersBar'
+} from '../../components/audit/auditFilters'
 import AuditPagination from '../../components/audit/AuditPagination'
 import AuditSkeleton from '../../components/audit/AuditSkeleton'
 import AuditSummaryCards from '../../components/audit/AuditSummaryCards'
